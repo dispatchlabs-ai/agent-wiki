@@ -1,0 +1,285 @@
+/* Shared shadcn adaptations. Classes apply to application controls, never prose elements globally. */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 3px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.ui-button:hover {
+  background: var(--color-surface);
+}
+.ui-button-primary {
+  background: var(--color-text);
+  color: var(--color-background);
+  border-color: var(--color-text);
+}
+.ui-button-primary:hover {
+  background: var(--color-text);
+  opacity: 0.85;
+}
+.ui-button-danger {
+  color: var(--color-text);
+}
+.ui-button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.ui-field {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 0;
+}
+.ui-field input,
+.ui-field textarea,
+.ui-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 400;
+  min-height: 44px;
+}
+.ui-field textarea {
+  resize: vertical;
+}
+.ui-button,
+.ui-button:visited {
+  text-decoration: none;
+}
+.ui-button:hover {
+  color: var(--color-text);
+}
+.ui-button-primary:hover {
+  color: var(--color-background);
+}
+.ui-field label {
+  margin: 0;
+  font-weight: 500;
+}
+.ui-page-heading {
+  margin: 0 0 28px;
+}
+.ui-page-heading h1 {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+.ui-page-heading p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 16px;
+}
+.ui-empty {
+  padding: 48px 24px;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+}
+.ui-empty h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.ui-empty p {
+  margin: 0;
+  color: var(--color-muted);
+}
+.ui-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+.ui-timestamp {
+  min-width: 0;
+}
+.ui-timestamp dt {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.ui-timestamp dd {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.conversation-catalog {
+  max-width: 1240px;
+  margin-inline: auto;
+}
+.catalog-search {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.catalog-search input {
+  flex: 1;
+}
+.catalog-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.catalog-filters {
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  margin: 0;
+}
+.catalog-filters summary {
+  font: 600 14px/1.5 var(--font-heading);
+  cursor: pointer;
+  min-height: 24px;
+}
+.catalog-filters .filter-form {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0 0;
+}
+.catalog-clear {
+  text-align: center;
+  font-size: 13px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.catalog-results {
+  min-width: 0;
+}
+.catalog-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.catalog-summary p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.catalog-list {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.catalog-row {
+  padding: 22px 24px;
+}
+.catalog-row + .catalog-row {
+  border-top: 1px solid var(--color-border);
+}
+.catalog-origin {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--color-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.catalog-row h2 {
+  margin: 10px 0 0;
+  font-size: 19px;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.catalog-row h2 a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.catalog-row h2 a:hover {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.catalog-snippet {
+  margin: 10px 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.catalog-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 16px 0 0;
+}
+@media (max-width: 760px) {
+  .catalog-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .catalog-filters {
+    padding: 14px 16px;
+  }
+  .catalog-filters summary {
+    min-height: 32px;
+    display: list-item;
+    align-content: center;
+  }
+  .catalog-row {
+    padding: 18px 16px;
+  }
+  .catalog-row h2 {
+    font-size: 17px;
+  }
+  .catalog-search {
+    margin-bottom: 20px;
+  }
+  .catalog-times {
+    gap: 12px 24px;
+  }
+}
+@media print {
+  .catalog-search,
+  .catalog-filters,
+  .ui-pagination {
+    display: none;
+  }
+  .catalog-layout {
+    display: block;
+  }
+  .catalog-row {
+    break-inside: avoid;
+  }
+}

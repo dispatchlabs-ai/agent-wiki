@@ -1,7 +1,7 @@
 // Adapted from shadcn/ui Base UI button, card, badge, native-select and tabs
 // patterns (MIT); see docs/shadcn-license.txt. Uses the wiki's semantic tokens.
-import React, { useState, useId } from "react";
-import { Button as PrimitiveButton } from "@base-ui/react/button";
+import React, { useState } from "react";
+import { Button, Badge, Field } from "./primitives.mjs";
 import { Tabs } from "@base-ui/react/tabs";
 import {
   Dialog,
@@ -10,17 +10,6 @@ import {
   DialogDescription,
 } from "./dialog.jsx";
 
-function Button({ variant = "outline", className = "", ...props }) {
-  return (
-    <PrimitiveButton
-      className={`agent-button agent-button-${variant} ${className}`}
-      {...props}
-    />
-  );
-}
-function Badge({ children }) {
-  return <span className="agent-badge">{children}</span>;
-}
 function Icon({ kind = "agent" }) {
   return (
     <svg
@@ -57,19 +46,6 @@ const permissions = {
   configure: "Edit definition",
   "manage-access": "Manage access",
 };
-function Field({ label, children, hint }) {
-  const id = useId();
-  return (
-    <div className="agent-field">
-      <label htmlFor={id}>{label}</label>
-      {React.cloneElement(children, {
-        id,
-        "aria-describedby": hint ? id + "-hint" : undefined,
-      })}
-      {hint && <small id={id + "-hint"}>{hint}</small>}
-    </div>
-  );
-}
 function PersonField({ people }) {
   const [value, setValue] = useState("");
   const person = people.find((p) => p.id === value);

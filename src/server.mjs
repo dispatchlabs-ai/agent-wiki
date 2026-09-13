@@ -866,6 +866,7 @@ export function createWiki({
         "/assets/favicon.svg": ["favicon.svg", "image/svg+xml"],
         "/assets/typeset.css": ["typeset.css", "text/css"],
         "/assets/ui.css": ["ui.css", "text/css"],
+        "/assets/components.css": ["components.css", "text/css"],
         "/assets/diagram.css": ["diagram.css", "text/css"],
         "/assets/diagram.html": ["diagram.html", "text/html"],
         "/assets/edit-contract.js": ["edit-contract.js", "text/javascript"],

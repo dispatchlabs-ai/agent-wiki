@@ -879,18 +879,6 @@ body > main {
   color: var(--color-text);
   font-weight: 500;
 }
-.agent-badge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  padding: 3px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-muted);
-  line-height: 1.5;
-}
 .agents-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 296px;
@@ -1024,43 +1012,7 @@ body > main {
   padding-top: 16px;
   border-top: 1px solid var(--color-border);
 }
-.agent-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: auto;
-  min-height: 44px;
-  padding: 9px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-size: 13px;
-  font-weight: 550;
-  cursor: pointer;
-  line-height: 1.4;
-}
-.agent-button:hover {
-  background: var(--color-surface);
-}
-.agent-button-primary {
-  background: var(--color-text);
-  color: var(--color-background);
-  border-color: var(--color-text);
-}
-.agent-button-primary:hover {
-  background: var(--color-text);
-  opacity: 0.85;
-}
-.agent-button-danger {
-  color: var(--color-text);
-}
-.agent-button:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-.agent-button:focus-visible,
+.ui-button:focus-visible,
 .agent-tabs [role="tab"]:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 3px;
@@ -1105,7 +1057,7 @@ body > main {
   white-space: normal;
   user-select: all;
 }
-.agent-endpoint .agent-button {
+.agent-endpoint .ui-button {
   align-self: flex-start;
 }
 .agent-connect .agent-connect-note {
@@ -1180,39 +1132,11 @@ body > main {
   font-size: 15px;
   margin: 0;
 }
-.agent-field {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-  min-width: 0;
-}
-.agent-field input,
-.agent-field textarea,
-.agent-field select {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--color-input-border);
-  border-radius: 8px;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-size: 16px;
-  font-weight: 400;
-  min-height: 44px;
-}
-.agent-field textarea {
-  resize: vertical;
-}
-.agent-field .agent-tools {
+.ui-field .agent-tools {
   font-family: var(--font-mono);
   font-size: 13px;
 }
-.agent-field small,
+.ui-field small,
 .agent-help {
   font-size: 12px;
   color: var(--color-muted);
@@ -1284,7 +1208,7 @@ body > main {
     flex-direction: column;
     gap: 20px;
   }
-  .agents-heading > .agent-button {
+  .agents-heading > .ui-button {
     width: 100%;
   }
   .agents-context {
@@ -1303,7 +1227,7 @@ body > main {
     padding: 16px;
     gap: 12px;
   }
-  .agent-connection > .agent-button {
+  .agent-connection > .ui-button {
     width: 100%;
   }
   .agent-dialog {

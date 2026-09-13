@@ -342,6 +342,19 @@ test("create an agent in the browser, grant access, and approve a remote connect
   ).toBeVisible();
   await page.getByRole("button", { name: "Create an agent" }).first().click();
   const form = page.locator('[data-agent-action="create"]');
+  await form.getByLabel("Name", { exact: true }).fill("Cancelled draft");
+  await form.getByLabel("Instructions").fill("Do not create this agent.");
+  const submitted = [];
+  const record = (request) => {
+    if (request.method() === "POST" && request.url().includes("/api/agents"))
+      submitted.push(request.url());
+  };
+  page.on("request", record);
+  await form.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  expect(submitted).toEqual([]);
+  page.off("request", record);
+  await page.getByRole("button", { name: "Create an agent" }).first().click();
   await form.getByLabel("Name", { exact: true }).fill("Browser Researcher");
   await form.getByLabel("Instructions").fill("Read relevant evidence.");
   await form.getByRole("button", { name: "Create agent" }).click();

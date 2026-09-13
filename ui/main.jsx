@@ -1,5 +1,4 @@
 import { ModeToggle } from "./components/mode-toggle.jsx";
-import { AgentsApp } from "./components/agents.jsx";
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { Tabs } from "@base-ui/react/tabs";
@@ -155,7 +154,23 @@ document.addEventListener("click", async (event) => {
 });
 
 const agents = document.querySelector("#agents-app");
-if (agents)
-  createRoot(agents).render(
-    <AgentsApp initial={JSON.parse(agents.dataset.state)} />,
-  );
+if (agents) {
+  import("./components/agents.jsx")
+    .then(({ AgentsApp }) => {
+      createRoot(agents).render(
+        <AgentsApp initial={JSON.parse(agents.dataset.state)} />,
+      );
+    })
+    .catch(() => {
+      const message = document.createElement("p");
+      message.setAttribute("role", "alert");
+      message.textContent =
+        "The agent controls could not load. Reload the page to try again.";
+      const reload = document.createElement("button");
+      reload.type = "button";
+      reload.className = "ui-button";
+      reload.textContent = "Reload";
+      reload.addEventListener("click", () => location.reload());
+      agents.replaceChildren(message, reload);
+    });
+}

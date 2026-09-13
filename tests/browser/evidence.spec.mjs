@@ -176,21 +176,70 @@ test("catalog shows source start time in the reader timezone with UTC fallback",
     });
     const page = await context.newPage();
     await page.goto(base + "/traces/");
-    const time = page.locator("time[data-local-time]").first();
+    const time = page
+      .locator(".ui-timestamp")
+      .filter({ hasText: "Started" })
+      .locator("time");
     await expect(time).toHaveAttribute("datetime", "2026-01-01T10:00:00.000Z");
     await expect(time).toContainText(
       javaScriptEnabled ? "5:00 AM EST" : "10:00 AM UTC",
     );
-    await expect(time.locator("..")).toContainText("Started");
-    await expect(time.locator("..")).toContainText("Last activity");
-    await expect(page.locator("time[data-local-time]").nth(1)).toContainText(
-      javaScriptEnabled ? "7:30 AM EST" : "12:30 PM UTC",
-    );
+    await expect(time.locator("../..")).toContainText("Started");
+    await expect(page.locator(".catalog-times")).toContainText("Last activity");
+    await expect(
+      page
+        .locator(".ui-timestamp")
+        .filter({ hasText: "Last activity" })
+        .locator("time"),
+    ).toContainText(javaScriptEnabled ? "7:30 AM EST" : "12:30 PM UTC");
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
     await context.close();
+  }
+});
+
+test("conversation components keep filters and navigation native across layouts", async ({
+  page,
+}, testInfo) => {
+  for (const width of [320, 768, 1440]) {
+    for (const colorScheme of ["light", "dark"]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.emulateMedia({ colorScheme });
+      await page.goto(
+        base + "/traces/?format=codex&machine=fixture-host&q=prototype",
+      );
+      await expect(
+        page.getByRole("heading", { name: "Conversations", exact: true }),
+      ).toBeVisible();
+      const filters = page.locator(".catalog-filters");
+      if (!(await filters.evaluate((el) => el.hasAttribute("open"))))
+        await filters.locator("summary").click();
+      await expect(page.getByLabel("Harness", { exact: true })).toHaveValue(
+        "codex",
+      );
+      await expect(page.getByLabel("Machine", { exact: true })).toHaveValue(
+        "fixture-host",
+      );
+      await expect(page.locator(".catalog-row")).toHaveCount(1);
+      await page.screenshot({
+        path: testInfo.outputPath(`conversations-${width}-${colorScheme}.png`),
+        fullPage: true,
+      });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.getByRole("button", { name: "Apply filters" }).click();
+      await expect(page).toHaveURL(/q=prototype/);
+      await expect(page).toHaveURL(/format=codex/);
+      if (!(await filters.evaluate((el) => el.hasAttribute("open"))))
+        await filters.locator("summary").click();
+      await page.getByRole("link", { name: "Clear filters" }).click();
+      await expect(page).toHaveURL(base + "/traces/");
+    }
   }
 });

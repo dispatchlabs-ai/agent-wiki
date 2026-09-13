@@ -37,3 +37,6 @@ served alongside them under `/assets/vendor/`. That license inventory is generat
 from installed package notices and includes development tools when installed.
 Syntax highlighting uses lowlight/highlight.js; math uses KaTeX via rehype-katex.
 Their separate upstream licenses apply.
+
+Shared native controls in `ui/components/primitives.mjs` extend the existing
+shadcn adaptations under the same MIT notice in `docs/shadcn-license.txt`.

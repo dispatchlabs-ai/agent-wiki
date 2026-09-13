@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.6 — shared UI and Conversations pilot
+
+- Introduce shared server-safe controls, fields, badges, headings, timestamps,
+  empty states, and pagination. Agents shares the same controls.
+- Rebuild Conversations with compact list rows, grouped activity timestamps,
+  responsive filters and consistent navigation, preserving request-time rendering.
+- Load the Agents interface only on its route.
+
 ## 0.4.5 — conversation activity
 
 - Show Last activity alongside Started in the conversation catalog. The archive

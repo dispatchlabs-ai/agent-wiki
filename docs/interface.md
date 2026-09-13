@@ -139,3 +139,21 @@ The evidence catalog orders by last activity before pagination, with start as a
 fallback when the end is unavailable; the UI labels missing activity explicitly.
 Dialogue search retains relevance ranking. Resuming an existing period preserves
 its start timestamp while its latest recorded activity moves it up in browsing.
+
+## Shared component contract
+
+`ui/components/primitives.mjs` owns server-safe Button, Badge, Field, PageHeading,
+EmptyState, Pagination and SourceTime components. Native controls and links work
+without client mounting; Base UI wrappers own interactive dialogs, menus and tabs.
+`public/components.css` owns their scoped styles. Do not add global element rules
+there: prose remains under Typeset and page layout stays separate.
+
+`ui/components/conversations.mjs` is the first complete catalog using this layer.
+Node renders it for every request using current evidence data. Search and filters
+use native GET forms; pagination keeps the query and filters. Agents reuses the
+same buttons, fields and badges and is dynamically imported only on its page.
+Do not hydrate static markup or put source content into the asset build.
+
+Next migrations: Articles/search and authentication/consent, then reader metadata
+and editing controls. Migrate one complete workflow at a time and preserve
+keyboard, no-JavaScript, print, citation and live-content behavior.

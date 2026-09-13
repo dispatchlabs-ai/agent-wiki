@@ -1,3 +1,6 @@
+import { createElement as h } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ConversationsCatalog } from "../ui/components/conversations.mjs";
 import {
   shell,
   escape as e,
@@ -20,38 +23,18 @@ const kinds = [
 ];
 const choice = (value, label, selected) =>
   `<option value="${e(value)}"${value === selected ? " selected" : ""}>${e(label)}</option>`;
-function sourceTime(value, label) {
-  const d = value ? new Date(value) : new Date(NaN);
-  if (Number.isNaN(d.valueOf())) return `${e(label)} unavailable`;
-  const formatted = new Intl.DateTimeFormat("en", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-    timeZone: "UTC",
-  }).format(d);
-  return `${e(label)} <time data-local-time datetime="${e(d.toISOString())}">${e(formatted)}</time>`;
-}
 export function evidenceCatalog(params, result) {
-  const q = params.get("q") || "",
-    format = params.get("format") || "",
-    machine = params.get("machine") || "";
-  const items = result.items || result.results || [];
-  const offset = Number(params.get("offset") || 0);
   return shell(
     "Conversations",
-    `<h1>Conversations</h1><p class="lede">Conversations and evidence from the existing archive.</p><form class="search-form" action="/traces/" role="search"><label class="sr-only" for="trace-query">Search conversations</label><input id="trace-query" name="q" type="search" value="${e(q)}" maxlength="300" placeholder="Search conversations"><input type="hidden" name="format" value="${e(format)}"><input type="hidden" name="machine" value="${e(machine)}"><button>Search</button></form><div class="filter-layout"><details class="filter-panel" data-responsive-details open><summary>Filters</summary><form class="filter-form" action="/traces/"><input type="hidden" name="q" value="${e(q)}"><label>Harness<select name="format">${[
-      ["", "All"],
-      ["codex", "Codex"],
-      ["pi", "pi"],
-      ["claude", "Claude Code"],
-    ]
-      .map(([v, l]) => choice(v, l, format))
-      .join(
-        "",
-      )}</select></label><label>Machine<input name="machine" value="${e(machine)}" placeholder="Any machine" maxlength="100"></label><button>Apply filters</button></form></details><div><p class="meta">${Number(result.total || 0).toLocaleString("en")} ${q ? "matching conversations" : "conversation periods · Most recent activity first"}</p>${items.length ? items.map((t) => `<section class="entry"><h2>${link(t.url, t.title)}</h2><p class="meta">${e(t.machine)} · ${e(t.format || t.harness)} · ${sourceTime(t.start, "Started")} · ${sourceTime(t.end, "Last activity")}</p>${t.snippet ? `<p>${e(t.snippet)}</p>` : ""}</section>`).join("") : '<p class="empty">No matching conversations.</p>'}<nav class="pagination" aria-label="Trace pages">${offset > 0 ? link(queryLink("/traces/", { q, format, machine, offset: Math.max(0, offset - 20) }), "Previous") : ""}${result.nextOffset !== null ? link(queryLink("/traces/", { q, format, machine, offset: result.nextOffset }), "Next") : ""}</nav></div></div>`,
+    renderToStaticMarkup(
+      h(ConversationsCatalog, {
+        q: params.get("q") || "",
+        format: params.get("format") || "",
+        machine: params.get("machine") || "",
+        offset: Number(params.get("offset") || 0),
+        result,
+      }),
+    ),
     { active: "Conversations" },
   );
 }
