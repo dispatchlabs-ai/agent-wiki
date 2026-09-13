@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.5 — conversation activity
+
+- Show Last activity alongside Started in the conversation catalog. The archive
+  orders browsing by most recent activity, falling back to start for undated ends.
+  Search results retain relevance ranking.
+
 ## 0.4.4 — conversation start timestamps
 
 - Label conversation catalog dates as Started and show time and timezone in the

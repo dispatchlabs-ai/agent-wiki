@@ -76,6 +76,7 @@ export async function evidenceFixture() {
       machine: "fixture-host",
       format: "claude",
       start: "2026-01-01T10:00:00Z",
+      end: "2026-01-02T12:30:00Z",
       url: "/conversations/" + evidenceId + "/",
       snippet: "A captured prototype decision.",
     };

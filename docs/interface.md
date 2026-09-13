@@ -133,3 +133,9 @@ Conversation catalog entries label the source start timestamp as Started and sho
 date, time, and timezone. The browser uses the reader's local timezone; server
 HTML falls back to UTC. Missing starts are explicitly unavailable. These dates
 represent the recorded conversation or work-period start, not archive ingestion.
+
+Conversation entries also show Last activity from the latest recorded event.
+The evidence catalog orders by last activity before pagination, with start as a
+fallback when the end is unavailable; the UI labels missing activity explicitly.
+Dialogue search retains relevance ranking. Resuming an existing period preserves
+its start timestamp while its latest recorded activity moves it up in browsing.

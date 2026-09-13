@@ -39,7 +39,7 @@ Each instance has one access boundary: everyone with access can read all its
 articles, history, and traces. Shared hosting requires your own HTTPS proxy and
 access control. See [security](SECURITY.md) before connecting private content.
 
-**Version 0.4.4 — initial development source release.** Public contracts
+**Version 0.4.5 — initial development source release.** Public contracts
 are evolving. The quickstart below uses `main`, which may include unreleased
 changes; see the [changelog](CHANGELOG.md) and [release policy](docs/releases.md).
 Created by Chris Reynolds, cofounder of **Dispatch Labs AI**, and released under MIT.

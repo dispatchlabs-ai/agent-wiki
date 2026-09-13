@@ -182,6 +182,10 @@ test("catalog shows source start time in the reader timezone with UTC fallback",
       javaScriptEnabled ? "5:00 AM EST" : "10:00 AM UTC",
     );
     await expect(time.locator("..")).toContainText("Started");
+    await expect(time.locator("..")).toContainText("Last activity");
+    await expect(page.locator("time[data-local-time]").nth(1)).toContainText(
+      javaScriptEnabled ? "7:30 AM EST" : "12:30 PM UTC",
+    );
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
