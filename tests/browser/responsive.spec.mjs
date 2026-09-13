@@ -161,11 +161,15 @@ test("all responsive views reflow, retain navigation and support both themes", a
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBeTruthy();
-  await page.getByLabel("Appearance").selectOption("light");
+  await page.getByRole("button", { name: "Toggle theme" }).click();
+  await page.getByRole("menuitemradio", { name: "Light", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await page.getByLabel("Appearance").selectOption("system");
+  await page.getByRole("button", { name: "Toggle theme" }).click();
+  await page
+    .getByRole("menuitemradio", { name: "System", exact: true })
+    .click();
   await expect(page.locator("html")).not.toHaveAttribute("data-theme");
   expect(errors).toEqual([]);
 });

@@ -28,6 +28,8 @@ with local semantic CSS and retaining Base UI behavior. The upstream MIT license
 is preserved in [shadcn-license.txt](docs/shadcn-license.txt).
 `ui/components/agents.jsx` also adapts shadcn Base UI button, card, badge,
 native-select and tabs patterns using the same semantic CSS approach.
+`ui/components/mode-toggle.jsx` adapts the [Mode Toggle](https://ui.shadcn.com/docs/dark-mode/vite#add-a-mode-toggle)
+and Base UI dropdown-menu patterns, retaining the existing pre-paint preference.
 
 React, Base UI and Mermaid browser bundles are generated from locked dependencies
 during setup. Their esbuild legal comments and an aggregate `licenses.txt` are

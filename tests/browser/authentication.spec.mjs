@@ -512,7 +512,9 @@ test("signed-out pages omit navigation and search until sign-in", async ({
       ).toHaveCount(0);
       await page.keyboard.press("Control+k");
       await expect(page.getByRole("dialog")).toHaveCount(0);
-      await expect(page.getByLabel("Appearance")).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Toggle theme" }),
+      ).toBeVisible();
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -537,4 +539,61 @@ test("signed-out pages omit navigation and search until sign-in", async ({
     .getByRole("button", { name: "Search", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toBeVisible();
+});
+
+test("mode toggle defaults to System, follows the device and remembers explicit choices", async ({
+  page,
+}) => {
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto(base + "/traces/");
+    const toggle = page.getByRole("button", { name: "Toggle theme" });
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme");
+    await expect(toggle.locator(".theme-moon")).toBeVisible();
+    await toggle.click();
+    await expect(
+      page.getByRole("menuitemradio", { name: "System", exact: true }),
+    ).toHaveAttribute("aria-checked", "true");
+    await page.screenshot({
+      path: test.info().outputPath(`mode-toggle-${width}-dark.png`),
+      fullPage: true,
+    });
+    await page
+      .getByRole("menuitemradio", { name: "Light", exact: true })
+      .click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await toggle.click();
+    await expect(
+      page.getByRole("menuitemradio", { name: "Light", exact: true }),
+    ).toHaveAttribute("aria-checked", "true");
+    await page.screenshot({
+      path: test.info().outputPath(`mode-toggle-${width}-light.png`),
+      fullPage: true,
+    });
+    await page
+      .getByRole("menuitemradio", { name: "Dark", exact: true })
+      .click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await toggle.click();
+    await page
+      .getByRole("menuitemradio", { name: "System", exact: true })
+      .click();
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme");
+    await page.emulateMedia({ colorScheme: "light" });
+    await expect(toggle.locator(".theme-sun")).toBeVisible();
+    await expect(toggle.locator(".theme-moon")).not.toBeVisible();
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(toggle).toBeFocused();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
 });

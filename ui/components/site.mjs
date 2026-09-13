@@ -82,22 +82,8 @@ export function SiteFooter({ signedOut = false }) {
       !signedOut &&
         h("a", { href: "/api/articles/authoring.json" }, "Agent API"),
     ),
-    h(
-      "label",
-      null,
-      "Appearance",
-      h(
-        "select",
-        { id: "appearance", defaultValue: "system" },
-        ["system", "light", "dark"].map((value) =>
-          h(
-            "option",
-            { key: value, value },
-            value[0].toUpperCase() + value.slice(1),
-          ),
-        ),
-      ),
-    ),
+    h("span", { id: "theme-toggle" }),
+    h("noscript", null, "Appearance follows your device settings."),
   );
 }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 — theme mode toggle
+
+- Replace the footer select with an accessible shadcn/Base UI icon menu for Light,
+  Dark and System. Default to System, follow device changes, preserve saved
+  preferences, and keep the control available while signed out.
+
 ## 0.4.1 — signed-out navigation
 
 - Hide unavailable navigation, search, account controls and the Agent API link on

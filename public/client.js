@@ -300,20 +300,6 @@ if (typeof document !== "undefined") {
       img.addEventListener("error", failed, { once: true });
       if (img.complete && !img.naturalWidth) failed();
     });
-  const appearance = document.querySelector("#appearance");
-  if (appearance) {
-    appearance.value = document.documentElement.dataset.theme || "system";
-    appearance.addEventListener("change", () => {
-      if (appearance.value === "system")
-        delete document.documentElement.dataset.theme;
-      else document.documentElement.dataset.theme = appearance.value;
-      try {
-        localStorage.setItem("wiki-appearance", appearance.value);
-      } catch {
-        /* Optional preference storage. */
-      }
-    });
-  }
   const mobile = matchMedia("(max-width: 760px)");
   document.querySelectorAll("[data-responsive-details]").forEach((d) => {
     d.open = !mobile.matches;

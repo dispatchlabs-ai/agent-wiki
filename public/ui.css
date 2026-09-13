@@ -1320,3 +1320,49 @@ body > main {
 .site-header.signed-out-header {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* shadcn Mode Toggle: current appearance icon, explicit three-way preference. */
+#theme-toggle {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  justify-self: end;
+}
+.theme-popup {
+  width: 160px;
+}
+.theme-option {
+  gap: 10px;
+}
+.theme-check {
+  margin-left: auto;
+}
+.mode-toggle .theme-moon {
+  display: none;
+}
+html[data-theme="dark"] .mode-toggle .theme-sun {
+  display: none;
+}
+html[data-theme="dark"] .mode-toggle .theme-moon {
+  display: block;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .mode-toggle .theme-sun {
+    display: none;
+  }
+  html:not([data-theme="light"]) .mode-toggle .theme-moon {
+    display: block;
+  }
+}
+@media (max-width: 760px) {
+  .site-footer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+  }
+}
+@media print {
+  #theme-toggle {
+    display: none;
+  }
+}

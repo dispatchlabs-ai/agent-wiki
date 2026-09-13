@@ -1,3 +1,4 @@
+import { ModeToggle } from "./components/mode-toggle.jsx";
 import { AgentsApp } from "./components/agents.jsx";
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
@@ -8,6 +9,8 @@ const account = document.querySelector("#account-menu");
 if (account) createRoot(account).render(<AccountMenu />);
 const search = document.querySelector("#quick-search");
 if (search) createRoot(search).render(<QuickSearch />);
+const theme = document.querySelector("#theme-toggle");
+if (theme) createRoot(theme).render(<ModeToggle />);
 // Preserve all server-rendered panels when scripting is unavailable or printing.
 function ContentTabs({ panels }) {
   const [value, setValue] = useState("0");

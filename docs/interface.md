@@ -15,7 +15,9 @@ collapse into disclosures, comparisons stack, and revision selectors fill their
 rows. Simple Markdown tables with up to four columns become labeled records;
 larger tables have a keyboard-focusable horizontal scrolling region.
 
-The footer Appearance control offers System, Light, and Dark. System follows the
+The footer Mode Toggle uses a sun/moon icon and a shadcn/Base UI menu offering
+Light, Dark, and System, with a check beside the selected preference. System is
+the default. System follows the
 browser preference. Explicit preferences persist in local storage and are read
 before paint by `public/theme.js`. With JavaScript disabled, system appearance
 and ordinary article navigation still work.
@@ -111,7 +113,7 @@ component on every page. Mobile search and account buttons retain 44px targets;
 primary navigation stays visible on its own row. Account controls no longer
 create a separate strip above the brand.
 
-On phones the footer stacks its identity/API link above the Appearance row,
+On phones the footer keeps its identity/API link beside the compact Mode Toggle,
 with the label and 44px selector aligned across the available width. Short pages
 use the viewport's available space instead of a fixed content-height spacer;
 the footer remains in document flow and respects the bottom safe area.
