@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { digest, secret } from "./control-store.mjs";
 import { WikiError } from "./errors.mjs";
-import { shell, escape } from "./render.mjs";
+import { shell } from "./render.mjs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AgentConsent } from "../ui/components/auth.mjs";
 
 const scopeActions = {
   "wiki:read": "read",
@@ -169,23 +172,18 @@ export class RemoteAgents {
   }
   consent(actor, params, csrf) {
     const request = this.request(params);
-    const hidden = [...params]
-      .map(
-        ([k, v]) =>
-          `<input type="hidden" name="${escape(k)}" value="${escape(v)}">`,
-      )
-      .join("");
-    const choices = this.choices(actor.id)
-      .map(
-        (a) =>
-          `<label class="agent-choice"><input type="radio" name="agent" value="${escape(a.id)}" required> ${escape(a.name)} — ${this.control.role(a.id) === "editor" ? "read and edit" : "read only"}</label>`,
-      )
-      .join("");
+    const choices = this.choices(actor.id).map((a) => ({
+      ...a,
+      role: this.control.role(a.id),
+    }));
     return shell(
       "Connect an agent",
-      `<section class="sign-in"><p class="eyebrow">Agentic Wiki</p><h1>Choose an agent</h1><p>Signed in as <strong>${escape(actor.name)}</strong>.</p><p>Allow <strong>${escape(request.name)}</strong> to use the selected agent's wiki access. This client name is supplied by the application. Continue only if you started this connection.</p><p>Return address: <code>${escape(request.redirect)}</code></p><p>The connection lasts up to 30 days. You can revoke it in <a href="/agents/">Agents</a>. Each operation records you as the initiator and the agent as the actor.</p><form id="agent-consent" method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${escape(csrf)}">${choices || "<p>No agents are available. Ask an agent owner to grant you permission to use one.</p>"}${choices ? '<button name="decision" value="allow">Connect</button>' : ""}<button class="secondary" name="decision" value="deny" formnovalidate>Cancel</button><p role="status"></p></form></section><script type="module" src="/assets/agent-consent.js"></script>`,
+      renderToStaticMarkup(
+        createElement(AgentConsent, { actor, request, params, csrf, choices }),
+      ),
     );
   }
+
   approve(actor, form) {
     // Approval parameters are validated again, including client and exact redirect.
     const params = new URLSearchParams(form);

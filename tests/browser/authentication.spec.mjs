@@ -7,6 +7,27 @@ import { once } from "node:events";
 import { createWiki } from "../../src/server.mjs";
 import { fixture } from "../helpers.mjs";
 let app, cleanup, base, control, identity;
+async function reviewAuth(page, name) {
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate(
+        (theme) => (document.documentElement.dataset.theme = theme),
+        theme,
+      );
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        `${name} ${width} ${theme}`,
+      ).toBe(true);
+      await page.screenshot({
+        path: test.info().outputPath(`${name}-${width}-${theme}.png`),
+        fullPage: true,
+      });
+    }
+  }
+}
 test.beforeAll(async () => {
   const repo = fixture({
     after: (fn) => {
@@ -152,6 +173,7 @@ test("local account setup, direct login, direct grant and password change need n
   const local = await context.newPage();
   await local.goto(setup);
   await expect(local).toHaveURL(base + "/auth/local/setup");
+  await reviewAuth(local, "setup");
   await local
     .getByLabel("Password", { exact: true })
     .fill("a fictional long passphrase");
@@ -201,6 +223,7 @@ test("local account setup, direct login, direct grant and password change need n
   await local
     .getByRole("menuitem", { name: "Your account", exact: true })
     .click();
+  await reviewAuth(local, "account");
   await local
     .getByLabel("Current password", { exact: true })
     .fill("a fictional long passphrase");
@@ -473,6 +496,11 @@ test("create an agent in the browser, grant access, and approve a remote connect
   await expect(
     page.getByRole("heading", { name: "Choose an agent" }),
   ).toBeVisible();
+  await reviewAuth(page, "consent");
+  await page.getByText("Connection details", { exact: true }).click();
+  await expect(page.locator(".auth-return")).toContainText(
+    reg.redirect_uris[0],
+  );
   await page.getByLabel("Browser Researcher — read only").check();
   await page.screenshot({
     path: test.info().outputPath("consent.png"),
@@ -615,4 +643,26 @@ test("mode toggle defaults to System, follows the device and remembers explicit 
       ),
     ).toBe(true);
   }
+});
+
+test("sign-in components reflow and retain the provider link without JavaScript", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto(base + "/wiki/guide/");
+  await reviewAuth(page, "sign-in");
+  await expect(page.getByLabel("Email", { exact: true })).toHaveAttribute(
+    "autocomplete",
+    "username",
+  );
+  await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute(
+    "autocomplete",
+    "current-password",
+  );
+  await page.getByRole("link", { name: "Continue to sign in" }).click();
+  await expect(
+    page.getByRole("button", { name: "Example owner", exact: true }),
+  ).toBeVisible();
+  await context.close();
 });

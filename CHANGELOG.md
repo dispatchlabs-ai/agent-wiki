@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.8
+
+- Sign-in, account setup, password settings and agent consent now share responsive
+  UI components, with consistent fields, buttons and clear permission choices.
+- Preserve authentication, CSRF, return destinations and consent behavior. No data
+  migration is required.
+
 ## 0.4.7 — Articles and search components
 
 - Apply shared server-rendered headings, fields, buttons, list styles and metadata

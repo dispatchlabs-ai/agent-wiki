@@ -154,8 +154,7 @@ use native GET forms; pagination keeps the query and filters. Agents reuses the
 same buttons, fields and badges and is dynamically imported only on its page.
 Do not hydrate static markup or put source content into the asset build.
 
-Next migrations: Articles/search and authentication/consent, then reader metadata
-and editing controls. Migrate one complete workflow at a time and preserve
+Next migrations: reader metadata and editing controls. Migrate one complete workflow at a time and preserve
 keyboard, no-JavaScript, print, citation and live-content behavior.
 
 Articles and search now compose the shared primitives through
@@ -163,3 +162,11 @@ Articles and search now compose the shared primitives through
 browser renderer in `public/search-results.js`, using the same scoped list styles
 for initial HTML and asynchronous updates. Filter groups distinguish article
 metadata from conversation sources; type navigation remains ordinary links.
+
+Sign-in, local account setup, account settings and agent consent compose shared
+primitives in `ui/components/auth.mjs`. The server renders these pages per request;
+existing auth clients retain CSRF, return destinations and explicit consent decisions.
+Consent keeps client identity, access and revocation information visible, with the
+return address in a native disclosure. Status live regions remain in the accessibility
+tree before messages arrive. Provider navigation works without JavaScript; local
+password operations continue to require the existing auth client.
