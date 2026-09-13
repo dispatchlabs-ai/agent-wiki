@@ -298,6 +298,7 @@
 
 .ui-link-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin: -4px 0 28px;
   border-bottom: 1px solid var(--color-border);
