@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3 — header theme control
+
+- Move the theme menu to the top-right header, beside the account menu when
+  signed in. Keep it visible on signed-out pages and adapt narrow phone headers.
+
 ## 0.4.2 — theme mode toggle
 
 - Replace the footer select with an accessible shadcn/Base UI icon menu for Light,

@@ -234,7 +234,7 @@ test("account menu keeps the header compact and supports keyboard and touch", as
       ).toBeHidden();
       const box = await page.locator(".site-header").boundingBox();
       expect(box.y).toBeLessThan(10);
-      expect(box.height).toBeLessThan(140);
+      expect(box.height).toBeLessThan(width <= 480 ? 220 : 140);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -244,7 +244,13 @@ test("account menu keeps the header compact and supports keyboard and touch", as
       const account = await trigger.boundingBox();
       expect(account.width).toBeGreaterThanOrEqual(44);
       expect(account.height).toBeGreaterThanOrEqual(44);
-      expect(brand.x + brand.width).toBeLessThanOrEqual(account.x);
+      if (width > 480)
+        expect(brand.x + brand.width).toBeLessThanOrEqual(account.x);
+      await expect(
+        page
+          .locator(".site-header")
+          .getByRole("button", { name: "Toggle theme" }),
+      ).toBeVisible();
       await trigger.focus();
       await page.keyboard.press("Enter");
       await expect(page.getByRole("menu")).toBeVisible();

@@ -49,12 +49,12 @@ export function SiteHeader({ active, signedOut = false }) {
     { className: signedOut ? "site-header signed-out-header" : "site-header" },
     h(Brand),
     !signedOut && h(SiteNavigation, { active }),
-    !signedOut &&
-      h(
-        "div",
-        { className: "header-actions" },
-        h(SearchForm, { compact: true }),
-        h("span", { id: "quick-search" }),
+    h(
+      "div",
+      { className: "header-actions" },
+      !signedOut && h(SearchForm, { compact: true }),
+      !signedOut && h("span", { id: "quick-search" }),
+      !signedOut &&
         h(
           "a",
           {
@@ -65,8 +65,9 @@ export function SiteHeader({ active, signedOut = false }) {
           h(SearchIcon),
           h("span", { className: "search-trigger-text" }, "Search"),
         ),
-        h("span", { id: "account-menu" }),
-      ),
+      h("span", { id: "theme-toggle" }),
+      !signedOut && h("span", { id: "account-menu" }),
+    ),
   );
 }
 
@@ -82,7 +83,6 @@ export function SiteFooter({ signedOut = false }) {
       !signedOut &&
         h("a", { href: "/api/articles/authoring.json" }, "Agent API"),
     ),
-    h("span", { id: "theme-toggle" }),
     h("noscript", null, "Appearance follows your device settings."),
   );
 }

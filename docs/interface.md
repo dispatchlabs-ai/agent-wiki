@@ -15,7 +15,7 @@ collapse into disclosures, comparisons stack, and revision selectors fill their
 rows. Simple Markdown tables with up to four columns become labeled records;
 larger tables have a keyboard-focusable horizontal scrolling region.
 
-The footer Mode Toggle uses a sun/moon icon and a shadcn/Base UI menu offering
+The header Mode Toggle uses a sun/moon icon and a shadcn/Base UI menu offering
 Light, Dark, and System, with a check beside the selected preference. System is
 the default. System follows the
 browser preference. Explicit preferences persist in local storage and are read
@@ -113,10 +113,11 @@ component on every page. Mobile search and account buttons retain 44px targets;
 primary navigation stays visible on its own row. Account controls no longer
 create a separate strip above the brand.
 
-On phones the footer keeps its identity/API link beside the compact Mode Toggle,
-with the label and 44px selector aligned across the available width. Short pages
-use the viewport's available space instead of a fixed content-height spacer;
-the footer remains in document flow and respects the bottom safe area.
+The Mode Toggle sits in the top-right header beside the account menu, and remains
+available while signed out. On narrow phones, signed-in header controls occupy
+a separate row above navigation to preserve 44px targets. Short pages use the
+viewport's available space; the footer stays in document flow and respects the
+bottom safe area.
 
 ## Agents and connections
 

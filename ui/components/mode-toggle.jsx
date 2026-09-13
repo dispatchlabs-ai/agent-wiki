@@ -74,7 +74,7 @@ export function ModeToggle() {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner
-          side="top"
+          side="bottom"
           align="end"
           sideOffset={8}
           collisionPadding={12}

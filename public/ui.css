@@ -1318,7 +1318,7 @@ body > main {
 
 /* Authentication pages have no unavailable navigation or client search mounts. */
 .site-header.signed-out-header {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 /* shadcn Mode Toggle: current appearance icon, explicit three-way preference. */
@@ -1354,11 +1354,17 @@ html[data-theme="dark"] .mode-toggle .theme-moon {
     display: block;
   }
 }
-@media (max-width: 760px) {
-  .site-footer {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 16px;
+@media (max-width: 480px) {
+  .site-header:not(.signed-out-header) .brand {
+    grid-column: 1 / -1;
+  }
+  .site-header:not(.signed-out-header) .header-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .site-header:not(.signed-out-header) .site-nav {
+    grid-row: 3;
   }
 }
 @media print {
