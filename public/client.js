@@ -469,3 +469,22 @@ if (typeof document !== "undefined") {
     });
   }
 }
+
+// Keep source timestamps intact; render conversation starts in the reader's zone.
+if (typeof document !== "undefined") {
+  for (const time of document.querySelectorAll("time[data-local-time]")) {
+    const value = time.getAttribute("datetime");
+    const d = new Date(value);
+    if (!Number.isNaN(d.valueOf())) {
+      time.textContent = new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short",
+      }).format(d);
+      time.setAttribute("title", value);
+    }
+  }
+}

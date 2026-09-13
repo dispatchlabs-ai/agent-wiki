@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.4 — conversation start timestamps
+
+- Label conversation catalog dates as Started and show time and timezone in the
+  reader’s local timezone, with UTC when JavaScript is unavailable. These are
+  source start timestamps, not ingestion times.
+
 ## 0.4.3 — header theme control
 
 - Move the theme menu to the top-right header, beside the account menu when

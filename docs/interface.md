@@ -128,3 +128,8 @@ contain definition editing and permission management. Connections have their own
 tab, with explicit disconnect actions. Mobile cards stack, controls retain 44px
 minimum targets, and dialogs scroll within the viewport. Server-side checks remain
 authoritative for every operation; the UI only exposes the caller's available controls.
+
+Conversation catalog entries label the source start timestamp as Started and show
+date, time, and timezone. The browser uses the reader's local timezone; server
+HTML falls back to UTC. Missing starts are explicitly unavailable. These dates
+represent the recorded conversation or work-period start, not archive ingestion.

@@ -163,3 +163,30 @@ for (const width of [390, 1440])
       path: `.runtime/responsive-review/attachment-fix-${width}.png`,
     });
   });
+
+test("catalog shows source start time in the reader timezone with UTC fallback", async ({
+  browser,
+}) => {
+  for (const javaScriptEnabled of [true, false]) {
+    const context = await browser.newContext({
+      timezoneId: "America/New_York",
+      locale: "en-US",
+      javaScriptEnabled,
+      viewport: { width: 390, height: 900 },
+    });
+    const page = await context.newPage();
+    await page.goto(base + "/traces/");
+    const time = page.locator("time[data-local-time]").first();
+    await expect(time).toHaveAttribute("datetime", "2026-01-01T10:00:00.000Z");
+    await expect(time).toContainText(
+      javaScriptEnabled ? "5:00 AM EST" : "10:00 AM UTC",
+    );
+    await expect(time.locator("..")).toContainText("Started");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await context.close();
+  }
+});

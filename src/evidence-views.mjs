@@ -20,6 +20,20 @@ const kinds = [
 ];
 const choice = (value, label, selected) =>
   `<option value="${e(value)}"${value === selected ? " selected" : ""}>${e(label)}</option>`;
+function startTime(value) {
+  const d = value ? new Date(value) : new Date(NaN);
+  if (Number.isNaN(d.valueOf())) return "Start time unavailable";
+  const label = new Intl.DateTimeFormat("en", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+    timeZone: "UTC",
+  }).format(d);
+  return `Started <time data-local-time datetime="${e(d.toISOString())}">${e(label)}</time>`;
+}
 export function evidenceCatalog(params, result) {
   const q = params.get("q") || "",
     format = params.get("format") || "",
@@ -37,7 +51,7 @@ export function evidenceCatalog(params, result) {
       .map(([v, l]) => choice(v, l, format))
       .join(
         "",
-      )}</select></label><label>Machine<input name="machine" value="${e(machine)}" placeholder="Any machine" maxlength="100"></label><button>Apply filters</button></form></details><div><p class="meta">${Number(result.total || 0).toLocaleString("en")} ${q ? "matching conversations" : "conversation periods"}</p>${items.length ? items.map((t) => `<section class="entry"><h2>${link(t.url, t.title)}</h2><p class="meta">${e(t.machine)} · ${e(t.format || t.harness)} · ${date(t.start)}</p>${t.snippet ? `<p>${e(t.snippet)}</p>` : ""}</section>`).join("") : '<p class="empty">No matching conversations.</p>'}<nav class="pagination" aria-label="Trace pages">${offset > 0 ? link(queryLink("/traces/", { q, format, machine, offset: Math.max(0, offset - 20) }), "Previous") : ""}${result.nextOffset !== null ? link(queryLink("/traces/", { q, format, machine, offset: result.nextOffset }), "Next") : ""}</nav></div></div>`,
+      )}</select></label><label>Machine<input name="machine" value="${e(machine)}" placeholder="Any machine" maxlength="100"></label><button>Apply filters</button></form></details><div><p class="meta">${Number(result.total || 0).toLocaleString("en")} ${q ? "matching conversations" : "conversation periods"}</p>${items.length ? items.map((t) => `<section class="entry"><h2>${link(t.url, t.title)}</h2><p class="meta">${e(t.machine)} · ${e(t.format || t.harness)} · ${startTime(t.start)}</p>${t.snippet ? `<p>${e(t.snippet)}</p>` : ""}</section>`).join("") : '<p class="empty">No matching conversations.</p>'}<nav class="pagination" aria-label="Trace pages">${offset > 0 ? link(queryLink("/traces/", { q, format, machine, offset: Math.max(0, offset - 20) }), "Previous") : ""}${result.nextOffset !== null ? link(queryLink("/traces/", { q, format, machine, offset: result.nextOffset }), "Next") : ""}</nav></div></div>`,
     { active: "Conversations" },
   );
 }
