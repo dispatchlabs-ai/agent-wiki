@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.4.0 — authenticated hosting and remote agents
+
+Breaking change: the standalone server now requires an authoritative control
+database, HTTPS hosting configuration, and explicit human/agent grants. Existing
+anonymous hosted clients must migrate using [authentication](docs/authentication.md)
+and [remote connections](docs/remote-agents.md). Synthetic loopback examples remain
+available. Back up control state as well as content before upgrading.
+
+- Restrict human-directory discovery to current wiki members with agent access
+  management permission; preserve explicitly granted agent-only invocation.
+- Add portable clean-clone checks for local CI and clarify credential recovery.
+
+### Remote user-to-agent connections
+
+- Rebuild the Agents page with shadcn/Base UI dialogs, buttons and tabs, responsive
+  cards, clear permission controls, and a separate client-connections view.
+
+- Connect remote MCP clients with browser sign-in, agent selection, S256 PKCE,
+  public client registration and rotating, revocable OAuth credentials.
+- Manage named agents, definitions, invoke/configure/access grants and client
+  connections through the Agents page. Preserve actual human initiator and agent
+  actor attribution, with current permission checks at access and publication.
+- Existing operator signing-key adapters remain supported.
+
+### Authenticated hosting
+
+- Add a Pi extension for normal-session Wiki MCP tools and instructions, with
+  opt-in synthetic model acceptance; document native Claude user setup.
+
+- Document Claude subscription login and add an opt-in synthetic Claude Code
+  acceptance probe for wiki search, trace reads, writes, and run closure.
+
+- Add named agent registration, independent/delegated run authority, registered
+  public-key authentication, five-minute tokens, and a renewing stdio MCP adapter.
+  Operator commands generate runtime files, enroll public keys, and revoke access.
+  Agent writes preserve run-bound receipts and recheck authority before publication.
+  This is the current single-space integration; the multi-space roadmap is unchanged.
+
+- Offer sign-in on protected browser links and return to the requested page and
+  citation anchor after Google/OIDC or local login. API and embedded-media requests
+  remain authenticated and return 401 without credentials.
+
+- Align footer links and appearance controls on phones, and size short pages
+  to the available viewport without a fixed content spacer.
+
+- Integrate identity and account actions into an accessible header menu; keep
+  search and account controls together with compact mobile navigation.
+
+- Direct Google OIDC and independent local accounts with invitation setup,
+  explicit reader/editor/manager grants, secure sessions and operator recovery.
+- Authenticated articles, original evidence, media and MCP; aliases redirect to a
+  canonical cookie origin. Current rich-reader and original-source behavior remain.
+- This development integration is not a published release.
+
 ## 0.3.3 — 2026-09-12
 
 - Use shared React components for the server-rendered header, navigation, footer,

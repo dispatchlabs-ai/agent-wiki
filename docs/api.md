@@ -39,6 +39,10 @@ For a complete local client setup and a first search/edit workflow, follow
 
 Connect a Streamable HTTP client to `${WIKI_ORIGIN}/mcp`. The existing wiki
 process serves this stateless endpoint; no separate service or browser is needed.
+Authenticated installations support [remote OAuth connections](remote-agents.md)
+with browser sign-in and agent selection. Unattended operators can also use the
+[signing-key adapter](agent-setup.md) for registration and renewal.
+Human browser sessions retain their cookie and CSRF flow.
 The official MCP SDK handles initialization, discovery, schema validation and
 protocol errors. Small tool results contain one text content block with JSON
 matching the HTTP API, without a duplicate structured payload. API failures set
@@ -74,8 +78,10 @@ Requests must target the configured Host. A supplied Origin must exactly match
 rejected and no CORS access is granted. POST bodies are limited to 512,000 bytes. Unsupported methods (including
 PUT, PATCH and DELETE) receive 405 before their bodies are read.
 Responses carry JSON results (legacy clients may receive SSE framing); the
-endpoint does not provide unsolicited notifications or persistent sessions. It inherits the wiki's access boundary and has no built-in
-user authentication. Keep existing proxy authentication/access rules on `/mcp`.
+endpoint does not provide unsolicited notifications or persistent sessions. It enforces the wiki's access boundary. Remote clients use agent bearer tokens.
+Human browser-session requests instead require the current wiki session cookie,
+exact Origin and session `X-Wiki-CSRF` for POSTs. See
+[authentication](authentication.md).
 The authoring discovery response includes the endpoint URL and transport.
 
 ## Preview a draft
@@ -328,3 +334,10 @@ content; original source records and captured files remain available separately.
 
 Example: `{id, event: "<event-id>", textOffset: 0, textLimit: 4000}` followed by
 the same request with `textOffset` set to the returned `nextTextOffset`.
+
+## Authenticated remote clients
+
+For shared hosting, prefer [remote agent connections](remote-agents.md): add the
+HTTPS MCP endpoint, sign in, and select an explicitly permitted agent. The signing-key
+adapter remains available for unattended operators. The loopback example workflow
+uses synthetic content and is not an authenticated hosting configuration.

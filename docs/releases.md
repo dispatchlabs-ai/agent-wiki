@@ -32,7 +32,9 @@ and additions. It does not imply production readiness.
    `npm audit --omit=dev --audit-level=high` using synthetic data. Review the diff
    and public source archive for unintended content. Keep dependencies locked.
 4. Commit and push; wait for the Linux/macOS runtime matrix and browser CI to pass
-   on that exact commit before tagging. Do not treat a queued CI run as a pass.
+   on that exact commit before tagging. Linux checks run through the Palm-managed
+   local runner, not GitHub Actions; run the same `scripts/check` gate on macOS
+   and record the exact SHA and result. Do not treat a queued CI run as a pass.
 5. Create an SSH-signed annotated `vX.Y.Z` tag on that commit, verify its signature,
    and push only that tag. Publish matching GitHub release notes from the changelog.
    Mark preview versions as GitHub prereleases; normal versions are regular releases.

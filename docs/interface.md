@@ -103,3 +103,25 @@ Search trigger with an icon. Cards show an excerpt of the article description
 (up to 180 characters at a word boundary), rather than the internal edit summary.
 The title opens the article; View changes opens the revision comparison. Full
 descriptions and original change summaries remain on article and history pages.
+
+Authenticated pages integrate an AccountMenu beside search in the shared header.
+The Base UI menu contains the identity, account link, manager-only access link and
+sign-out action; keyboard focus, Escape and outside-click dismissal use the same
+component on every page. Mobile search and account buttons retain 44px targets;
+primary navigation stays visible on its own row. Account controls no longer
+create a separate strip above the brand.
+
+On phones the footer stacks its identity/API link above the Appearance row,
+with the label and 44px selector aligned across the available width. Short pages
+use the viewport's available space instead of a fixed content-height spacer;
+the footer remains in document flow and respects the bottom safe area.
+
+## Agents and connections
+
+The Agents workspace uses shadcn-style cards, badges, buttons, native selects,
+Base UI tabs, and the shared shadcn/Base UI dialog. Semantic color tokens preserve
+light and dark appearance. Agent cards keep everyday status visible; dialogs
+contain definition editing and permission management. Connections have their own
+tab, with explicit disconnect actions. Mobile cards stack, controls retain 44px
+minimum targets, and dialogs scroll within the viewport. Server-side checks remain
+authoritative for every operation; the UI only exposes the caller's available controls.

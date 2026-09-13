@@ -98,3 +98,25 @@ Observed on Linux x86-64 / Node 26.8.1 with 1,000 articles, 201 initial commits,
 peak RSS 333 MiB. This larger catalog workload is not directly comparable with
 prior one-snapshot benchmarks. Git refresh remains synchronous; cold rendering
 still parses a complete snapshot. These are measurements, not capacity guarantees.
+
+## Authentication deployment integration — September 12, 2026
+
+Integrated Google/local authentication with the exact v0.3.2 reader, keeping its
+responsive UI, rich Markdown, original evidence, media ranges, previews and MCP.
+The authenticated tests also exercise MCP caller isolation, reader-write denial,
+original evidence API protection, delayed-response revocation and the portable
+writer lock. Browser coverage includes invitation, password setup, direct grants,
+login, logout and password changes alongside the existing reader suites.
+The deployment runbook owns live verification; synthetic checks do not establish
+a working Google client registration.
+
+## 0.4.0 release review — September 13, 2026
+
+Independent source/OSS and security reviews covered current authentication,
+remote OAuth, permissions, UI data exposure, licensing, and portability. A
+confirmed outsider directory-disclosure bug was fixed with a regression that
+failed before the fix and passes afterward. Explicit agent-only invocation still
+works. No additional blockers were confirmed within this bounded review.
+It was not an external identity-provider assessment or penetration test.
+The source review found no private infrastructure identifiers in the current tree;
+private engineering history remains separate from public Git history.

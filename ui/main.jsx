@@ -1,7 +1,11 @@
+import { AgentsApp } from "./components/agents.jsx";
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { Tabs } from "@base-ui/react/tabs";
 import { QuickSearch } from "./components/quick-search.jsx";
+import { AccountMenu } from "./components/account-menu.jsx";
+const account = document.querySelector("#account-menu");
+if (account) createRoot(account).render(<AccountMenu />);
 const search = document.querySelector("#quick-search");
 if (search) createRoot(search).render(<QuickSearch />);
 // Preserve all server-rendered panels when scripting is unavailable or printing.
@@ -146,3 +150,9 @@ document.addEventListener("click", async (event) => {
     button.textContent = "Rendering diagram…";
   }
 });
+
+const agents = document.querySelector("#agents-app");
+if (agents)
+  createRoot(agents).render(
+    <AgentsApp initial={JSON.parse(agents.dataset.state)} />,
+  );

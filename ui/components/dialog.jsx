@@ -6,13 +6,17 @@ export const Dialog = Primitive.Root;
 export const DialogTrigger = Primitive.Trigger;
 export const DialogTitle = Primitive.Title;
 export const DialogDescription = Primitive.Description;
-export function DialogContent({ children }) {
+export function DialogContent({
+  children,
+  className = "",
+  closeLabel = "Close search",
+}) {
   return (
     <Primitive.Portal>
       <Primitive.Backdrop className="ui-overlay" />
-      <Primitive.Popup className="ui-dialog">
+      <Primitive.Popup className={`ui-dialog ${className}`}>
         {children}
-        <Primitive.Close className="ui-close" aria-label="Close search">
+        <Primitive.Close className="ui-close" aria-label={closeLabel}>
           ×
         </Primitive.Close>
       </Primitive.Popup>

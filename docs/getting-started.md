@@ -5,6 +5,9 @@ follows a claim to its source, and saves an edit you can inspect in Git. Everyth
 in the example is synthetic. You can also complete the browser steps without an
 agent account.
 
+For a private authenticated installation, follow [Remote agent connections](remote-agents.md)
+instead of the unauthenticated loopback connection below.
+
 ## Start the example
 
 Use Linux or macOS with Node 24.19+ and Git. These commands use public `main`, which
@@ -168,6 +171,14 @@ the Git history and operation receipts are not. See [content format](../README.m
 
 For remote use, supply HTTPS and access control at a reverse proxy, including on
 `/mcp`. Browser login cookies do not automatically authenticate an MCP client.
-There is no built-in user authentication or OAuth server. Verify your chosen
-client can satisfy the proxy's authentication before connecting private content.
+The standalone server supports [remote OAuth connections](remote-agents.md):
+add its HTTPS MCP endpoint, sign in, and choose a permitted agent. The client
+receives its own revocable credentials; do not copy browser session cookies.
 Do not expose the editable example as a public demo. See [security](../SECURITY.md).
+
+## Authenticated remote clients
+
+For shared hosting, prefer [remote agent connections](remote-agents.md): add the
+HTTPS MCP endpoint, sign in, and select an explicitly permitted agent. The signing-key
+adapter remains available for unattended operators. The loopback example workflow
+uses synthetic content and is not an authenticated hosting configuration.

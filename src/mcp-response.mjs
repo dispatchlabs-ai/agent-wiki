@@ -22,7 +22,7 @@ export class McpApiClient {
   }
 
   /** @param {string} route @param {any} [draft] @param {AbortSignal} [signal] */
-  async request(route, draft, signal) {
+  async request(route, draft, signal, identityHeaders = {}) {
     const cancelled = () =>
       new WikiError(
         "MCP_CANCELLED",
@@ -51,6 +51,7 @@ export class McpApiClient {
         path: route,
         method: draft ? "POST" : "GET",
         headers: {
+          ...identityHeaders,
           Host: new URL(this.origin).host,
           Origin: this.origin,
           "Content-Type": "application/json",

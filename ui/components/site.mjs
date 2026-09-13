@@ -49,13 +49,22 @@ export function SiteHeader({ active }) {
     { className: "site-header" },
     h(Brand),
     h(SiteNavigation, { active }),
-    h(SearchForm, { compact: true }),
-    h("span", { id: "quick-search" }),
     h(
-      "a",
-      { className: "mobile-search", href: "/search/" },
-      h(SearchIcon),
-      "Search",
+      "div",
+      { className: "header-actions" },
+      h(SearchForm, { compact: true }),
+      h("span", { id: "quick-search" }),
+      h(
+        "a",
+        {
+          className: "mobile-search",
+          href: "/search/",
+          "aria-label": "Search",
+        },
+        h(SearchIcon),
+        h("span", { className: "search-trigger-text" }, "Search"),
+      ),
+      h("span", { id: "account-menu" }),
     ),
   );
 }
@@ -63,10 +72,10 @@ export function SiteHeader({ active }) {
 export function SiteFooter() {
   return h(
     "footer",
-    null,
+    { className: "site-footer" },
     h(
       "span",
-      null,
+      { className: "footer-links" },
       "Agentic Wiki · ",
       h("a", { href: "/api/articles/authoring.json" }, "Agent API"),
     ),

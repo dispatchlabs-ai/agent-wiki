@@ -1002,3 +1002,110 @@ footer select {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+#access form {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 1rem 0;
+  border-bottom: 1px solid #ddd;
+}
+#access select {
+  margin-left: 0.5rem;
+  padding: 0.5rem;
+}
+
+.principal-identity {
+  order: 1;
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+  opacity: 0.8;
+}
+
+.sign-in {
+  max-width: 30rem;
+  margin: 3rem auto 5rem;
+}
+.sign-in h1 {
+  font-size: 2.6rem;
+}
+.sign-in form {
+  display: grid;
+  gap: 1rem;
+}
+.sign-in label,
+.invite-account label {
+  display: grid;
+  gap: 0.4rem;
+}
+.sign-in input,
+.invite-account input {
+  box-sizing: border-box;
+  width: 100%;
+}
+.provider-login {
+  display: block;
+  text-align: center;
+  padding: 0.8rem 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.35rem;
+  margin: 2rem 0 1rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.login-divider {
+  text-align: center;
+  font-size: 0.9rem;
+}
+.login-help {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.auth-status {
+  margin: 0;
+}
+.invite-account {
+  margin: 2rem 0;
+  padding: 1rem;
+  border: 1px solid #cdd5d0;
+  border-radius: 0.35rem;
+}
+.invite-account summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.invite-account form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  max-width: 34rem;
+}
+.invite-account output {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+/* Native controls on the remote agent consent page. */
+.sign-in .agent-choice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+.sign-in .agent-choice input[type="radio"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  min-height: 0;
+  margin: 0;
+  flex: 0 0 auto;
+  box-shadow: none;
+}
+.sign-in button.secondary {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--color-border);
+}

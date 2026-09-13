@@ -1,4 +1,6 @@
 // @ts-check
+import { AgentStore } from "./agent-store.mjs";
+import { ControlStore, digest } from "./control-store.mjs";
 import { validateEvidence, verifyDraftEvidence } from "./evidence-quotes.mjs";
 import { WikiError } from "./errors.mjs";
 import { editSchema } from "../public/edit-contract.js";
@@ -18,9 +20,25 @@ import {
 } from "./git-wiki.mjs";
 import { references } from "./wiki.mjs";
 
+function operationIdentity(actor, authority, operation) {
+  return actor
+    ? digest(
+        (authority ? JSON.stringify({ actor, authority }) : actor) +
+          ":" +
+          operation,
+      )
+    : operation;
+}
+
 /** @param {string} repo @param {import("../public/edit-contract.js").EditDraft} draft
  * @returns {import("../public/edit-contract.js").SaveReceipt} */
-export function saveGitEdits(repo, draft, verified = new Map()) {
+export function saveGitEdits(
+  repo,
+  draft,
+  verified = new Map(),
+  actor = null,
+  authority = null,
+) {
   if (
     !draft ||
     !validId(draft.operation_id) ||
@@ -29,6 +47,12 @@ export function saveGitEdits(repo, draft, verified = new Map()) {
     draft.updates.length > editSchema.properties.updates.maxItems
   )
     throw new WikiError("INVALID_EDIT", "Invalid edit operation");
+  const publicOperation = draft.operation_id;
+  if (actor)
+    draft = {
+      ...draft,
+      operation_id: operationIdentity(actor, authority, publicOperation),
+    };
   const wiki = new GitWiki(repo);
   const fingerprint = sha(JSON.stringify(draft));
   const prior = wiki.receipt(draft.operation_id);
@@ -186,7 +210,9 @@ export function saveGitEdits(repo, draft, verified = new Map()) {
         );
   /** @type {import("../public/edit-contract.js").StoredReceipt} */
   const receipt = {
-    operation_id: draft.operation_id,
+    operation_id: publicOperation,
+    ...(actor ? { actor } : {}),
+    ...(authority ? { authority } : {}),
     state: "saved",
     articles: results,
   };
@@ -209,12 +235,76 @@ if (
   try {
     await withWriterLock(repo, async () => {
       const draft = JSON.parse(fs.readFileSync(0, "utf8"));
-      const verified = await verifyDraftEvidence(
-        repo,
-        draft,
-        process.env.WIKI_EVIDENCE_URL,
-      );
-      const result = saveGitEdits(repo, draft, verified);
+      let result;
+      let control;
+      try {
+        let agents;
+        if (process.env.WIKI_HTTP_WRITE === "1") {
+          control = new ControlStore(process.env.WIKI_CONTROL);
+          agents = process.env.WIKI_AGENT_TOKEN
+            ? new AgentStore(control)
+            : null;
+        }
+        const authorize = () => {
+          if (!control) return { actor: null, authority: null };
+          if (agents) {
+            const actor = agents.requireToken(
+              process.env.WIKI_AGENT_TOKEN,
+              process.env.WIKI_AGENT_AUDIENCE,
+              "default",
+              "write",
+            );
+            if (draft?.updates?.some((update) => update?.evidence?.length))
+              agents.requireToken(
+                process.env.WIKI_AGENT_TOKEN,
+                process.env.WIKI_AGENT_AUDIENCE,
+                "default",
+                "trace",
+              );
+            return {
+              actor: actor.id,
+              authority: {
+                run: actor.run,
+                subject: actor.subject,
+                mode: actor.mode,
+                definition: actor.definition,
+                scope: actor.scope,
+              },
+            };
+          }
+          const actor = control.authenticate(process.env.WIKI_SESSION);
+          if (!actor) throw new WikiError("NOT_FOUND", "Not found", 404);
+          control.require(actor.id, "editor");
+          return { actor: actor.id, authority: null };
+        };
+        const initial = authorize();
+        const verified = await verifyDraftEvidence(
+          repo,
+          {
+            ...draft,
+            operation_id: operationIdentity(
+              initial.actor,
+              initial.authority,
+              draft?.operation_id,
+            ),
+          },
+          process.env.WIKI_EVIDENCE_URL,
+        );
+        const publish = () => {
+          const current = authorize();
+          return saveGitEdits(
+            repo,
+            draft,
+            verified,
+            current.actor,
+            current.authority,
+          );
+        };
+        result = control ? control.transaction(publish) : publish();
+      } finally {
+        control?.close();
+      }
+
       // Retry also retries a previously failed push. A failed remote never makes
       // the local durable commit disappear or creates a duplicate revision.
       try {

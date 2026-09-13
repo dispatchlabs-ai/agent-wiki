@@ -8,12 +8,24 @@ class RequestError extends Error {
   }
 }
 export async function request(url, draft) {
+  let csrf;
+  if (draft) {
+    try {
+      csrf = (await request("/api/me")).csrf;
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
+  }
   const response = await fetch(
     url,
     draft
       ? {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Wiki-Write": "1" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Wiki-Write": "1",
+            ...(csrf ? { "X-Wiki-CSRF": csrf } : {}),
+          },
           body: JSON.stringify(draft),
         }
       : {},
@@ -71,24 +83,107 @@ export async function registerTools(context, writable, config = {}) {
   }
 }
 if (typeof document !== "undefined") {
-  if (window.top === window.self)
-    request("/api/articles/authoring.json")
-      .then(async (config) => {
-        const controller = await registerTools(
-          document.modelContext || navigator.modelContext,
-          config.write,
-          config,
-        );
-        document.documentElement.dataset.webmcp = controller
-          ? "ready"
-          : "unavailable";
-        window.addEventListener("pagehide", () => controller?.abort(), {
-          once: true,
+  request("/api/me")
+    .then((me) => {
+      const inviteForm = document.querySelector("#invite-local");
+      if (inviteForm)
+        inviteForm.onsubmit = async (event) => {
+          event.preventDefault();
+          const button = inviteForm.querySelector("button"),
+            status = inviteForm.querySelector("[role=status]"),
+            output = inviteForm.querySelector("output");
+          button.disabled = true;
+          try {
+            const result = await request(
+              "/api/access/invitations",
+              Object.fromEntries(new FormData(inviteForm)),
+            );
+            inviteForm.reset();
+            output.replaceChildren();
+            const label = document.createElement("label");
+            label.textContent = "Private setup link";
+            const input = document.createElement("input");
+            input.readOnly = true;
+            input.value = result.url;
+            label.append(input);
+            output.append(label);
+            status.textContent =
+              "Setup link created. Share it privately. Reload this page to set the new account’s access.";
+          } catch (error) {
+            status.textContent = error.message;
+          } finally {
+            button.disabled = false;
+          }
+        };
+      if (document.querySelector("#access"))
+        return request("/api/access").then(({ principals }) => {
+          const root = document.querySelector("#access");
+          for (const p of principals) {
+            const row = document.createElement("form");
+            const label = document.createElement("label");
+            label.textContent = p.name + " ";
+            const select = document.createElement("select");
+            select.setAttribute("aria-label", p.name + " access");
+            for (const role of ["", "reader", "editor", "manager"]) {
+              const option = document.createElement("option");
+              option.value = role;
+              option.textContent = role || "No access";
+              select.append(option);
+            }
+            select.value = p.role || "";
+            label.append(select);
+            row.append(label);
+            const identity = document.createElement("small");
+            identity.textContent = p.email
+              ? `Local account · ${p.email}${p.local_ready ? "" : " · awaiting setup"}`
+              : `${p.issuer || p.kind} · ${p.subject || p.id}`;
+            identity.className = "principal-identity";
+            row.append(identity);
+            const button = document.createElement("button");
+            button.textContent = "Save access";
+            row.append(button);
+            const status = document.createElement("span");
+            status.setAttribute("role", "status");
+            row.append(status);
+            row.onsubmit = async (e) => {
+              e.preventDefault();
+              try {
+                await request("/api/access", {
+                  principal: p.id,
+                  role: select.value || null,
+                });
+                status.textContent = "Saved";
+              } catch (error) {
+                status.textContent = error.message;
+              }
+            };
+            root.append(row);
+          }
         });
-      })
-      .catch(() => {
-        document.documentElement.dataset.webmcp = "unavailable";
-      });
+    })
+    .catch((error) => {
+      const access = document.querySelector("#access");
+      if (access) access.textContent = error.message;
+    });
+  if (window.top === window.self)
+    if (window.top === window.self)
+      request("/api/articles/authoring.json")
+        .then(async (config) => {
+          const controller = await registerTools(
+            document.modelContext || navigator.modelContext,
+            config.write,
+            config,
+          );
+          document.documentElement.dataset.webmcp = controller
+            ? "ready"
+            : "unavailable";
+          window.addEventListener("pagehide", () => controller?.abort(), {
+            once: true,
+          });
+        })
+        .catch(() => {
+          document.documentElement.dataset.webmcp = "unavailable";
+        });
   const searchForm = document.querySelector("[data-live-search]");
   if (searchForm) {
     let pending, controller;

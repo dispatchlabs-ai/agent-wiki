@@ -24,7 +24,7 @@ export function QuickSearch() {
       <DialogTrigger className="quick-search-trigger" aria-label="Search">
         <span className="search-trigger-label">
           <SearchIcon />
-          Search
+          <span className="search-trigger-text">Search</span>
         </span>
         <kbd aria-hidden="true">⌘ / Ctrl K</kbd>
       </DialogTrigger>

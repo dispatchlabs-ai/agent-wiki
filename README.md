@@ -15,6 +15,19 @@ build. Browser controls are bundled locally during `npm ci`. An agent client use
 [Find a contribution](docs/roadmap.md) ·
 [API reference](docs/api.md)
 
+## Authentication
+
+Shared hosting requires [Google or local-account setup](docs/authentication.md)
+and an explicit initial manager. `npm start` requires a durable `WIKI_CONTROL`;
+Google uses `WIKI_GOOGLE_CLIENT_ID` and `WIKI_GOOGLE_CLIENT_SECRET` directly.
+Local email/password login is enabled unless `WIKI_LOCAL_LOGIN=0`. Neither path
+requires groups, and sign-in alone gives no content access. Managers grant access
+through **Manage access**. All hosted article, evidence, attachment and MCP routes
+enforce current identity and space grants. [Remote agent connections](docs/remote-agents.md) let people sign in, choose a
+permitted agent, and use its tools without installing wiki software locally.
+[Operator signing-key adapters](docs/agent-setup.md) remain available for unattended clients. The synthetic loopback example below
+remains available without a provider account.
+
 ## Who it is for
 
 For individuals and small trusted teams who want a shared knowledge collection
@@ -26,7 +39,7 @@ Each instance has one access boundary: everyone with access can read all its
 articles, history, and traces. Shared hosting requires your own HTTPS proxy and
 access control. See [security](SECURITY.md) before connecting private content.
 
-**Latest release: 0.3.3 — initial development source release.** Public contracts
+**Version 0.4.0 — initial development source release.** Public contracts
 are evolving. The quickstart below uses `main`, which may include unreleased
 changes; see the [changelog](CHANGELOG.md) and [release policy](docs/releases.md).
 Created by Chris Reynolds, cofounder of **Dispatch Labs AI**, and released under MIT.
@@ -58,10 +71,14 @@ For managed HTTPS hosting, example mode also accepts `WIKI_ORIGIN` and
 
 Initialize a separate Git repository on `main`, configure its Git author, put
 Markdown in `wiki/`, and make an initial commit (an empty commit also works).
-Then run this command from the engine checkout:
+Configure an HTTPS reverse proxy and bootstrap your first manager using
+[operator setup](docs/authentication.md#operator-setup). Then run from the engine
+checkout with those environment variables exported:
 
 ```sh
-WIKI_REPO=/absolute/path/to/content npm start
+WIKI_REPO=/absolute/path/to/content \
+WIKI_CONTROL=/absolute/private/path/control.sqlite3 \
+WIKI_ORIGIN=https://wiki.example.org npm start
 ```
 
 | Setting             | Default                 | Purpose                                                                   |
@@ -82,9 +99,10 @@ only. Example mode always uses its own local content and trace archive, ignores
 The process binds only to `127.0.0.1`. Shared hosting needs an HTTPS reverse proxy
 and appropriate access control; configure `WIKI_ORIGIN` to its external origin
 and preserve its Host header. This repository installs no persistent service.
-There is no built-in user authentication or per-article authorization. Same-origin
-checks protect browser writes but do not authenticate local processes. Give each
-instance only the content its readers may access.
+Google/local sessions and direct space grants protect the standalone server.
+There is one space per instance, with no per-article grants. Trusted local
+filesystem writers remain outside HTTP authentication; give each instance only
+the content its authorized readers may access.
 
 ## Content format
 
@@ -151,10 +169,11 @@ content updates need no build step. `src/editor.mjs` coordinates Git writes;
 
 The service checks HEAD every second and on requests. Malformed trees retain the
 last valid reader snapshot and report degraded health. Rendered pages have a
-256-entry cache. Restart the process after engine code changes. SQLite is only a
+256-entry cache. Restart the process after engine code changes. The `WIKI_DATABASE` search index is a
 rebuildable derivative: stop the process and move its database plus WAL/SHM files
 aside to rebuild. Restore the complete content Git repository to recover articles,
-history, and operation receipts.
+history, and operation receipts. The `WIKI_CONTROL` database is authoritative and
+must be backed up separately; it cannot be rebuilt from articles.
 
 This is a small single-process engine. Git commands and SQLite work synchronously;
 refresh walks the tree and first-parent history even though parsing/indexing is
@@ -184,8 +203,13 @@ accidental registry publication). Dependencies are downloaded with `npm ci`.
 ## Stop, back up, and remove
 
 Stop the foreground server with Ctrl-C. Before upgrades, stop writes and back up
-the entire content Git repository and trace directory. Restore both into their
-configured locations; the SQLite index can be rebuilt. Backups must include Git
+the entire content Git repository, trace directory, and `WIKI_CONTROL` database.
+Stop the service before copying the control database and any SQLite WAL/SHM
+sidecars; keep the backup private because it contains password hashes, identities,
+grants, sessions, and agent credentials. Restore these together into their configured
+locations. Only the `WIKI_DATABASE` search index can be rebuilt. Restoring an old
+control backup can restore previously revoked grants or credentials; review and
+revoke obsolete access before reopening the service. Backups must include Git
 history and operation receipts, not only current Markdown.
 
 The example creates only `.runtime/` within this checkout. After stopping it,
