@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Rename the project and repository to Agent Wiki (`agent-wiki`). Existing local
+  identity issuer values remain stable so accounts and grants keep working.
+
 ## 0.4.8
 
 - Sign-in, account setup, password settings and agent consent now share responsive

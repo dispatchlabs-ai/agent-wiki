@@ -12,11 +12,11 @@ instead of the unauthenticated loopback connection below.
 
 Use Linux or macOS with Node 24.19+ and Git. These commands use public `main`, which
 may be newer than the latest tagged release. For an exact released version, see
-[releases](https://github.com/dispatchlabs-ai/agentic-wiki/releases).
+[releases](https://github.com/dispatchlabs-ai/agent-wiki/releases).
 
 ```sh
-git clone https://github.com/dispatchlabs-ai/agentic-wiki.git
-cd agentic-wiki
+git clone https://github.com/dispatchlabs-ai/agent-wiki.git
+cd agent-wiki
 npm ci
 npm run example
 ```

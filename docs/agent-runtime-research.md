@@ -13,7 +13,7 @@ Pi and Claude client integrations before deployment. **Decision-ready for suppor
 all three through the shared adapter; production Pi integration and advanced Claude lifecycle cases remain
 unverified.**
 
-The setup is an Agentic Wiki identity system connected through MCP. The Codex
+The setup is an Agent Wiki identity system connected through MCP. The Codex
 connection follows its documented local MCP configuration. Neither the public
 registration JSON nor the agent/run model is an OpenAI agent-definition format.
 Pi can use the same wiki adapter through an extension; the installed Pi runtime
@@ -25,8 +25,8 @@ package compatible or make the complete setup a standard agent manifest.
 | Layer                                                                         | Owner and contract                                                 | Portability                                                                         |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | Model, reasoning, conversation, execution, scheduling                         | The selected runtime                                               | Configure separately in Codex, Pi, or another host.                                 |
-| Named principal, owner, instructions version, grants, delegation, run records | Agentic Wiki                                                       | Independent of model provider or harness.                                           |
-| Connection JSON and public registration JSON                                  | Agentic Wiki's application schema                                  | Reusable by its adapter; not a universal MCP or Codex configuration format.         |
+| Named principal, owner, instructions version, grants, delegation, run records | Agent Wiki                                                         | Independent of model provider or harness.                                           |
+| Connection JSON and public registration JSON                                  | Agent Wiki's application schema                                    | Reusable by its adapter; not a universal MCP or Codex configuration format.         |
 | Signed client assertion, token exchange, bearer authentication                | OAuth mechanisms implemented using the official MCP SDK and `jose` | Established mechanisms, with wiki-specific assertion fields and lifecycle behavior. |
 | Local adapter's tools and initialization instructions                         | MCP over stdio                                                     | Usable by a compatible MCP client.                                                  |
 | `mcp_servers.wiki.command` and `args`                                         | Codex configuration                                                | Codex-specific wiring. Pi needs an extension or another supported bridge.           |
@@ -223,7 +223,7 @@ For a dedicated Claude principal, generate and enroll a new connection using
       "type": "stdio",
       "command": "/absolute/path/to/node",
       "args": [
-        "/absolute/path/to/agentic-wiki/scripts/agent-mcp.mjs",
+        "/absolute/path/to/agent-wiki/scripts/agent-mcp.mjs",
         "/absolute/path/to/claude-researcher.json"
       ]
     }

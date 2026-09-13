@@ -3,7 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { git, markdown } from "../src/git-wiki.mjs";
 export function fixture(t) {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "agentic-wiki-test-"));
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "agent-wiki-test-"));
   t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
   git(repo, ["init", "-b", "main"]);
   git(repo, ["config", "user.name", "Test"]);

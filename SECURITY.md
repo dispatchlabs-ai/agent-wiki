@@ -17,7 +17,7 @@ instructions trustworthy or redact sensitive content. Local repository writers,
 Git configuration, and filesystem owners are trusted. This is not a sandbox for
 untrusted repositories. Public-reader traffic needs proxy rate and resource limits.
 
-Report vulnerabilities using [GitHub private vulnerability reporting](https://github.com/dispatchlabs-ai/agentic-wiki/security/advisories/new),
+Report vulnerabilities using [GitHub private vulnerability reporting](https://github.com/dispatchlabs-ai/agent-wiki/security/advisories/new),
 which is enabled for this repository. Include the affected version, expected and
 actual behavior, and a minimal synthetic reproduction. Do not post exploit details,
 real traces, credentials, or private data in a public issue. If GitHub reporting is

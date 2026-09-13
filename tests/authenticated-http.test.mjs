@@ -175,12 +175,7 @@ test("read-only mode and request limits are enforced", async (t) => {
 });
 test("failed remote push leaves one durable commit and retries push without another revision", async (t) => {
   const repo = fixture(t);
-  git(repo, [
-    "remote",
-    "add",
-    "origin",
-    "/nonexistent-agentic-wiki-test-remote",
-  ]);
+  git(repo, ["remote", "add", "origin", "/nonexistent-agent-wiki-test-remote"]);
   const draft = { operation_id: "retry-push", updates: [update("new")] };
   const run = () =>
     new Promise((resolve, reject) => {

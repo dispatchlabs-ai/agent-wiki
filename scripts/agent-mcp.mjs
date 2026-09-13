@@ -26,7 +26,7 @@ try {
     await connection.close();
   } else {
     const server = new McpServer(
-      { name: "agentic-wiki", version: "1" },
+      { name: "agent-wiki", version: "1" },
       {
         instructions:
           connection.client.getInstructions() ||

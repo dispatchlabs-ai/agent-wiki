@@ -164,7 +164,7 @@ export class AgentCredential {
 
 export async function connectAgent(config, options = {}) {
   const credential = new AgentCredential(config, options);
-  const client = new Client({ name: "agentic-wiki-adapter", version: "1" });
+  const client = new Client({ name: "agent-wiki-adapter", version: "1" });
   const transport = new StreamableHTTPClientTransport(
     new URL(config.endpoint),
     {

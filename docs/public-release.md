@@ -4,11 +4,11 @@ Historical snapshot: published September 9, 2026 with explicit owner authorizati
 The policies below describe that date, not current operations.
 See [current release policy](releases.md) for maintainer pushes and local CI.
 
-- Repository: https://github.com/dispatchlabs-ai/agentic-wiki
-- Source alpha: https://github.com/dispatchlabs-ai/agentic-wiki/releases/tag/v0.1.0-alpha.1
+- Repository: https://github.com/dispatchlabs-ai/agent-wiki
+- Source alpha: https://github.com/dispatchlabs-ai/agent-wiki/releases/tag/v0.1.0-alpha.1
 - Public root: `3206ddfdb2fe42ab53ee19b9cdfd2d1c395624c4`
 - Annotated tag: `f57e12a6ebe5efeaf071835e914af2545e004a61`
-- CI: https://github.com/dispatchlabs-ai/agentic-wiki/actions/runs/34395019505
+- CI: https://github.com/dispatchlabs-ai/agent-wiki/actions/runs/34395019505
 
 Anonymous repository and release reads succeeded. Hosted CI passed all 22 tests,
 formatting, installation, and the production dependency audit. Hosted logs were

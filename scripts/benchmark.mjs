@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { WikiSearch } from "../src/wiki-search.mjs";
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentic-wiki-benchmark-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-wiki-benchmark-"));
 const index = new WikiSearch(path.join(root, "index.sqlite3"));
 try {
   const count = 10000,

@@ -1,4 +1,4 @@
-# Agentic Wiki
+# Agent Wiki
 
 A Git-backed wiki that people and AI agents can read and update, with links back
 to the conversations behind its knowledge.
@@ -50,8 +50,8 @@ Requires **Linux or macOS, Node 24.19+, and Git**. Node's built-in SQLite
 is used; no database server is needed.
 
 ```sh
-git clone https://github.com/dispatchlabs-ai/agentic-wiki.git
-cd agentic-wiki
+git clone https://github.com/dispatchlabs-ai/agent-wiki.git
+cd agent-wiki
 npm ci
 npm run example
 ```

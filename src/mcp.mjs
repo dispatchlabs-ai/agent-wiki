@@ -29,7 +29,7 @@ export function createWikiMcp({
     (context) => {
       const agent = agentContext();
       const server = new McpServer(
-        { name: "agentic-wiki", version: packageInfo.version },
+        { name: "agent-wiki", version: packageInfo.version },
         {
           instructions:
             (agent

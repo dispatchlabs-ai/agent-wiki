@@ -10,7 +10,7 @@ fs.writeFileSync(
   new URL("brand-mark.svg", out),
   svg(
     'viewBox="0 0 64 56" fill="#256c9e"',
-    `<title>Agentic Wiki</title>${pages}`,
+    `<title>Agent Wiki</title>${pages}`,
   ),
 );
 for (const [name, ink, blue] of [
@@ -21,8 +21,8 @@ for (const [name, ink, blue] of [
   fs.writeFileSync(
     new URL(`brand-${name}.svg`, out),
     svg(
-      'viewBox="0 0 272 48" role="img" aria-label="Agentic Wiki"',
-      `<g fill="${blue}" transform="translate(0 7) scale(.6)">${pages}</g><text x="48" y="34" fill="${ink}" font-family="system-ui, sans-serif" font-size="30" font-weight="700" letter-spacing="-1">Agentic Wiki</text>`,
+      'viewBox="0 0 272 48" role="img" aria-label="Agent Wiki"',
+      `<g fill="${blue}" transform="translate(0 7) scale(.6)">${pages}</g><text x="48" y="34" fill="${ink}" font-family="system-ui, sans-serif" font-size="30" font-weight="700" letter-spacing="-1">Agent Wiki</text>`,
     ),
   );
 }

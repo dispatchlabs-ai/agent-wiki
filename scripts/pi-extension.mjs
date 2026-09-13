@@ -7,7 +7,7 @@ export default function wikiExtension(pi, { command, args }) {
   let instructions = "";
   pi.on("session_start", async (_event, ctx) => {
     try {
-      client = new Client({ name: "agentic-wiki-pi", version: "1" });
+      client = new Client({ name: "agent-wiki-pi", version: "1" });
       await client.connect(
         new StdioClientTransport({ command, args, stderr: "pipe" }),
       );

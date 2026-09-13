@@ -31,9 +31,9 @@ reach the canonical HTTPS wiki endpoint.
 For a Mac user named `you`, example absolute paths are:
 
 ```text
-/Users/you/.config/agentic-wiki/sam.json
-/Users/you/.config/agentic-wiki/sam.key.pem
-/Users/you/.config/agentic-wiki/sam.public.json
+/Users/you/.config/agent-wiki/sam.json
+/Users/you/.config/agent-wiki/sam.key.pem
+/Users/you/.config/agent-wiki/sam.public.json
 /Users/you/.codex/config.toml
 ```
 
@@ -48,7 +48,7 @@ with `--agent SAM-UUID`, then register its public file under Sam's existing owne
 name, definition, and intended role/mode. For example, on the second machine:
 
 ```sh
-node scripts/agent-keygen.mjs /Users/you/.config/agentic-wiki/sam.json \
+node scripts/agent-keygen.mjs /Users/you/.config/agent-wiki/sam.json \
   --origin https://wiki.example.org --name 'Sam' --agent SAM-UUID --role editor
 ```
 
@@ -140,7 +140,7 @@ client authentication; the server validates assertions with `jose`.
 Run from the engine checkout, replacing the origin and output path:
 
 ```sh
-node scripts/agent-keygen.mjs /home/you/.config/agentic-wiki/researcher.json \
+node scripts/agent-keygen.mjs /home/you/.config/agent-wiki/researcher.json \
   --origin https://wiki.example.org --name 'Researcher'
 ```
 
@@ -157,7 +157,7 @@ The connection file looks like this (the command fills in actual IDs):
   "endpoint": "https://wiki.example.org/mcp",
   "agent": "AGENT-UUID",
   "key": "KEY-UUID",
-  "privateKeyFile": "/home/you/.config/agentic-wiki/researcher.key.pem",
+  "privateKeyFile": "/home/you/.config/agent-wiki/researcher.key.pem",
   "scope": "wiki:read wiki:trace"
 }
 ```
@@ -211,7 +211,7 @@ scope. This foundation has only the `default` space; unknown spaces are denied.
 Back on the runtime machine:
 
 ```sh
-node scripts/agent-mcp.mjs /home/you/.config/agentic-wiki/researcher.json --check
+node scripts/agent-mcp.mjs /home/you/.config/agent-wiki/researcher.json --check
 ```
 
 It prints the authenticated agent ID, run ID, and discovered tools, then closes
@@ -227,7 +227,7 @@ absolute paths. Manage it through your deployment system when one owns that file
 ```toml
 [mcp_servers.wiki]
 command = "/usr/bin/node"
-args = ["/opt/agentic-wiki/scripts/agent-mcp.mjs", "/home/you/.config/agentic-wiki/researcher.json"]
+args = ["/opt/agent-wiki/scripts/agent-mcp.mjs", "/home/you/.config/agent-wiki/researcher.json"]
 ```
 
 Start a fresh Codex session so the connection is loaded. The adapter obtains a
@@ -269,7 +269,7 @@ so routine tests do not make billed model requests. Invocation without `--run`
 only prints help.
 
 After generating, registering, and checking a separate `claude-researcher.json`,
-create `/home/you/.config/agentic-wiki/claude-mcp.json` on the runtime machine:
+create `/home/you/.config/agent-wiki/claude-mcp.json` on the runtime machine:
 
 ```json
 {
@@ -278,8 +278,8 @@ create `/home/you/.config/agentic-wiki/claude-mcp.json` on the runtime machine:
       "type": "stdio",
       "command": "/usr/bin/node",
       "args": [
-        "/opt/agentic-wiki/scripts/agent-mcp.mjs",
-        "/home/you/.config/agentic-wiki/claude-researcher.json"
+        "/opt/agent-wiki/scripts/agent-mcp.mjs",
+        "/home/you/.config/agent-wiki/claude-researcher.json"
       ]
     }
   }
@@ -289,14 +289,14 @@ create `/home/you/.config/agentic-wiki/claude-mcp.json` on the runtime machine:
 For normal Claude sessions, register the adapter once at user scope:
 
 ```sh
-claude mcp add --scope user --transport stdio wiki -- /absolute/path/to/node /opt/agentic-wiki/scripts/agent-mcp.mjs /home/you/.config/agentic-wiki/researcher.json
+claude mcp add --scope user --transport stdio wiki -- /absolute/path/to/node /opt/agent-wiki/scripts/agent-mcp.mjs /home/you/.config/agent-wiki/researcher.json
 claude
 ```
 
 The JSON above can also be used for a dedicated session:
 
 ```sh
-claude --strict-mcp-config --mcp-config /home/you/.config/agentic-wiki/claude-mcp.json
+claude --strict-mcp-config --mcp-config /home/you/.config/agent-wiki/claude-mcp.json
 ```
 
 `--strict-mcp-config` limits this session to explicitly supplied MCP configuration;
@@ -329,8 +329,8 @@ for await (const message of query({
       wiki: {
         command: "/usr/bin/node",
         args: [
-          "/opt/agentic-wiki/scripts/agent-mcp.mjs",
-          "/home/you/.config/agentic-wiki/claude-researcher.json",
+          "/opt/agent-wiki/scripts/agent-mcp.mjs",
+          "/home/you/.config/agent-wiki/claude-researcher.json",
         ],
       },
     },
@@ -352,13 +352,13 @@ authentication in your application, then run step 5; see the
 After steps 1–3, create `~/.pi/agent/extensions/wiki.ts`:
 
 ```typescript
-import wiki from "/opt/agentic-wiki/scripts/pi-extension.mjs";
+import wiki from "/opt/agent-wiki/scripts/pi-extension.mjs";
 export default function (pi) {
   wiki(pi, {
     command: "/absolute/path/to/node",
     args: [
-      "/opt/agentic-wiki/scripts/agent-mcp.mjs",
-      "/home/you/.config/agentic-wiki/researcher.json",
+      "/opt/agent-wiki/scripts/agent-mcp.mjs",
+      "/home/you/.config/agent-wiki/researcher.json",
     ],
   });
 }
@@ -411,7 +411,7 @@ filename and name. Launch its runtime with that connection file. For example, a
 separate Codex process can select it without changing the default connection:
 
 ```sh
-codex -c 'mcp_servers.wiki.args=["/opt/agentic-wiki/scripts/agent-mcp.mjs","/home/you/.config/agentic-wiki/librarian.json"]'
+codex -c 'mcp_servers.wiki.args=["/opt/agent-wiki/scripts/agent-mcp.mjs","/home/you/.config/agent-wiki/librarian.json"]'
 ```
 
 Multiple processes using one file are separate runs of the **same principal**.
@@ -442,7 +442,7 @@ keep secrets out of diagnostic logs.
 Generate a fresh key with a new filename and the existing agent ID:
 
 ```sh
-node scripts/agent-keygen.mjs /home/you/.config/agentic-wiki/researcher-next.json \
+node scripts/agent-keygen.mjs /home/you/.config/agent-wiki/researcher-next.json \
   --origin https://wiki.example.org --name 'Researcher' --agent AGENT-UUID
 ```
 

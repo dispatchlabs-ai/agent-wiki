@@ -1,6 +1,6 @@
 # Versioning and releases
 
-Agentic Wiki follows [Semantic Versioning 2.0.0](https://semver.org/).
+Agent Wiki follows [Semantic Versioning 2.0.0](https://semver.org/).
 The public contract covers the documented HTTP, MCP and WebMCP APIs, CLI commands,
 configuration, article format, and persisted trace and edit-receipt formats.
 Internal modules and disposable indexes/caches are not public APIs. Raising the
@@ -87,3 +87,11 @@ Before future releases, verify both the local signature and GitHub's recognition
 of the key. If GitHub still reports the key as unknown, report that limitation
 instead of describing the tag as GitHub-verified. Announce future key changes with
 the new fingerprint and preserve prior public keys for historical verification.
+
+## Project rename
+
+The repository is now `dispatchlabs-ai/agent-wiki`. Update clone remotes and local
+checkout paths to the new name. Existing GitHub links redirect automatically.
+The persisted `urn:agentic-wiki:local` issuer intentionally remains unchanged to
+preserve account identity and grants. Historical release artifacts retain their
+original bytes and signatures.

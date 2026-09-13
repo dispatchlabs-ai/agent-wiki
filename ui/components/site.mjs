@@ -15,7 +15,7 @@ export function Brand() {
       "span",
       { className: "brand-lockup" },
       h("span", { className: "brand-mark", "aria-hidden": true }),
-      h("span", null, "Agentic Wiki"),
+      h("span", null, "Agent Wiki"),
     ),
     h(
       "span",
@@ -78,7 +78,7 @@ export function SiteFooter({ signedOut = false }) {
     h(
       "span",
       { className: "footer-links" },
-      "Agentic Wiki",
+      "Agent Wiki",
       !signedOut && " · ",
       !signedOut &&
         h("a", { href: "/api/articles/authoring.json" }, "Agent API"),
