@@ -185,8 +185,12 @@ export const queryLink = (pathname, params) =>
       ([, v]) => v !== "" && v !== null && v !== undefined,
     ),
   ).toString();
-export function shell(title, body, { active = "", className = "" } = {}) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><title>${escape(title)} · Agentic Wiki</title><script src="/assets/theme.js"></script><link rel="stylesheet" href="/assets/theme.css"><link rel="stylesheet" href="/assets/typeset.css"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ui.css"><script type="module" src="/assets/vendor/ui.js"></script><script type="module" src="/assets/client.js"></script></head><body><a class="skip-link" href="#main">Skip to content</a>${renderToStaticMarkup(createElement(SiteHeader, { active }))}<main id="main" class="${escape(className)}">${body}</main>${renderToStaticMarkup(createElement(SiteFooter))}</body></html>`;
+export function shell(
+  title,
+  body,
+  { active = "", className = "", signedOut = false } = {},
+) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><title>${escape(title)} · Agentic Wiki</title><script src="/assets/theme.js"></script><link rel="stylesheet" href="/assets/theme.css"><link rel="stylesheet" href="/assets/typeset.css"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ui.css"><script type="module" src="/assets/vendor/ui.js"></script><script type="module" src="/assets/client.js"></script></head><body><a class="skip-link" href="#main">Skip to content</a>${renderToStaticMarkup(createElement(SiteHeader, { active, signedOut }))}<main id="main" class="${escape(className)}">${body}</main>${renderToStaticMarkup(createElement(SiteFooter, { signedOut }))}</body></html>`;
 }
 export function sources(page) {
   const found = new Map();

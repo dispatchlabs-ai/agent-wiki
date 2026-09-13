@@ -490,3 +490,51 @@ test("create an agent in the browser, grant access, and approve a remote connect
     page.getByRole("heading", { name: "No active connections" }),
   ).toBeVisible();
 });
+
+test("signed-out pages omit navigation and search until sign-in", async ({
+  page,
+}) => {
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme: width === 390 ? "light" : "dark" });
+    for (const path of ["/traces/", "/auth/local/setup"]) {
+      await page.goto(base + path);
+      await expect(
+        page.getByRole("navigation", { name: "Main navigation" }),
+      ).toHaveCount(0);
+      await expect(
+        page.locator(
+          "#quick-search, #account-menu, .header-search, .mobile-search",
+        ),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "Agent API", exact: true }),
+      ).toHaveCount(0);
+      await page.keyboard.press("Control+k");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(page.getByLabel("Appearance")).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+    }
+    await page.goto(base + "/traces/");
+    await page.screenshot({
+      path: test.info().outputPath(`signed-out-${width}.png`),
+      fullPage: true,
+    });
+  }
+  await page.getByRole("link", { name: "Continue to sign in" }).click();
+  await page
+    .getByRole("button", { name: "Example owner", exact: true })
+    .click();
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
+  await page
+    .locator("#quick-search")
+    .getByRole("button", { name: "Search", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+});

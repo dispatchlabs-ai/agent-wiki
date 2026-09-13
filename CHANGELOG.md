@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — signed-out navigation
+
+- Hide unavailable navigation, search, account controls and the Agent API link on
+  sign-in and account-setup pages. Keep branding and appearance controls available.
+  Authenticated pages and the synthetic example retain their full navigation.
+
 ## 0.4.0 — authenticated hosting and remote agents
 
 Breaking change: the standalone server now requires an authoritative control

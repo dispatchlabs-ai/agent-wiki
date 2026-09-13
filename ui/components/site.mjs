@@ -43,41 +43,44 @@ export function SiteNavigation({ active }) {
   );
 }
 
-export function SiteHeader({ active }) {
+export function SiteHeader({ active, signedOut = false }) {
   return h(
     "header",
-    { className: "site-header" },
+    { className: signedOut ? "site-header signed-out-header" : "site-header" },
     h(Brand),
-    h(SiteNavigation, { active }),
-    h(
-      "div",
-      { className: "header-actions" },
-      h(SearchForm, { compact: true }),
-      h("span", { id: "quick-search" }),
+    !signedOut && h(SiteNavigation, { active }),
+    !signedOut &&
       h(
-        "a",
-        {
-          className: "mobile-search",
-          href: "/search/",
-          "aria-label": "Search",
-        },
-        h(SearchIcon),
-        h("span", { className: "search-trigger-text" }, "Search"),
+        "div",
+        { className: "header-actions" },
+        h(SearchForm, { compact: true }),
+        h("span", { id: "quick-search" }),
+        h(
+          "a",
+          {
+            className: "mobile-search",
+            href: "/search/",
+            "aria-label": "Search",
+          },
+          h(SearchIcon),
+          h("span", { className: "search-trigger-text" }, "Search"),
+        ),
+        h("span", { id: "account-menu" }),
       ),
-      h("span", { id: "account-menu" }),
-    ),
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ signedOut = false }) {
   return h(
     "footer",
     { className: "site-footer" },
     h(
       "span",
       { className: "footer-links" },
-      "Agentic Wiki · ",
-      h("a", { href: "/api/articles/authoring.json" }, "Agent API"),
+      "Agentic Wiki",
+      !signedOut && " · ",
+      !signedOut &&
+        h("a", { href: "/api/articles/authoring.json" }, "Agent API"),
     ),
     h(
       "label",

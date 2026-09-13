@@ -1315,3 +1315,8 @@ body > main {
     padding: 20px;
   }
 }
+
+/* Authentication pages have no unavailable navigation or client search mounts. */
+.site-header.signed-out-header {
+  grid-template-columns: minmax(0, 1fr);
+}
