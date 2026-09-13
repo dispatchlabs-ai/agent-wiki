@@ -1,4 +1,4 @@
-import { SearchForm } from "../ui/components/search.mjs";
+import { ArticlesCatalog, SearchPage } from "../ui/components/library.mjs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ArticleCard, UpdatePeriod } from "../ui/components/site.mjs";
@@ -88,7 +88,14 @@ export function topics(wiki, params) {
     );
   return shell(
     "Articles",
-    `<h1>Articles</h1><p class="lede">Browse the people, organizations, and ideas in your wiki.</p><div class="filter-layout"><details class="filter-panel" data-responsive-details open><summary>Filter articles</summary><form class="filter-form" action="/wiki/">${topicSelect(wiki, topic)}<label>Sort<select name="sort">${option("title", "Title A–Z", sort)}${option("updated", "Recently updated", sort)}</select></label><button>Apply filters</button></form></details><div><p class="meta">${pages.length} articles${topic ? ` · ${e(topic)}` : ""}</p>${pages.length ? pages.map((p) => `<section class="entry"><h2>${link(p.url, p.title)}</h2><p>${e(p.description)}</p><p class="meta">${e(p.topic)} · Updated ${date(p.updated_at)}</p></section>`).join("") : empty("No articles match this topic.")}</div></div>`,
+    renderToStaticMarkup(
+      createElement(ArticlesCatalog, {
+        pages,
+        topics: topicNames(wiki),
+        topic,
+        sort,
+      }),
+    ),
     { active: "Articles" },
   );
 }
@@ -270,65 +277,21 @@ function traceProvenance(hit) {
   return `<details><summary>Seen in ${hit.snapshot_count} snapshots</summary>${list(hit.provenance.map((p) => link(p.url, `Imported ${date(p.imported_at)} · line ${p.line}`)))}${hit.provenance_nextOffset !== null ? `<p>${link(`/traces/provenance/?key=${hit.logical_key}`, "All source citations")}</p>` : ""}</details>`;
 }
 export function searchView(wiki, params, articles, traces) {
-  const q = params.get("q") || "";
-  const type = ["articles", "traces"].includes(params.get("type"))
-    ? params.get("type")
-    : "all";
-  const state = params.get("state") || "",
-    topic = params.get("topic") || "",
-    format = params.get("format") || "",
-    machine = params.get("machine") || "";
   return shell(
     "Search",
-    `<h1>Search the wiki</h1>${renderToStaticMarkup(
-      createElement(SearchForm, {
-        id: "search-query",
-        query: q,
-        hidden: { type, state, topic, format, machine },
-        live: true,
-        label: "Search query",
+    renderToStaticMarkup(
+      createElement(SearchPage, {
+        params,
+        topics: topicNames(wiki),
+        articleHTML: articleResults(articles, params),
+        traceHTML: traceResults(traces, params),
+        pending: traces.pending,
+        fallbackURL: queryLink(
+          "/search/",
+          Object.fromEntries([...params.entries(), ["sync", "1"]]),
+        ),
       }),
-    )}<nav class="tabs" aria-label="Search type">${[
-      ["all", "All"],
-      ["articles", "Articles"],
-      ["traces", "Conversations"],
-    ]
-      .map(([v, l]) => {
-        const p = new URLSearchParams(params);
-        p.set("type", v);
-        p.delete("offset");
-        p.delete("traceOffset");
-        return `<a href="/search/?${e(p.toString())}"${v === type ? ' aria-current="page"' : ""}>${l}</a>`;
-      })
-      .join(
-        "",
-      )}</nav><div class="layout"><div>${type !== "traces" ? `<h2>Articles</h2><div id="article-results" aria-live="polite">${articleResults(articles, params)}</div>` : ""}${type !== "articles" ? `<h2>Conversations</h2><div id="trace-results" aria-live="polite"${traces.pending ? ' data-pending="true"' : ""}>${traceResults(traces, params)}</div>${traces.pending ? `<noscript>${link(queryLink("/search/", Object.fromEntries([...params.entries(), ["sync", "1"]])), "Load conversation results")}</noscript>` : ""}` : ""}</div><aside class="sidebar"><details data-responsive-details open><summary>Filter results</summary><form class="filter-form" action="/search/"><input type="hidden" name="q" value="${e(q)}"><label>Type<select name="type">${[
-      ["all", "All"],
-      ["articles", "Articles"],
-      ["traces", "Conversations"],
-    ]
-      .map(([v, l]) => option(v, l, type))
-      .join(
-        "",
-      )}</select></label>${topicSelect(wiki, topic)}<label>Task status<select name="state">${[
-      ["", "Any status"],
-      ["pending", "Pending"],
-      ["wip", "In progress"],
-      ["done", "Done"],
-    ]
-      .map(([v, l]) => option(v, l, state))
-      .join(
-        "",
-      )}</select></label><p class="meta">Topic and task status filter articles.</p><label>Trace harness<select name="format">${[
-      ["", "All"],
-      ["codex", "Codex"],
-      ["pi", "pi"],
-      ["claude", "Claude Code"],
-    ]
-      .map(([v, l]) => option(v, l, format))
-      .join(
-        "",
-      )}</select></label><label>Trace machine<input name="machine" value="${e(machine)}" maxlength="100" placeholder="Any machine"></label><button>Apply filters</button></form></details></aside></div>`,
+    ),
     { className: "search-page" },
   );
 }

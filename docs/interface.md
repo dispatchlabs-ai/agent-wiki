@@ -157,3 +157,9 @@ Do not hydrate static markup or put source content into the asset build.
 Next migrations: Articles/search and authentication/consent, then reader metadata
 and editing controls. Migrate one complete workflow at a time and preserve
 keyboard, no-JavaScript, print, citation and live-content behavior.
+
+Articles and search now compose the shared primitives through
+`ui/components/library.mjs`. Search result fragments retain their shared server/
+browser renderer in `public/search-results.js`, using the same scoped list styles
+for initial HTML and asynchronous updates. Filter groups distinguish article
+metadata from conversation sources; type navigation remains ordinary links.

@@ -64,6 +64,10 @@ test("articles appear before a delayed trace query; typing updates both groups a
   backend.state.delay = 0;
   await page.locator("#search-query").fill("captured");
   await expect(page).toHaveURL(/q=captured/);
+  await expect(page.locator("[data-clear-search-filters]")).toHaveAttribute(
+    "href",
+    "/search/?q=captured",
+  );
   await expect(
     page.locator('nav[aria-label="Search type"] a').last(),
   ).toHaveAttribute("href", /q=captured/);
@@ -241,5 +245,66 @@ test("conversation components keep filters and navigation native across layouts"
       await page.getByRole("link", { name: "Clear filters" }).click();
       await expect(page).toHaveURL(base + "/traces/");
     }
+  }
+});
+
+test("Articles and search share responsive controls with native fallbacks", async ({
+  browser,
+}, testInfo) => {
+  for (const javaScriptEnabled of [true, false]) {
+    const context = await browser.newContext({ javaScriptEnabled });
+    const page = await context.newPage();
+    for (const width of [320, 1440]) {
+      for (const colorScheme of ["light", "dark"]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.emulateMedia({ colorScheme });
+        await page.goto(base + "/wiki/?topic=Research&sort=updated");
+        const filters = page.locator(".catalog-filters");
+        if (!(await filters.evaluate((el) => el.hasAttribute("open"))))
+          await filters.locator("summary").click();
+        await expect(page.getByLabel("Topic", { exact: true })).toHaveValue(
+          "Research",
+        );
+        await expect(page.getByLabel("Sort", { exact: true })).toHaveValue(
+          "updated",
+        );
+        await page.getByRole("button", { name: "Apply filters" }).click();
+        await expect(page).toHaveURL(/topic=Research/);
+        await expect(page.locator(".ui-result-row")).toContainText(
+          "Prototype guide",
+        );
+        await page.screenshot({
+          path: testInfo.outputPath(
+            `articles-${width}-${colorScheme}-${javaScriptEnabled}.png`,
+          ),
+          fullPage: true,
+        });
+        await page.goto(base + "/search/?q=prototype&sync=1");
+        await expect(page.locator("#article-results")).toContainText(
+          "Prototype guide",
+        );
+        await expect(page.locator("#trace-results")).toContainText(
+          "Prototype archive discussion",
+        );
+        await page.screenshot({
+          path: testInfo.outputPath(
+            `search-${width}-${colorScheme}-${javaScriptEnabled}.png`,
+          ),
+          fullPage: true,
+        });
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+        await page
+          .getByRole("navigation", { name: "Search type" })
+          .getByRole("link", { name: "Articles", exact: true })
+          .click();
+        await expect(page).toHaveURL(/type=articles/);
+        await expect(page.locator("#trace-results")).toHaveCount(0);
+      }
+    }
+    await context.close();
   }
 });

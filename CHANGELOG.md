@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.7 — Articles and search components
+
+- Apply shared server-rendered headings, fields, buttons, list styles and metadata
+  to Articles and search. Group filters clearly and preserve live search, native
+  forms, relevance ranking, citation links and pagination.
+
 ## 0.4.6 — shared UI and Conversations pilot
 
 - Introduce shared server-safe controls, fields, badges, headings, timestamps,

@@ -206,6 +206,9 @@ if (typeof document !== "undefined") {
         document
           .querySelectorAll('.filter-form input[name="q"]')
           .forEach((el) => (el.value = q));
+        const clear = document.querySelector("[data-clear-search-filters]");
+        if (clear)
+          clear.setAttribute("href", "/search/?" + new URLSearchParams({ q }));
       } else {
         for (const key of ["offset", "traceOffset"]) {
           const value = new URLSearchParams(location.search).get(key);

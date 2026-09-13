@@ -1,4 +1,5 @@
 import { createElement as h } from "react";
+import { Button } from "./primitives.mjs";
 
 export function SearchIcon() {
   return h(
@@ -31,7 +32,11 @@ export function SearchForm({
   return h(
     "form",
     {
-      className: compact ? "header-search" : "search-form",
+      className: compact
+        ? "header-search"
+        : live
+          ? "search-form catalog-search ui-field"
+          : "search-form",
       action: "/search/",
       role: "search",
       "data-live-search": live ? true : undefined,
@@ -53,6 +58,10 @@ export function SearchForm({
     ...Object.entries(hidden).map(([name, value]) =>
       h("input", { key: name, type: "hidden", name, value }),
     ),
-    h("button", { type: "submit" }, "Search"),
+    h(
+      live ? Button : "button",
+      { type: "submit", ...(live ? { variant: "primary" } : {}) },
+      "Search",
+    ),
   );
 }
