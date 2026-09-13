@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
+    "@dispatchlabs-ai/agent-house": "file:vendor/dispatchlabs-ai-agent-house-0.1.0-alpha.3.tgz",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",

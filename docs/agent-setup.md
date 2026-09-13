@@ -511,3 +511,28 @@ Back up the authoritative control database consistently along with content and
 traces. On disaster recovery, revoke restored agent keys/runs before reopening if
 restoring old revocations would be unsafe. Losing the database is not an index
 repair: it loses registered identities, permissions, and revocation state.
+
+## Require Agent House execution admission
+
+For named agents running alongside an independent Agent House authority on the
+same host, set `WIKI_AGENT_HOUSE_DATABASE` to its SQLite database and
+`WIKI_AGENT_HOUSE_AGENTS` to a comma-separated list of their existing principal
+IDs. Restart the wiki after changing these settings. The service must have
+read-only access to that database; its own control database remains separate.
+This integration ships the Agent House `./resource` verifier, version
+`0.1.0-alpha.3`, in the vendored package.
+
+Each listed agent must present a per-execution capability in its signed assertion.
+Agent House supplies it automatically through `invoke`/`run.start`. The wiki
+binds one resource run to that execution and rechecks its current authorization
+before releasing content or making edits. A signing key alone, the legacy CLI,
+and a saved remote login without an admitted execution are rejected for managed
+agents. Unlisted agents retain their existing authentication flow.
+
+Missing/unreadable authority state, expired capability, revoked caller access or
+finished execution denies access. The wiki retains its own space permissions
+and signing-key checks; invocation grants do not grant resource access. Token
+renewal must preserve the same execution/run pair. A revoked execution may still
+close its existing resource run, without reading content. Historical wiki run
+rows and identities are preserved. This is a same-host adapter, not cross-host
+SSO or a shared writable identity database. No decision is cached.

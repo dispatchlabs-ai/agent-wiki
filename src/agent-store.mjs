@@ -1,9 +1,10 @@
+import { authorizeResource } from "@dispatchlabs-ai/agent-house/resource";
+import { AgentIdentityStore } from "@dispatchlabs-ai/agent-house/identity";
 import { randomUUID } from "node:crypto";
 import { digest, secret } from "./control-store.mjs";
 import { WikiError } from "./errors.mjs";
 
 const actions = new Set(["read", "write", "trace"]);
-const controls = new Set(["invoke", "configure", "manage-access"]);
 const fail = () => {
   throw new WikiError("NOT_FOUND", "Not found", 404);
 };
@@ -56,15 +57,17 @@ const permits = (entries, space, action) =>
   entries.some((e) => e.space === space && e.actions.includes(action));
 
 /** Durable agent identity and authority. The runtime, not the wiki, executes runs. */
-export class AgentStore {
+export class AgentStore extends AgentIdentityStore {
   constructor(control, { now = () => Date.now() } = {}) {
-    this.control = control;
-    this.db = control.db;
-    this.now = now;
+    super(control, { now, ErrorType: WikiError });
+    this.houseDatabase = process.env.WIKI_AGENT_HOUSE_DATABASE;
+    this.houseAgents = new Set(
+      (process.env.WIKI_AGENT_HOUSE_AGENTS || "").split(",").filter(Boolean),
+    );
+    if (this.houseAgents.size && !this.houseDatabase)
+      throw Error("Agent House database is required for managed agents");
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS agents(id TEXT PRIMARY KEY REFERENCES principals(id), owner TEXT NOT NULL REFERENCES principals(id), definition TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS agent_definitions(id TEXT PRIMARY KEY, agent TEXT NOT NULL REFERENCES agents(id), config TEXT NOT NULL, created INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS agent_permissions(agent TEXT NOT NULL REFERENCES agents(id), principal TEXT NOT NULL REFERENCES principals(id), permission TEXT NOT NULL CHECK(permission IN ('invoke','configure','manage-access')), PRIMARY KEY(agent,principal,permission));
+      CREATE TABLE IF NOT EXISTS agent_house_runs(run TEXT PRIMARY KEY,execution TEXT NOT NULL,audience TEXT NOT NULL,UNIQUE(execution,audience));
       CREATE TABLE IF NOT EXISTS agent_keys(agent TEXT NOT NULL REFERENCES agents(id), kid TEXT NOT NULL, jwk TEXT NOT NULL, authorization TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(agent,kid));
       CREATE TABLE IF NOT EXISTS agent_delegations(id TEXT PRIMARY KEY, agent TEXT NOT NULL REFERENCES agents(id), subject TEXT NOT NULL REFERENCES principals(id), scope TEXT NOT NULL, expires INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1);
       CREATE TABLE IF NOT EXISTS agent_runs(id TEXT PRIMARY KEY, agent TEXT NOT NULL REFERENCES agents(id), initiator TEXT NOT NULL REFERENCES principals(id), mode TEXT NOT NULL CHECK(mode IN ('delegated','independent')), delegation TEXT REFERENCES agent_delegations(id), definition TEXT NOT NULL REFERENCES agent_definitions(id), scope TEXT NOT NULL, trace_space TEXT NOT NULL REFERENCES spaces(id), expires INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1, created INTEGER NOT NULL, runtime_key TEXT);
@@ -122,38 +125,7 @@ export class AgentStore {
           expiresAt: spec.expiresAt,
         };
       }
-      const a = this.db
-        .prepare(
-          "SELECT a.*,p.name FROM agents a JOIN principals p ON p.id=a.id WHERE a.id=?",
-        )
-        .get(spec.agent);
-      if (a) {
-        if (
-          a.owner !== owner ||
-          a.name !== name ||
-          this.db
-            .prepare("SELECT config FROM agent_definitions WHERE id=?")
-            .get(a.definition).config !== config
-        )
-          throw new WikiError(
-            "REGISTRATION_CONFLICT",
-            "Existing agent definition or owner differs",
-            409,
-          );
-        this.get(spec.agent);
-      } else {
-        const definition = randomUUID();
-        this.db
-          .prepare("INSERT INTO principals(id,kind,name) VALUES (?,'agent',?)")
-          .run(spec.agent, name);
-        this.db
-          .prepare("INSERT INTO agents VALUES (?,?,?)")
-          .run(spec.agent, owner, definition);
-        this.db
-          .prepare("INSERT INTO agent_definitions VALUES (?,?,?,?)")
-          .run(definition, spec.agent, config, this.now());
-        this.record("operator", "agent:create", spec.agent);
-      }
+      this.enrollDefinition(spec.agent, owner, name, spec.definition);
       let delegation = null;
       if (mode === "independent") {
         this.db
@@ -191,160 +163,15 @@ export class AgentStore {
       };
     });
   }
-  principal(id) {
-    return (
-      this.db
-        .prepare("SELECT * FROM principals WHERE id=? AND active=1")
-        .get(id) || fail()
-    );
-  }
-  human(id) {
-    const p = this.principal(id);
-    if (p.kind !== "human") fail();
-    return p;
-  }
-  record(actor, action, target) {
+  onRevokeInvoke(agent, principal) {
     this.db
-      .prepare("INSERT INTO audit(actor,action,target) VALUES (?,?,?)")
-      .run(actor, action, target);
-  }
-  get(id) {
-    return (
-      this.db
-        .prepare(
-          "SELECT a.*,p.name FROM agents a JOIN principals p ON p.id=a.id WHERE a.id=? AND p.active=1",
-        )
-        .get(id) || fail()
-    );
-  }
-  allowed(actor, agent, permission) {
-    this.principal(actor);
-    const a = this.get(agent);
-    return (
-      a.owner === actor ||
-      !!this.db
-        .prepare(
-          "SELECT 1 FROM agent_permissions WHERE agent=? AND principal=? AND permission=?",
-        )
-        .get(agent, actor, permission)
-    );
-  }
-  require(actor, agent, permission) {
-    if (!this.allowed(actor, agent, permission)) fail();
-  }
-  list(actor) {
-    this.human(actor);
-    return this.db
       .prepare(
-        "SELECT a.*,p.name,p.active FROM agents a JOIN principals p ON p.id=a.id WHERE a.owner=? OR EXISTS (SELECT 1 FROM agent_permissions g WHERE g.agent=a.id AND g.principal=?) ORDER BY p.name",
+        "UPDATE remote_grants SET active=0 WHERE agent=? AND principal=?",
       )
-      .all(actor, actor);
+      .run(agent, principal);
   }
-  definition(value) {
-    if (
-      !value ||
-      typeof value !== "object" ||
-      Array.isArray(value) ||
-      typeof value.instructions !== "string" ||
-      value.instructions.length > 20000 ||
-      !Array.isArray(value.tools) ||
-      value.tools.length > 100 ||
-      value.tools.some((t) => typeof t !== "string" || t.length > 200) ||
-      Object.keys(value).some((k) => !["instructions", "tools"].includes(k))
-    )
-      throw new WikiError(
-        "INVALID_DEFINITION",
-        "Specify instructions and tool names only; credentials do not belong in definitions",
-        400,
-      );
-    return JSON.stringify(value);
-  }
-  create(actor, { name, definition }) {
-    this.human(actor);
-    name = text(name);
-    const config = this.definition(definition);
-    return this.control.transaction(() => {
-      const id = randomUUID(),
-        version = randomUUID();
-      this.db
-        .prepare("INSERT INTO principals(id,kind,name) VALUES (?,'agent',?)")
-        .run(id, name);
-      this.db
-        .prepare("INSERT INTO agents VALUES (?,?,?)")
-        .run(id, actor, version);
-      this.db
-        .prepare("INSERT INTO agent_definitions VALUES (?,?,?,?)")
-        .run(version, id, config, this.now());
-      this.record(actor, "agent:create", id);
-      return this.get(id);
-    });
-  }
-  configure(actor, agent, definition) {
-    const config = this.definition(definition);
-    return this.control.transaction(() => {
-      this.require(actor, agent, "configure");
-      const id = randomUUID();
-      this.db
-        .prepare("INSERT INTO agent_definitions VALUES (?,?,?,?)")
-        .run(id, agent, config, this.now());
-      this.db
-        .prepare("UPDATE agents SET definition=? WHERE id=?")
-        .run(id, agent);
-      this.record(actor, "agent:configure", agent);
-      return { definition: id };
-    });
-  }
-  permission(actor, agent, principal, permission, enabled) {
-    if (!controls.has(permission) || typeof enabled !== "boolean")
-      throw new WikiError(
-        "INVALID_PERMISSION",
-        "Invalid agent permission",
-        400,
-      );
-    return this.control.transaction(() => {
-      this.require(actor, agent, "manage-access");
-      this.human(principal);
-      if (enabled)
-        this.db
-          .prepare("INSERT OR IGNORE INTO agent_permissions VALUES (?,?,?)")
-          .run(agent, principal, permission);
-      else
-        this.db
-          .prepare(
-            "DELETE FROM agent_permissions WHERE agent=? AND principal=? AND permission=?",
-          )
-          .run(agent, principal, permission);
-      if (!enabled && permission === "invoke") {
-        this.db
-          .prepare(
-            "UPDATE remote_grants SET active=0 WHERE agent=? AND principal=?",
-          )
-          .run(agent, principal);
-      }
-      this.record(
-        actor,
-        "agent:permission:" + permission + ":" + enabled,
-        agent + ":" + principal,
-      );
-    });
-  }
-  transfer(actor, agent, owner) {
-    return this.control.transaction(() => {
-      this.require(actor, agent, "manage-access");
-      this.human(owner);
-      this.db.prepare("UPDATE agents SET owner=? WHERE id=?").run(owner, agent);
-      this.record(actor, "agent:owner", agent + ":" + owner);
-    });
-  }
-  suspend(actor, agent) {
-    return this.control.transaction(() => {
-      this.require(actor, agent, "manage-access");
-      this.db.prepare("UPDATE principals SET active=0 WHERE id=?").run(agent);
-      this.db
-        .prepare("UPDATE agent_runs SET active=0 WHERE agent=?")
-        .run(agent);
-      this.record(actor, "agent:suspend", agent);
-    });
+  onSuspend(agent) {
+    this.db.prepare("UPDATE agent_runs SET active=0 WHERE agent=?").run(agent);
   }
   role(principal, space) {
     return this.control.role(principal, space);
@@ -474,8 +301,30 @@ export class AgentStore {
       r.mode === "delegated" ? this.delegation(r.delegation, r.agent) : null;
     return { ...r, scope: JSON.parse(r.scope), subject: d?.subject || null };
   }
+  houseRun(r) {
+    if (!this.houseAgents.has(r.agent)) return;
+    const binding = this.db
+      .prepare("SELECT * FROM agent_house_runs WHERE run=?")
+      .get(r.id);
+    if (!binding) fail();
+    try {
+      const approval = authorizeResource(
+        this.houseDatabase,
+        {
+          agent: r.agent,
+          audience: binding.audience,
+          execution: binding.execution,
+        },
+        this.now(),
+      );
+      if (approval.initiator !== r.initiator) fail();
+    } catch {
+      fail();
+    }
+  }
   authorize(runId, space, action) {
     const r = this.run(runId);
+    this.houseRun(r);
     if (!permits(r.scope, space, action)) fail();
     if (r.mode === "delegated") {
       const d = this.delegation(r.delegation, r.agent);
@@ -601,9 +450,37 @@ export class AgentStore {
     this.require(authorization.initiator, agent, "invoke");
     return JSON.parse(k.jwk);
   }
-  issue(agent, kid, runId, audience, requestedScope, jti, assertionExpires) {
+  issue(
+    agent,
+    kid,
+    runId,
+    audience,
+    requestedScope,
+    jti,
+    assertionExpires,
+    houseProof,
+  ) {
     return this.control.transaction(() => {
       this.key(agent, kid);
+      let house = null;
+      if (this.houseAgents.has(agent)) {
+        if (typeof houseProof !== "string") fail();
+        try {
+          house = authorizeResource(
+            this.houseDatabase,
+            { agent, audience, proof: houseProof },
+            this.now(),
+          );
+        } catch {
+          fail();
+        }
+        const linked = this.db
+          .prepare(
+            "SELECT run FROM agent_house_runs WHERE execution=? AND audience=?",
+          )
+          .get(house.execution, audience);
+        if (linked && linked.run !== runId) fail();
+      }
       text(jti, 200);
       if (
         !Number.isSafeInteger(assertionExpires) ||
@@ -666,6 +543,21 @@ export class AgentStore {
         r.runtime_key = kid;
       }
       if (r.agent !== agent || r.runtime_key !== kid) fail();
+      if (house) {
+        if (house.initiator !== r.initiator) fail();
+        const existing = this.db
+          .prepare("SELECT * FROM agent_house_runs WHERE run=?")
+          .get(r.id);
+        if (
+          existing &&
+          (existing.execution !== house.execution ||
+            existing.audience !== audience)
+        )
+          fail();
+        this.db
+          .prepare("INSERT OR IGNORE INTO agent_house_runs VALUES (?,?,?)")
+          .run(r.id, house.execution, audience);
+      }
       runId = r.id;
       const entries = requestedScope ? scope(requestedScope) : r.scope;
       for (const entry of entries)
@@ -695,7 +587,7 @@ export class AgentStore {
       };
     });
   }
-  authenticate(token, audience) {
+  authenticate(token, audience, closing = false) {
     const row = this.db
       .prepare(
         "SELECT * FROM agent_tokens WHERE hash=? AND audience=? AND expires>?",
@@ -704,6 +596,7 @@ export class AgentStore {
     if (!row) return this.authenticateRemote(token, audience);
     const r = this.run(row.run);
     this.key(r.agent, row.kid);
+    if (!closing) this.houseRun(r);
     return {
       id: r.agent,
       kind: "agent",
@@ -725,6 +618,7 @@ export class AgentStore {
     this.human(row.principal);
     const r = this.run(row.run);
     if (r.agent !== row.agent || r.initiator !== row.principal) fail();
+    this.houseRun(r);
     return {
       id: r.agent,
       kind: "agent",

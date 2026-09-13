@@ -141,13 +141,14 @@ export class AgentAuth {
         entries,
         payload.jti,
         payload.exp * 1000,
+        payload.agent_house_proof,
       );
     } catch (error) {
       if (error instanceof WikiError && error.status === 429) throw error;
       throw denied();
     }
   }
-  bearer(header) {
+  bearer(header, closing = false) {
     if (
       typeof header !== "string" ||
       !/^Bearer [A-Za-z0-9_-]{43}$/i.test(header)
@@ -155,7 +156,10 @@ export class AgentAuth {
       throw denied();
     const token = header.slice(7);
     try {
-      return { token, actor: this.agents.authenticate(token, this.resource) };
+      return {
+        token,
+        actor: this.agents.authenticate(token, this.resource, closing),
+      };
     } catch {
       throw denied();
     }
@@ -169,9 +173,9 @@ export class AgentAuth {
       return "trace";
     throw new WikiError("NOT_FOUND", "Not found", 404);
   }
-  require(token, action) {
+  require(token, action, closing = false) {
     return action
       ? this.agents.requireToken(token, this.resource, "default", action)
-      : this.agents.authenticate(token, this.resource);
+      : this.agents.authenticate(token, this.resource, closing);
   }
 }

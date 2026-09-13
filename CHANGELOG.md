@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add opt-in Agent House execution admission for same-host managed agents; retain wiki resource scopes and permit cleanup after revocation.
+- Vendor Agent House 0.1.0-alpha.3 with a read-only resource authorization adapter.
+
 - Rename the project and repository to Agent Wiki (`agent-wiki`). Existing local
   identity issuer values remain stable so accounts and grants keep working.
 

@@ -259,11 +259,16 @@ export function createWiki({
         !url.pathname.startsWith("/assets/")
       ) {
         res.setHeader("WWW-Authenticate", agentAuth.challenge());
-        const identity = agentAuth.bearer(req.headers.authorization);
+        const closingAgent =
+          req.method === "DELETE" && url.pathname === "/api/agent/run";
+        const identity = agentAuth.bearer(
+          req.headers.authorization,
+          closingAgent,
+        );
         agentToken = identity.token;
         actor = identity.actor;
         agentAction = agentAuth.action(url.pathname);
-        agentAuth.require(agentToken, agentAction);
+        agentAuth.require(agentToken, agentAction, closingAgent);
         if (
           (req.headers.origin !== undefined && req.headers.origin !== origin) ||
           req.headers["sec-fetch-site"] === "cross-site"
@@ -655,7 +660,7 @@ export function createWiki({
           });
         if (req.method === "DELETE") {
           control.transaction(() => {
-            const current = agentAuth.require(agentToken, null);
+            const current = agentAuth.require(agentToken, null, true);
             control.db
               .prepare("UPDATE agent_runs SET active=0 WHERE id=?")
               .run(current.run);

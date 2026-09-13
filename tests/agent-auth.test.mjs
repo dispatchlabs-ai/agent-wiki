@@ -37,7 +37,12 @@ function registration(name = "Researcher") {
 }
 async function setup(
   t,
-  { role = "reader", mode = "independent", options = {} } = {},
+  {
+    role = "reader",
+    mode = "independent",
+    options = {},
+    houseDatabase = undefined,
+  } = {},
 ) {
   const repo = fixture(t);
   const portServer = http.createServer();
@@ -68,6 +73,22 @@ async function setup(
         ? "wiki:read wiki:trace"
         : "wiki:read wiki:trace wiki:write",
   };
+  if (houseDatabase) {
+    const prior = {
+      database: process.env.WIKI_AGENT_HOUSE_DATABASE,
+      agents: process.env.WIKI_AGENT_HOUSE_AGENTS,
+    };
+    process.env.WIKI_AGENT_HOUSE_DATABASE = houseDatabase;
+    process.env.WIKI_AGENT_HOUSE_AGENTS = spec.agent;
+    t.after(() => {
+      if (prior.database === undefined)
+        delete process.env.WIKI_AGENT_HOUSE_DATABASE;
+      else process.env.WIKI_AGENT_HOUSE_DATABASE = prior.database;
+      if (prior.agents === undefined)
+        delete process.env.WIKI_AGENT_HOUSE_AGENTS;
+      else process.env.WIKI_AGENT_HOUSE_AGENTS = prior.agents;
+    });
+  }
   const app = createWiki({
     repo,
     origin,
@@ -537,4 +558,68 @@ test("expired server tokens renew once without switching run or authority", asyn
   );
   await connection.close();
   assert.throws(() => s.agents.run(run), /Not found/);
+});
+
+test("managed wiki agent requires a live authority execution and revocation denies resource access", async (t) => {
+  const { Authority } = await import("@dispatchlabs-ai/agent-house/authority");
+  const { createExecutionApplication, enrollExecution } =
+    await import("@dispatchlabs-ai/agent-house/execution");
+  const temp = fixture(t);
+  const database = path.join(temp, ".git/house.sqlite3");
+  const authority = new Authority(database);
+  t.after(() => authority.close());
+  const s = await setup(t, { houseDatabase: database });
+  const owner = authority.bootstrap("Owner", s.owner);
+  const credentialFile = path.join(temp, ".git/connection.json");
+  fs.writeFileSync(credentialFile, JSON.stringify(s.config));
+  const loaded = {
+    credentialFile,
+    definition: {
+      version: 2,
+      principal: s.spec.agent,
+      name: s.spec.name,
+      instructions: "Read evidence",
+      default_harness: "codex",
+      harnesses: { codex: { model: "synthetic", thinking: "low" } },
+    },
+  };
+  enrollExecution(authority, loaded, owner.principal, temp);
+  await assert.rejects(connectAgent(s.config));
+  let wikiRun;
+  const app = createExecutionApplication(authority, {
+    executeRun: async (_, __, options) => {
+      const config = { ...s.config, agentHouseProof: options.resourceProof };
+      const connection = await connectAgent(config);
+      wikiRun = connection.credential.run;
+      const token = await connection.credential.token();
+      assert.equal((await s.request("/api/agent/run", token)).status, 200);
+      // The same execution cannot mint a second independent resource session.
+      await assert.rejects(connectAgent(config));
+      authority.execute(
+        owner.token,
+        "credential.revoke",
+        { credential: owner.id },
+        "revoke",
+      );
+      assert.equal((await s.request("/api/agent/run", token)).status, 401);
+      assert.equal(await connection.close(), "closed");
+      return { id: "native", status: "cancelled", cleanup: "closed" };
+    },
+  });
+  await assert.rejects(
+    app.execute(
+      owner.token,
+      "run.start",
+      { agent: s.spec.agent, task: "Read" },
+      "run",
+    ),
+    { code: "UNAUTHENTICATED" },
+  );
+  assert.equal(
+    s.control.db
+      .prepare("SELECT active FROM agent_runs WHERE id=?")
+      .get(wikiRun).active,
+    0,
+  );
+  await assert.rejects(connectAgent(s.config));
 });

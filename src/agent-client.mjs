@@ -116,6 +116,9 @@ export class AgentCredential {
       scope: this.config.scope || "wiki:read wiki:trace",
       claims: {
         wiki_key: this.config.key,
+        ...(this.config.agentHouseProof
+          ? { agent_house_proof: this.config.agentHouseProof }
+          : {}),
         ...(this.run ? { wiki_run: this.run } : {}),
       },
     });
