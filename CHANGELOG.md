@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1 — Verified first-use workflows
+
+- Lead with an agent-assisted synthetic quickstart and keep a short manual path.
+- Correct personal-content setup: private control database, HTTPS, explicit local
+  manager bootstrap and authenticated MCP clients.
+- Add an end-to-end production startup/bootstrap/restart regression test.
+- Record fresh Linux/macOS agent rehearsals and an unbranded discovery baseline.
+
 ## 0.5.0 — Standalone agent authorization
 
 - Remove the shared four-request MCP bridge concurrency limit so concurrent reads

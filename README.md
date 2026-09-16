@@ -15,39 +15,25 @@ build. Browser controls are bundled locally during `npm ci`. An agent client use
 [Find a contribution](docs/roadmap.md) ·
 [API reference](docs/api.md)
 
-## Authentication
+## Use it with your AI agent
 
-Shared hosting requires [Google or local-account setup](docs/authentication.md)
-and an explicit initial manager. `npm start` requires a durable `WIKI_CONTROL`;
-Google uses `WIKI_GOOGLE_CLIENT_ID` and `WIKI_GOOGLE_CLIENT_SECRET` directly.
-Local email/password login is enabled unless `WIKI_LOCAL_LOGIN=0`. Neither path
-requires groups, and sign-in alone gives no content access. Managers grant access
-through **Manage access**. All hosted article, evidence, attachment and MCP routes
-enforce current identity and space grants. [Remote agent connections](docs/remote-agents.md) let people sign in, choose a
-permitted agent, and use its tools without installing wiki software locally.
-[Operator signing-key adapters](docs/agent-setup.md) remain available for unattended clients. The synthetic loopback example below
-remains available without a provider account.
+Give an agent with terminal access, Git and Node 24.19+ this prompt:
 
-## Who it is for
+> Follow https://github.com/dispatchlabs-ai/agent-wiki/blob/main/docs/agent-workflow.md
+> to run Agent Wiki's synthetic example in a new directory. Use its MCP tools to
+> find Atlas Labs, follow the original conversation evidence, and tell me the
+> prototype duration and reviewer with a source citation. Preview a short tutorial
+> note without saving it. Report what passed and give me the local browser URL.
+> Do not use my private content, change global client settings, or expose the server
+> to the network.
 
-For individuals and small trusted teams who want a shared knowledge collection
-that humans can browse and agents can maintain. Articles live in a separate Git
-repository; optional Codex and pi conversation snapshots preserve the evidence
-behind them. Article commits appear without rebuilding the site.
+The wiki supplies fictional knowledge and MCP tools; your agent uses its own model
+and account. Setup downloads public dependencies and creates a disposable local
+checkout and example data. No wiki account or external provider is required for
+this loopback example. Your agent needs permission to run commands and keep a
+local process running. A browser is optional for the agent; you can open the URL.
 
-Each instance has one access boundary: everyone with access can read all its
-articles, history, and traces. Shared hosting requires your own HTTPS proxy and
-access control. See [security](SECURITY.md) before connecting private content.
-
-Agent identity and permissions are owned by the wiki; no agent-management service
-or private package is required. See [the source reset](docs/upgrading.md) for this release.
-
-**Version 0.5.0 — initial development source release.** Public contracts
-are evolving. The quickstart below uses `main`, which may include unreleased
-changes; see the [changelog](CHANGELOG.md) and [release policy](docs/releases.md).
-Created by Chris Reynolds, cofounder of **Dispatch Labs AI**, and released under MIT.
-
-## Run the example
+## Try it manually
 
 Requires **Linux or macOS, Node 24.19+, and Git**. Node's built-in SQLite
 is used; no database server is needed.
@@ -70,42 +56,30 @@ corpus is unchanged. Set `PORT` to choose another port. Stop with Ctrl-C.
 For managed HTTPS hosting, example mode also accepts `WIKI_ORIGIN` and
 `WIKI_DATABASE`; put it behind a reverse proxy with the configured Host header.
 
-## Use a content repository
+## Who it is for
 
-Initialize a separate Git repository on `main`, configure its Git author, put
-Markdown in `wiki/`, and make an initial commit (an empty commit also works).
-Configure an HTTPS reverse proxy and bootstrap your first manager using
-[operator setup](docs/authentication.md#operator-setup). Then run from the engine
-checkout with those environment variables exported:
+For individuals and small trusted teams who want a shared knowledge collection
+that humans and agents can search and maintain. Articles live in a separate Git
+repository; optional Codex and pi snapshots preserve original conversation evidence.
+Edits appear after commit without rebuilding the site.
 
-```sh
-WIKI_REPO=/absolute/path/to/content \
-WIKI_CONTROL=/absolute/private/path/control.sqlite3 \
-WIKI_ORIGIN=https://wiki.example.org npm start
-```
+**Version 0.5.1 — initial development source release.** Linux and macOS are
+supported; native Windows is not verified. The quickstart uses `main`, which may
+include unreleased work. See [verification](docs/onboarding-verification.md),
+[changelog](CHANGELOG.md), and [release policy](docs/releases.md).
+Created by Chris Reynolds, cofounder of **Dispatch Labs AI**, and released under MIT.
 
-| Setting             | Default                 | Purpose                                                                   |
-| ------------------- | ----------------------- | ------------------------------------------------------------------------- |
-| `WIKI_REPO`         | Required                | Content repository, independent of this engine                            |
-| `PORT`              | `4317`                  | Loopback listener port                                                    |
-| `WIKI_ORIGIN`       | `http://127.0.0.1:PORT` | Exact allowed origin and Host                                             |
-| `WIKI_DATABASE`     | `:memory:`              | Optional path for a persistent, disposable SQLite index                   |
-| `WIKI_EVIDENCE_URL` | Disabled                | Read-only existing archive service; mutually exclusive with `WIKI_TRACES` |
-| `WIKI_TRACES`       | Disabled                | Separate directory of imported immutable trace snapshots                  |
-| `WIKI_WRITE`        | Disabled                | Set `1` to enable HTTP/browser edits                                      |
-| `WIKI_PUSH`         | Disabled                | Set `1` to push writer commits to content `origin main`                   |
+## Use your own content
 
-The CLI writer uses `WIKI_REPO` and `WIKI_PUSH`; `WIKI_WRITE` controls HTTP access
-only. Example mode always uses its own local content and trace archive, ignores
-`WIKI_REPO`, `WIKI_TRACES`, `WIKI_EVIDENCE_URL`, and `WIKI_PUSH`, and does not push.
+The example is deliberately unauthenticated and synthetic. A real wiki requires
+its own content repository, a private authentication database, HTTPS and an
+explicitly bootstrapped manager. Follow [the complete setup](docs/getting-started.md#start-a-personal-content-repository).
+Sign-in alone grants no access; managers assign reader/editor/manager permissions.
+Agent identity and permissions belong entirely to the wiki, with no external
+agent-management service or private package required.
 
-The process binds only to `127.0.0.1`. Shared hosting needs an HTTPS reverse proxy
-and appropriate access control; configure `WIKI_ORIGIN` to its external origin
-and preserve its Host header. This repository installs no persistent service.
-Google/local sessions and direct space grants protect the standalone server.
-There is one space per instance, with no per-article grants. Trusted local
-filesystem writers remain outside HTTP authentication; give each instance only
-the content its authorized readers may access.
+[Authentication](docs/authentication.md) · [Remote agent connections](docs/remote-agents.md) ·
+[Operator signing keys](docs/agent-setup.md) · [Security boundary](SECURITY.md)
 
 ## Content format
 
@@ -157,40 +131,15 @@ See [API and editing](docs/api.md) for request shapes, retry semantics, and erro
 
 ## Design and limits
 
-Node serves sanitized articles on demand. SQLite FTS5 indexes changed blobs and
-wiki links. The [responsive interface](docs/interface.md) supports light and dark
-appearance, revision comparisons, source views, and draft preview. Optional
-immutable JSONL snapshots use a bounded worker pool and cache; see
-[trace storage and rendering](docs/traces.md).
+The engine renders committed Markdown and original conversation snapshots on
+demand. SQLite search indexes are disposable; content Git history and the private
+authentication database are authoritative. The server binds to loopback and needs
+an HTTPS reverse proxy for shared hosting. Each instance has one content space;
+there is no per-article permission model. Tools enforce current grants and do not
+redact sensitive material inside imported traces.
 
-`src/git-wiki.mjs` validates committed trees and reads history from Git objects.
-`src/wiki-search.mjs` transactionally updates section passages and backlinks only
-for changed blobs. `src/render.mjs` uses remark/rehype sanitization; the HTML
-shell stays server-rendered. Browser controls are bundled once during engine setup;
-content updates need no build step. `src/editor.mjs` coordinates Git writes;
-`src/server.mjs` connects these interfaces.
-
-The service checks HEAD every second and on requests. Malformed trees retain the
-last valid reader snapshot and report degraded health. Rendered pages have a
-256-entry cache. Restart the process after engine code changes. The `WIKI_DATABASE` search index is a
-rebuildable derivative: stop the process and move its database plus WAL/SHM files
-aside to rebuild. Restore the complete content Git repository to recover articles,
-history, and operation receipts. The `WIKI_CONTROL` database is authoritative and
-must be backed up separately; it cannot be rebuilt from articles.
-
-This is a small single-process engine. Git commands and SQLite work synchronously;
-refresh walks the tree and first-parent history even though parsing/indexing is
-incremental. Search returns article groups from at most 400 candidate sections;
-`truncated` discloses the bound. It is not a globally exhaustive ranked result count.
-Markdown files are bounded by a 4 MiB Git read limit. There is no built-in attachment ingestion service,
-change queue, ingestion pipeline, multi-tenant permission system, or remote auto-pull.
-Content editors must coordinate with the service writer; see the API recovery notes.
-
-Run `npm run benchmark` for a synthetic 10,000-article SQLite indexing/search
-measurement. It excludes Git refresh, HTTP, rendering and model calls. Test coverage
-includes atomic batches, retries, conflicts, concurrent writers, metadata preservation,
-first-parent history, invalid trees, sanitization, indexing and HTTP/WebMCP contracts.
-See [verification](docs/verification.md) for the initial observed results.
+See [architecture](docs/architecture.md), [API contracts and recovery](docs/api.md),
+[trace handling](docs/traces.md), and [verification](docs/verification.md).
 
 ## License and attribution
 
@@ -203,23 +152,9 @@ under MIT. See [contributing](CONTRIBUTING.md), [security](SECURITY.md), and
 This source release does not publish an npm package (`private: true` prevents
 accidental registry publication). Dependencies are downloaded with `npm ci`.
 
-## Stop, back up, and remove
+## Stop and remove the example
 
-Stop the foreground server with Ctrl-C. Before upgrades, stop writes and back up
-the entire content Git repository, trace directory, and `WIKI_CONTROL` database.
-Stop the service before copying the control database and any SQLite WAL/SHM
-sidecars; keep the backup private because it contains password hashes, identities,
-grants, sessions, and agent credentials. Restore these together into their configured
-locations. Only the `WIKI_DATABASE` search index can be rebuilt. Restoring an old
-control backup can restore previously revoked grants or credentials; review and
-revoke obsolete access before reopening the service. Backups must include Git
-history and operation receipts, not only current Markdown.
-
-The example creates only `.runtime/` within this checkout. After stopping it,
-remove that directory only if you intend to discard your example edits and imported
-example snapshots. Removing the engine checkout does not remove a separately
-configured content repository or trace archive. There are no installed services,
-cloud resources, model calls, or paid accounts required by this engine.
-
-Existing archives can supply conversation search, preserved event links, and captured
-files through the [external evidence contract](docs/external-evidence.md).
+Stop `npm run example` with Ctrl-C. The example's data stays in `.runtime/` inside
+its checkout. Keep it to retain demo edits, or remove the dedicated checkout when
+you no longer need it. Your real content repository and authentication database
+are separate; see [authenticated operation and recovery](docs/authentication.md).

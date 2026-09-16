@@ -138,20 +138,54 @@ git -C ../my-wiki-content add wiki
 git -C ../my-wiki-content commit -m "Add first article"
 ```
 
-Start the engine with that repository and explicit read-only settings, without
-inheriting an existing trace provider:
+### Configure authenticated hosting
+
+The example launcher above is only for synthetic content. `npm start` always
+requires a private control database and authenticated hosting, even for read-only
+content. An unauthenticated example MCP connection cannot be reused here.
+
+Before starting, choose your real HTTPS hostname and configure a reverse proxy to
+forward it to `127.0.0.1:4317`, preserving the Host header. The proxy must run on
+the same machine or use a separately secured connection. You supply DNS and a
+trusted TLS certificate; the wiki does not provision them. Do not expose port
+4317 directly. Replace `wiki.example.org` below with that hostname.
+
+In the engine checkout, create a new private directory for authentication state.
+Choose another name if `../my-wiki-state` already exists. Use the same shell for
+bootstrap and server startup so the exported settings are retained:
 
 ```sh
-WIKI_REPO="$(cd ../my-wiki-content && pwd)" \
-WIKI_TRACES= WIKI_EVIDENCE_URL= WIKI_WRITE=0 WIKI_PUSH=0 \
-WIKI_DATABASE=:memory: WIKI_ORIGIN=http://127.0.0.1:4317 PORT=4317 npm start
+mkdir -m 700 ../my-wiki-state
+export WIKI_CONTROL="$(cd ../my-wiki-state && pwd)/control.sqlite3"
+export WIKI_REPO="$(cd ../my-wiki-content && pwd)"
+export WIKI_ORIGIN=https://wiki.example.org
+export PORT=4317
+export WIKI_LOCAL_LOGIN=1
+export WIKI_WRITE=0 WIKI_PUSH=0 WIKI_DATABASE=:memory:
+export WIKI_TRACES= WIKI_EVIDENCE_URL=
+unset WIKI_GOOGLE_CLIENT_ID WIKI_GOOGLE_CLIENT_SECRET
+unset WIKI_OIDC_ISSUER WIKI_OIDC_CLIENT_ID WIKI_OIDC_CLIENT_SECRET
+node scripts/local-account.mjs bootstrap manager@example.org 'Initial manager'
+npm start
 ```
 
-Read **Welcome** in the browser. Restart the agent with the same MCP URL and search
-for Welcome. Read-only discovery omits `wiki.save`. To edit through the browser or
-MCP, stop the server and rerun the command with `WIKI_WRITE=1`. Client permissions
-still apply. Ordinary file edits appear only after you commit them; pause server
-writing while making direct Git edits.
+Replace the manager email with your own. The bootstrap command prints a private,
+single-use setup URL. Open it through your configured HTTPS hostname and choose
+an initial password of at least 15 characters. Keep the URL out of shared logs
+and Git. Bootstrap is for an empty control store; do not rerun it at every start.
+Read **Welcome** in the browser after account setup. A fresh signed-out browser
+must see sign-in rather than the article.
+
+To enable editing, restart the server with `WIKI_WRITE=1`; manager/editor grants
+are still required. Content changes are committed locally, and `WIKI_PUSH=0`
+prevents automatic pushes. Ordinary file edits appear only after commit; pause
+server writing while making direct Git edits.
+
+For agent access, follow [remote OAuth connections](remote-agents.md) to create
+and permit an agent, then connect the HTTPS MCP endpoint and complete consent.
+Alternatively use the [operator signing-key guide](agent-setup.md). Never copy a
+browser cookie into the client. Verify article reads and that read-only discovery
+omits `wiki.save`; reconnect after changing server write settings.
 
 Back up the complete content repository, including `.git`. The index is disposable;
 the Git history and operation receipts are not. See [content format](../README.md#content-format),
