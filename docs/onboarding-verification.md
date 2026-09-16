@@ -1,5 +1,28 @@
 # Onboarding and discovery verification
 
+## September 16, 2026 — contributor browser checks
+
+Following the published contributor instructions on public 0.6.0 reproduced a
+30-second timeout in the responsive browser sweep. A diagnostic run with enough
+time to finish took 41.8 seconds: one test visited 154 route/size/theme combinations
+and captured 72 screenshots. Its slowest navigation took 674 ms. The clean-clone
+gate had hidden this mismatch with a longer timeout than the documented command.
+
+Responsive and rich Markdown sweeps now use separate tests for each screen size
+and theme. All 154 responsive and 28 rich-page visits, assertions and screenshots
+remain covered; theme preference persistence has its own test. Both the global
+clean-clone override and the rich sweep's extended timeout were removed.
+
+The corrected source passed `scripts/check` on Linux x86-64 (Node 26.8.1, npm
+11.19.0) and in a fresh public clone with the candidate patch on macOS arm64
+(Node 26.5.0, npm 11.17.0). Each run passed formatting, contracts, types, 144
+application tests, 65 Chromium browser tests and the production dependency audit.
+The revised matrix cases took 1.6–3.7 seconds on these machines, using the default
+30-second test limit, one worker and no retries. The complete browser suite took
+about two minutes. The higher test count reflects smaller cases, not added
+coverage. These checks use synthetic temporary repositories and do not establish
+performance for every host or private corpus.
+
 ## September 16, 2026 — 0.5.1 documentation
 
 The README's exact agent prompt was rehearsed by separate fresh agent sessions on

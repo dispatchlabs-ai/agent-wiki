@@ -56,6 +56,8 @@ Run `npm run check` and `npm run test:browser`. Browser fixtures use temporary
 synthetic content and trace repositories. Coverage includes eleven routes at
 320px, 390px, 768px, 1024px, 1440px, 1920px, and 2560px in both themes, document overflow, appearance persistence,
 mobile filters, trace anchors, preview sanitization, draft retention, and saving.
+Responsive and rich Markdown checks run each screen-size and theme combination
+as a separate test, with a fresh browser context and the default test timeout.
 Review screenshots are written under ignored `.runtime/responsive-review/`.
 
 The synthetic example articles cite the bundled immutable traces at their original

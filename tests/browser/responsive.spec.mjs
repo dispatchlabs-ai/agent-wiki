@@ -109,27 +109,27 @@ test.afterAll(async () => {
     });
   cleanup?.();
 });
-test("all responsive views reflow, retain navigation and support both themes", async ({
-  page,
-}) => {
-  const errors = [];
-  page.on("pageerror", (err) => errors.push(err.message));
-  const routes = [
-    "/",
-    "/wiki/",
-    "/search/?q=prototype",
-    "/wiki/guide/",
-    "/wiki/guide/history/",
-    "/wiki/guide/compare/?from=2&to=3",
-    "/wiki/guide/revision/2/",
-    "/wiki/guide/sources/",
-    "/traces/",
-    `/traces/${trace.id}/`,
-    "/wiki/guide/edit/",
-  ];
-  for (const width of [320, 390, 768, 1024, 1440, 1920, 2560]) {
-    await page.setViewportSize({ width, height: 1000 });
-    for (const theme of ["light", "dark"]) {
+for (const width of [320, 390, 768, 1024, 1440, 1920, 2560]) {
+  for (const theme of ["light", "dark"]) {
+    test(`responsive views reflow and retain navigation at ${width}px in ${theme} mode`, async ({
+      page,
+    }) => {
+      const errors = [];
+      page.on("pageerror", (err) => errors.push(err.message));
+      const routes = [
+        "/",
+        "/wiki/",
+        "/search/?q=prototype",
+        "/wiki/guide/",
+        "/wiki/guide/history/",
+        "/wiki/guide/compare/?from=2&to=3",
+        "/wiki/guide/revision/2/",
+        "/wiki/guide/sources/",
+        "/traces/",
+        `/traces/${trace.id}/`,
+        "/wiki/guide/edit/",
+      ];
+      await page.setViewportSize({ width, height: 1000 });
       await page.emulateMedia({ colorScheme: theme });
       for (let i = 0; i < routes.length; i++) {
         await page.goto(base + routes[i]);
@@ -152,8 +152,16 @@ test("all responsive views reflow, retain navigation and support both themes", a
             fullPage: true,
           });
       }
-    }
+      expect(errors).toEqual([]);
+    });
   }
+}
+test("theme preferences persist and can return to the system setting", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (err) => errors.push(err.message));
+  await page.emulateMedia({ colorScheme: "dark" });
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto(base + "/wiki/guide/");
   expect(

@@ -4,5 +4,5 @@ set -eu
 npm ci
 npm run check
 npx playwright install chromium
-npm run test:browser -- --timeout 120000
+npm run test:browser
 npm audit --omit=dev --audit-level=high

@@ -73,15 +73,14 @@ test.afterAll(async () => {
     });
   cleanup?.();
 });
-test("rich articles and conversations work from small phone to large desktop", async ({
-  page,
-}) => {
-  test.setTimeout(90_000);
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  for (const width of [320, 390, 768, 1024, 1440, 1920, 2560]) {
-    await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
-    for (const theme of ["light", "dark"]) {
+for (const width of [320, 390, 768, 1024, 1440, 1920, 2560]) {
+  for (const theme of ["light", "dark"]) {
+    test(`rich articles and conversations work at ${width}px in ${theme} mode`, async ({
+      page,
+    }) => {
+      const errors = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
       await page.emulateMedia({ colorScheme: theme });
       for (const route of ["/wiki/guide/", `/traces/${trace.id}/`]) {
         await page.goto(base + route);
@@ -134,10 +133,10 @@ test("rich articles and conversations work from small phone to large desktop", a
           fullPage: true,
         });
       }
-    }
+      expect(errors).toEqual([]);
+    });
   }
-  expect(errors).toEqual([]);
-});
+}
 test("search dialog traps focus, dismisses with Escape and restores the trigger", async ({
   page,
 }) => {

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Split responsive and rich Markdown browser checks into independent screen-size
+  and theme cases, preserving all routes, assertions and review screenshots.
+  The contributor command and clean-clone gate now use the same default test
+  timeout, without extended timeout overrides.
+
 ## 0.6.0 — 2026-09-16
 
 - **Breaking permission change:** readers retain published articles, history and
