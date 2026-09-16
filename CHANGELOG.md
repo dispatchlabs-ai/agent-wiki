@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.2 — 2026-09-16
+
+- Add explicitly non-expiring, individually revocable independent machine
+  enrollments. Existing expiring keys and delegated authority retain their limits.
+- Add a native HTTP MCP credential helper with five-minute tokens and bounded
+  runs, eliminating shared OAuth refresh-token rotation for trusted machines.
+- Document Codex migration, required startup, credential checks, and revocation;
+  test concurrent helpers, years of enrollment, and immediate denial after revocation.
+
 ## 0.5.1 — Verified first-use workflows
 
 - Lead with an agent-assisted synthetic quickstart and keep a short manual path.

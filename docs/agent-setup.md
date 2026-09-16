@@ -517,3 +517,65 @@ repair: it loses registered identities, permissions, and revocation state.
 Agent identity, permissions and revocation belong to the wiki. No external agent
 authority, runtime, or shared database is required. See [the source reset](upgrading.md)
 for the 0.5.0 public history.
+
+## Persistent credentials for trusted machines
+
+An operator can explicitly enroll an **independent** machine credential until
+revocation. Generate a separate key on each trusted machine; retain the private
+key there and transfer only its public registration to the Wiki operator:
+
+```sh
+node scripts/agent-keygen.mjs /absolute/machine.json \
+  --origin https://wiki.example.org --name "Trusted workstation" \
+  --role editor --until-revoked
+```
+
+Register it using the same operator procedure above with `--mode independent`.
+The public registration uses `expiresAt: null`; omitted or malformed expiration
+is rejected. Delegated authority always expires. Existing registrations retain
+their expiration and cannot be changed in place; rotate to a new key ID.
+
+For Codex versions supporting `http_headers_helper`, configure the native HTTP
+connection with an absolute, shell-quoted command:
+
+```toml
+[mcp_servers.wiki]
+url = "https://wiki.example.org/mcp"
+http_headers_helper = "'/absolute/node' '/absolute/agent-wiki/scripts/agent-headers.mjs' '/absolute/machine.json'"
+required = true
+startup_timeout_sec = 45
+```
+
+Run `codex mcp logout wiki` once when migrating an existing OAuth connection:
+stored OAuth takes precedence over a helper-provided Authorization header.
+Reload the MCP connection in existing Codex sessions after changing configuration.
+Do not run browser OAuth login for a helper-managed connection. Keep the URL
+and server name unchanged so tool references remain stable.
+
+The helper signs a fresh, one-use assertion and returns only a five-minute bearer
+header. Each invocation has a distinct run, bounded to five minutes by the signed
+`wiki_run_duration` claim (allowed range 60–86400 seconds; the existing default is
+24 hours). Codex caches the header per connection and refreshes it after a
+same-origin POST receives 401/403. It never shares a rotating refresh token
+between processes. Expired short runs do not consume the active-run quota.
+Edit retries for persistent credentials bind the operation ID to the registered
+key and current authority across runs; receipts retain the original run for
+attribution. Existing expiring credentials keep their earlier receipt identity.
+
+No private key or bearer token is written into Codex configuration. The enrollment
+does not expire, but access still checks the active key, principal, owner/invoke
+permission, current role, run and requested scope on every operation. Revoking
+one key immediately rejects its existing tokens and future helper invocations.
+Stopping one short run stops that token; revoke the key to deauthorize the
+machine. Permission and revocation failures are never silently re-enrolled.
+Keep recovery and explicit key rotation in the operator's deployment system.
+
+Check authentication and required tool discovery without printing credentials:
+
+```sh
+node scripts/agent-headers.mjs /absolute/machine.json --check
+```
+
+`required = true` makes a connection failure visible at startup. Network, server,
+filesystem and deliberate revocation failures can still interrupt access; a
+persistent enrollment removes scheduled login expiry, not those dependencies.

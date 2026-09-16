@@ -11,7 +11,11 @@ import {
 export class AgentCredential {
   constructor(
     config,
-    { fetch: fetchFn = globalThis.fetch, now = () => Date.now() } = {},
+    {
+      fetch: fetchFn = globalThis.fetch,
+      now = () => Date.now(),
+      runLifetimeSeconds = 86400,
+    } = {},
   ) {
     const url = new URL(config.endpoint);
     if (
@@ -36,6 +40,13 @@ export class AgentCredential {
       !!config.privateKeyFile === !!config.privateKeyEnv
     )
       throw Error("Invalid agent connection file");
+    if (
+      !Number.isSafeInteger(runLifetimeSeconds) ||
+      runLifetimeSeconds < 60 ||
+      runLifetimeSeconds > 86400
+    )
+      throw Error("Invalid run lifetime");
+    this.runLifetimeSeconds = runLifetimeSeconds;
     this.config = config;
     this.origin = url.origin;
     this.now = now;
@@ -116,6 +127,7 @@ export class AgentCredential {
       scope: this.config.scope || "wiki:read wiki:trace",
       claims: {
         wiki_key: this.config.key,
+        wiki_run_duration: this.runLifetimeSeconds,
         ...(this.run ? { wiki_run: this.run } : {}),
       },
     });

@@ -9,7 +9,8 @@ const { values, positionals } = parseArgs({
     origin: { type: "string" },
     name: { type: "string" },
     agent: { type: "string" },
-    days: { type: "string", default: "90" },
+    days: { type: "string" },
+    "until-revoked": { type: "boolean", default: false },
     role: { type: "string", default: "reader" },
   },
 });
@@ -20,7 +21,7 @@ if (
   !["reader", "editor"].includes(values.role)
 )
   throw Error(
-    "Usage: node scripts/agent-keygen.mjs /absolute/researcher.json --origin https://wiki.example.org --name Researcher [--role editor] [--agent EXISTING-ID] [--days 90]",
+    "Usage: node scripts/agent-keygen.mjs /absolute/researcher.json --origin https://wiki.example.org --name Researcher [--role editor] [--agent EXISTING-ID] [--days 90 | --until-revoked]",
   );
 const origin = new URL(values.origin);
 if (
@@ -32,7 +33,9 @@ if (
     ))
 )
   throw Error("Use an HTTPS origin or loopback development origin");
-const days = Number(values.days);
+if (values["until-revoked"] && values.days !== undefined)
+  throw Error("Choose days or until-revoked");
+const days = Number(values.days ?? "90");
 if (!Number.isInteger(days) || days < 1 || days > 365)
   throw Error("days must be 1–365");
 const filename = path.resolve(positionals[0]);
@@ -75,7 +78,9 @@ const registration = {
   key,
   name: values.name,
   publicKey: { ...publicKey.export({ format: "jwk" }), alg: "RS256" },
-  expiresAt: new Date(Date.now() + days * 86400000).toISOString(),
+  expiresAt: values["until-revoked"]
+    ? null
+    : new Date(Date.now() + days * 86400000).toISOString(),
   definition: {
     instructions:
       "Search maintained articles and original conversations; read relevant source passages and cite evidence.",

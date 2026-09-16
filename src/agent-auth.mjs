@@ -130,7 +130,13 @@ export class AgentAuth {
         typeof payload.jti !== "string" ||
         payload.jti.length > 200 ||
         (protectedHeader.kid && protectedHeader.kid !== payload.wiki_key) ||
-        (payload.wiki_run !== undefined && typeof payload.wiki_run !== "string")
+        (payload.wiki_run !== undefined &&
+          typeof payload.wiki_run !== "string") ||
+        (payload.wiki_run_duration !== undefined &&
+          (typeof payload.wiki_run_duration !== "number" ||
+            !Number.isSafeInteger(payload.wiki_run_duration) ||
+            payload.wiki_run_duration < 60 ||
+            payload.wiki_run_duration > 86400))
       )
         throw denied();
       return this.agents.issue(
@@ -141,6 +147,7 @@ export class AgentAuth {
         entries,
         payload.jti,
         payload.exp * 1000,
+        payload.wiki_run_duration,
       );
     } catch (error) {
       if (error instanceof WikiError && error.status === 429) throw error;

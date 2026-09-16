@@ -21,6 +21,13 @@ import {
 import { references } from "./wiki.mjs";
 
 function operationIdentity(actor, authority, operation) {
+  // Persistent machine requests have short, independent runs. Bind retries to
+  // their registered key and authority, while retaining the original run in the
+  // receipt. Legacy expiring credentials preserve their existing identity.
+  if (authority?.credential) {
+    const { run: _run, ...stable } = authority;
+    authority = stable;
+  }
   return actor
     ? digest(
         (authority ? JSON.stringify({ actor, authority }) : actor) +
@@ -265,6 +272,9 @@ if (
               actor: actor.id,
               authority: {
                 run: actor.run,
+                ...("credential" in actor
+                  ? { credential: actor.credential }
+                  : {}),
                 subject: actor.subject,
                 mode: actor.mode,
                 definition: actor.definition,

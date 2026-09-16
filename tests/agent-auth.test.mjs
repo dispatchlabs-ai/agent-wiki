@@ -538,3 +538,164 @@ test("expired server tokens renew once without switching run or authority", asyn
   await connection.close();
   assert.throws(() => s.agents.run(run), /Not found/);
 });
+
+test("persistent independent enrollments survive years and remain individually revocable", async (t) => {
+  const s = await setup(t);
+  const spec = { ...s.spec, key: randomUUID(), expiresAt: null };
+  assert.equal(s.agents.enrollOperator(spec, s.owner).changed, true);
+  assert.equal(s.agents.enrollOperator(spec, s.owner).changed, false);
+  const now = Date.now() + 2 * 365 * 86400000;
+  s.agents.now = () => now;
+  assert.doesNotThrow(() => s.agents.key(spec.agent, spec.key));
+  assert.throws(() => s.agents.key(s.spec.agent, s.spec.key));
+  const first = s.agents.issue(
+    spec.agent,
+    spec.key,
+    null,
+    s.origin + "/mcp",
+    null,
+    randomUUID(),
+    now + 60000,
+    300,
+  );
+  const run = s.agents.run(first.wiki_run);
+  assert.equal(run.expires, now + 300000);
+  assert.equal(first.expires_in, 300);
+  assert.equal(
+    s.agents.authenticate(first.access_token, s.origin + "/mcp").id,
+    spec.agent,
+  );
+  s.agents.revokeKey(spec.agent, spec.key);
+  assert.throws(() =>
+    s.agents.authenticate(first.access_token, s.origin + "/mcp"),
+  );
+  assert.throws(() => s.agents.enrollOperator(spec, s.owner));
+});
+
+test("persistent enrollment is explicit and never creates unbounded delegation or runs", async (t) => {
+  const s = await setup(t);
+  for (const expiresAt of [undefined, "", "invalid"]) {
+    assert.throws(() =>
+      s.agents.enrollOperator({ ...registration(), expiresAt }, s.owner),
+    );
+  }
+  assert.throws(() =>
+    s.agents.enrollOperator(
+      { ...registration(), expiresAt: null },
+      s.owner,
+      "reader",
+      "delegated",
+    ),
+  );
+  for (const wiki_run_duration of [0, 59, 86401, null, "300", 300.5]) {
+    assert.equal(
+      (await s.exchange(await s.assertion({ wiki_run_duration }))).status,
+      401,
+    );
+  }
+  const response = await s.exchange(
+    await s.assertion({ wiki_run_duration: 300 }),
+  );
+  assert.equal(response.status, 200);
+  const token = await response.json();
+  assert(s.agents.run(token.wiki_run).expires <= Date.now() + 300000);
+});
+
+test("header helpers use independent short runs and return no private key or refresh token", async (t) => {
+  const s = await setup(t, { role: "editor" });
+  const configFile = path.join(s.repo, ".git", "headers.json");
+  fs.writeFileSync(configFile, JSON.stringify(s.config), { mode: 0o600 });
+  const helper = () =>
+    new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [
+        "scripts/agent-headers.mjs",
+        configFile,
+      ]);
+      let out = "",
+        err = "";
+      child.stdout.on("data", (data) => {
+        out += data;
+      });
+      child.stderr.on("data", (data) => {
+        err += data;
+      });
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code) reject(Error(err));
+        else resolve(JSON.parse(out));
+      });
+    });
+  const results = await Promise.all(Array.from({ length: 6 }, helper));
+  assert.equal(new Set(results.map((x) => x.Authorization)).size, 6);
+  for (const headers of results) {
+    assert.deepEqual(Object.keys(headers), ["Authorization"]);
+    assert.match(headers.Authorization, /^Bearer [A-Za-z0-9_-]{43}$/);
+    const actor = s.agents.authenticate(
+      headers.Authorization.slice(7),
+      s.origin + "/mcp",
+    );
+    assert(s.agents.run(actor.run).expires <= Date.now() + 300000);
+    assert.equal(
+      (
+        await s.request(
+          "/api/articles/catalog.json",
+          headers.Authorization.slice(7),
+        )
+      ).status,
+      200,
+    );
+  }
+  s.agents.revokeKey(s.spec.agent, s.spec.key);
+  await assert.rejects(helper(), /Wiki machine authentication failed/);
+  for (const headers of results)
+    assert.equal(
+      (
+        await s.request(
+          "/api/articles/catalog.json",
+          headers.Authorization.slice(7),
+        )
+      ).status,
+      401,
+    );
+});
+
+test("persistent machine edit retries retain receipts across independent token runs", async (t) => {
+  const s = await setup(t, { role: "editor" });
+  const persistent = { ...s.spec, key: randomUUID(), expiresAt: null };
+  s.agents.enrollOperator(persistent, s.owner, "editor");
+  const a = new AgentCredential(
+    { ...s.config, key: persistent.key },
+    { runLifetimeSeconds: 300 },
+  );
+  const b = new AgentCredential(
+    { ...s.config, key: persistent.key },
+    { runLifetimeSeconds: 300 },
+  );
+  t.after(async () => {
+    await a.close();
+    await b.close();
+  });
+  const draft = {
+    operation_id: "persistent-retry",
+    updates: [update("machine-created", "See [[guide]].")],
+  };
+  const save = (token) =>
+    s.request("/api/articles/edits", token, {
+      method: "POST",
+      headers: { "X-Wiki-Write": "1", "Content-Type": "application/json" },
+      body: JSON.stringify(draft),
+    });
+  const first = await save(await a.token());
+  assert.equal(first.status, 200);
+  const receipt = await first.json();
+  const second = await save(await b.token());
+  assert.equal(second.status, 200);
+  const retry = await second.json();
+  assert.notEqual(a.run, b.run);
+  assert.equal(retry.state, "already-saved");
+  assert.equal(retry.commit, receipt.commit);
+  assert.equal(retry.authority.run, a.run);
+  assert.equal(retry.authority.credential, persistent.key);
+  s.agents.revokeKey(persistent.agent, persistent.key);
+  assert.equal((await save(b.accessToken)).status, 401);
+});

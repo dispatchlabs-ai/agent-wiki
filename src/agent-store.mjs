@@ -101,7 +101,10 @@ export class AgentStore {
           role === "editor" ? ["read", "trace", "write"] : ["read", "trace"],
       },
     ]);
-    const expires = expiry(Date.parse(spec.expiresAt), this.now());
+    const expires =
+      spec.expiresAt === null && mode === "independent"
+        ? null
+        : expiry(Date.parse(spec.expiresAt), this.now());
     const fingerprint = digest(JSON.stringify({ spec, owner, role, mode }));
     return this.control.transaction(() => {
       const existing = this.db
@@ -553,7 +556,10 @@ export class AgentStore {
     this.human(value.initiator);
     this.require(value.initiator, agent, "invoke");
     const entries = scope(value.scope);
-    const expires = expiry(value.expires, this.now());
+    const expires =
+      value.expires === null && value.mode === "independent"
+        ? null
+        : expiry(value.expires, this.now());
     let subject = agent;
     if (value.mode === "delegated") {
       const d = this.delegation(value.delegation, agent);
@@ -597,13 +603,29 @@ export class AgentStore {
         .prepare("SELECT authorization FROM agent_keys WHERE agent=? AND kid=?")
         .get(agent, kid).authorization,
     );
-    if (authorization.expires <= this.now()) fail();
+    if (authorization.expires !== null && authorization.expires <= this.now())
+      fail();
     this.require(authorization.initiator, agent, "invoke");
     return JSON.parse(k.jwk);
   }
-  issue(agent, kid, runId, audience, requestedScope, jti, assertionExpires) {
+  issue(
+    agent,
+    kid,
+    runId,
+    audience,
+    requestedScope,
+    jti,
+    assertionExpires,
+    runLifetimeSeconds = 86400,
+  ) {
     return this.control.transaction(() => {
       this.key(agent, kid);
+      if (
+        !Number.isSafeInteger(runLifetimeSeconds) ||
+        runLifetimeSeconds < 60 ||
+        runLifetimeSeconds > 86400
+      )
+        fail();
       text(jti, 200);
       if (
         !Number.isSafeInteger(assertionExpires) ||
@@ -658,7 +680,10 @@ export class AgentStore {
           throw new WikiError("AUTH_BUSY", "Too many active agent runs", 429);
         r = this.startRecord(authorization.initiator, agent, {
           ...authorization,
-          expires: Math.min(authorization.expires, this.now() + 24 * 3600000),
+          expires: Math.min(
+            authorization.expires ?? Infinity,
+            this.now() + runLifetimeSeconds * 1000,
+          ),
         });
         this.db
           .prepare("UPDATE agent_runs SET runtime_key=? WHERE id=?")
@@ -704,7 +729,13 @@ export class AgentStore {
     if (!row) return this.authenticateRemote(token, audience);
     const r = this.run(row.run);
     this.key(r.agent, row.kid);
+    const enrollment = JSON.parse(
+      this.db
+        .prepare("SELECT authorization FROM agent_keys WHERE agent=? AND kid=?")
+        .get(r.agent, row.kid).authorization,
+    );
     return {
+      ...(enrollment.expires === null ? { credential: row.kid } : {}),
       id: r.agent,
       kind: "agent",
       run: r.id,
