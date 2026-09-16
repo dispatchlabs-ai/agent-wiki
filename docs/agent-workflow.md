@@ -40,7 +40,9 @@ when finished. Do not substitute guessed HTTP routes for an MCP verification.
 2. Read its article with `wiki.read`, follow the original conversation citations,
    and use the available trace tools to inspect the cited source passage.
 3. Answer: how long is the prototype, and who reviews it? Include a link to the
-   original passage, rather than citing only the maintained article.
+   original passage, rather than citing only the maintained article. Use a complete
+   URL with the example's origin so the citation opens from outside the wiki;
+   retain its page query and line anchor.
 4. Use `wiki.preview` for this Markdown: `Tutorial note: Morgan reviews the two-week prototype.`
    Verify rendered output. Do not call `wiki.save`.
 5. Report discovery, search, article read, source read and preview separately.

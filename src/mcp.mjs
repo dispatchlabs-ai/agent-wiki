@@ -11,6 +11,7 @@ import packageInfo from "../package.json" with { type: "json" };
 
 /** The same catalog and API operations power both MCP transports. */
 export function createWikiMcp({
+  origin,
   request,
   write,
   externalEvidence,
@@ -33,6 +34,7 @@ export function createWikiMcp({
         { name: "agent-wiki", version: packageInfo.version },
         {
           instructions:
+            `Wiki URL: ${origin}. Use absolute links in answers and citations. Resolve site-relative article and source URLs against this Wiki URL, preserving the path, query and fragment.\n\n` +
             (agent
               ? `Authenticated agent: ${agent.name}. Definition ${agent.definition}: ${agent.config.instructions}\n\n`
               : "") +
@@ -110,7 +112,8 @@ export function createWikiMcp({
       }
       return server;
     },
-    { responseMode: "json" },
+    // Return JSON normally, while allowing the SDK to stream notifications.
+    { responseMode: "auto" },
   );
   return {
     handle: toNodeHandler({

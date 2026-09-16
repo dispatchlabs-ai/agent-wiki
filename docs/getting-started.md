@@ -66,7 +66,9 @@ Ask:
 > reviews it? Cite the source passage. Do not change any articles.
 
 Expect **two weeks** and **Morgan Vale**, supported by the bundled pi source at
-`/traces/1becc1c6b6aff33213fee188a377c98641a4d78146ebd6f0ea7b9e7720709ce7/?page=1#line-5`.
+`http://127.0.0.1:4317/traces/1becc1c6b6aff33213fee188a377c98641a4d78146ebd6f0ea7b9e7720709ce7/?page=1#line-5`.
+The answer's citation should be a complete URL you can open outside the wiki.
+MCP supplies the configured wiki origin for resolving article and source links.
 The wording of the answer can vary. The tool activity should include a search,
 an article read, and a trace read; an answer from the article alone has not checked
 the original evidence.
@@ -78,14 +80,16 @@ Then ask:
 
 ### Compatibility checked
 
-On September 11, 2026, Codex CLI **0.153.0** on Linux with Node **26.8.1** completed
-MCP discovery, article search/read, trace reading, preview, and history reading
-against the v0.2.2 engine with the example-isolation fix. The test used a
-command-line MCP URL override as above. Its noninteractive save attempt was
-blocked by client approval policy; an agent-driven save was not verified in that
-run. The browser save below and the official MCP SDK's save/retry/conflict tests
-are separately tested. Other clients and remote authentication setups need their
-own checks; protocol support alone is not a compatibility claim.
+On September 16, 2026, Codex CLI **0.154.0** on Linux with Node **26.8.1** completed
+MCP discovery, article search/read, original trace reading and unsaved preview
+against this source with the citation-origin fix. The test used the temporary
+command-line MCP URL override above, with a free loopback port. Its answer linked
+directly to the original passage, which was opened and checked in a browser.
+Example Git history remained unchanged. Agent-driven saving was not part of this
+run; the browser save below and the official MCP SDK's save/retry/conflict tests
+are separately tested. See the [verification record](onboarding-verification.md)
+for scope and earlier runs. Other clients and remote authentication setups need
+their own checks; protocol support alone is not a compatibility claim.
 
 ## Save and inspect a revision
 

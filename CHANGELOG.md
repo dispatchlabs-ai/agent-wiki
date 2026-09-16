@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Give MCP clients the configured wiki origin and guidance to return complete
+  article and source citations, retaining page and line anchors.
+- Use MCP's automatic response mode so normal startup no longer warns about
+  deliberately dropping notifications.
+
 - Split responsive and rich Markdown browser checks into independent screen-size
   and theme cases, preserving all routes, assertions and review screenshots.
   The contributor command and clean-clone gate now use the same default test

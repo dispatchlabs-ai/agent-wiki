@@ -1422,6 +1422,7 @@ export function createWiki({
   const mcpApi = new McpApiClient(server, origin);
   const makeMcp = (writable, evidenceAccess) =>
     createWikiMcp({
+      origin,
       write: writable,
       evidenceAccess,
       externalEvidence: !!evidence,

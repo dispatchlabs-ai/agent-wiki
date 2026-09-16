@@ -50,6 +50,9 @@ The official MCP SDK handles initialization, discovery, schema validation and
 protocol errors. Small tool results contain one text content block with JSON
 matching the HTTP API, without a duplicate structured payload. API failures set
 MCP `isError` and retain `state`, `status`, `code` and `error` inside that JSON.
+Initialization instructions provide `WIKI_ORIGIN` as the base for complete links
+in answers and citations. Resolve site-relative URLs against that origin and
+preserve their query and fragment; original article and trace data is unchanged.
 
 The loopback bridge imposes no concurrency limit. Each call retains a 30-second
 whole-call deadline and a 1 MiB inline JSON budget. A successful GET larger than

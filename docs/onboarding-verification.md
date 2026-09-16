@@ -1,5 +1,40 @@
 # Onboarding and discovery verification
 
+## September 16, 2026 — native client citations
+
+The manual walkthrough on source `4744b9b` connected Codex CLI 0.154.0 to the
+synthetic example using a temporary MCP URL override. Discovery, search, article
+reading, both original source passages and unsaved preview worked, but its answer
+returned a site-relative source citation. That link did not identify which wiki
+to open from a standalone client.
+
+MCP now supplies the configured wiki origin and asks clients to retain the full
+path, query and fragment in absolute citations. API payloads and original evidence
+remain unchanged. The same walkthrough prompt, with no extra citation coaching,
+then produced the correct answer and a complete link to pi source line 5. Opening
+that URL in a browser displayed the original supporting passage. The run used
+Linux, Node 26.8.1 and the same Codex account/model settings, with a free loopback
+port; example Git history was unchanged. This verifies that native client journey,
+not every model or remote authentication configuration.
+
+MCP also uses the SDK's automatic response mode: ordinary responses remain JSON,
+and notifications can stream if needed. This removes the four startup warnings
+caused by forcing a mode that drops notifications.
+
+The resulting source passed `npm run check` on Linux (Node 26.8.1) and a fresh
+macOS arm64 public clone with the candidate patch (Node 26.5.0): contracts,
+formatting, types and 145 application tests. All 65 Linux Chromium checks passed
+with normal test deadlines, and the production dependency audit was clean.
+
+The personal-content and bootstrap shell blocks were also executed against a
+temporary copy of the candidate with synthetic account details and an isolated
+HTTPS proxy. A test client trusted only the generated fixture certificate and
+verified its hostname; no system trust or DNS configuration changed. Account
+setup, the Welcome article, read-only discovery, enabling writes, an authenticated
+save, and account/content persistence after restart passed. Anonymous content
+requests remained denied. These were HTTPS client checks, not a new browser
+account-setup rehearsal or public certificate/DNS provisioning test.
+
 ## September 16, 2026 — contributor browser checks
 
 Following the published contributor instructions on public 0.6.0 reproduced a

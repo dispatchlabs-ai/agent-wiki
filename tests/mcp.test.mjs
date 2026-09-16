@@ -76,6 +76,18 @@ async function setup(t, write = false, options = {}, clientOptions = {}) {
   return { client, call, url, origin, fetchWiki, server, requests };
 }
 
+test("MCP gives standalone clients the canonical citation origin", async (t) => {
+  const { client, call, origin, url } = await setup(t);
+  const instructions = client.getInstructions();
+  assert.ok(instructions.startsWith(`Wiki URL: ${origin}.`));
+  assert.match(instructions.slice(0, 512), /absolute links/);
+  assert.match(instructions.slice(0, 512), /path, query and fragment/);
+  assert.ok(!instructions.includes(new URL(url).origin));
+  // Original API data stays relative and source content is never rewritten.
+  const { value } = await call("wiki.read", { id: "guide" });
+  assert.equal(value.url, "/wiki/guide/");
+});
+
 test("regular MCP shares WebMCP schemas, reads, preview and read-only discovery", async (t) => {
   const { client, call } = await setup(t);
   const { tools } = await client.listTools();
