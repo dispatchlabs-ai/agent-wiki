@@ -1,4 +1,4 @@
-# Version 0.5.0 source reset
+# Upgrading
 
 ## 0.6.0 — article readers and editorial evidence
 
@@ -24,6 +24,8 @@ source. A source upgrade does not reconfigure or deploy a running installation.
 Read [CLI recovery](cli.md#output-and-credential-recovery) before copying profiles
 or rotating OAuth credentials. Run `scripts/check` with synthetic data after a
 fresh checkout and `npm ci`.
+
+## 0.5.0 — source reset
 
 Agent Wiki owns its agent identities, definitions, permissions, signing-key
 enrollment, sessions and resource grants. External agents connect through the

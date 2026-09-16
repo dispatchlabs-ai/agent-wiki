@@ -543,7 +543,7 @@ export function openAPI() {
         additionalProperties: true,
       };
       spec.responses["200"].content = content(health);
-      spec.responses["503"].content = content({ oneOf: [health, error] });
+      spec.responses["503"].content = content({ anyOf: [health, error] });
     }
     if (id === "agents.manage")
       spec.responses["201"] = {

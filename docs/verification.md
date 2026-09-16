@@ -1,5 +1,35 @@
 # Verification
 
+## 0.6.0 interface and authorization review — September 16, 2026
+
+The release adds a separately enforced editorial-evidence boundary, an ordinary
+authenticated API-client CLI, generated OpenAPI and an operation-to-interface
+inventory. [Interfaces](interfaces.md) records the supported operations, required
+authority and intentional transport differences. [Upgrading](upgrading.md)
+documents the breaking change for existing reader credentials.
+
+Prepublication Linux checks passed all 144 application tests on Node 24.19.0 and
+26.8.1, and all 38 Chromium browser tests. Tests include actual CLI processes,
+human sessions, synthetic browser OAuth, signed machine credentials, narrower
+scopes, revocation during successful and failed source reads, exact write retries,
+revision conflicts and validation of representative live HTTP responses against
+the published contract. A degraded-index regression also validates the health
+503 schema. These checks use synthetic fixtures, never a private installation.
+
+An independent source/OSS and security review found and resolved authorization,
+credential-recovery and response-contract defects; no confirmed security blocker
+remained in its bounded review. This is not a penetration test or qualification
+of every external identity provider or named agent client. Gitleaks 8.30.1 found
+no secrets in the exported candidate source; current-source review removed stale
+internal infrastructure references. Production dependency audit reported zero
+known vulnerabilities, and GitHub Actions remains disabled.
+
+The exact released SHA and clean-clone Linux/macOS `scripts/check` results belong
+in the matching release notes, verified before signing the tag. The earlier
+[fresh-agent onboarding evidence](onboarding-verification.md) remains separately
+dated; automated API parity does not establish universal native-client support.
+Source publication does not deploy or change permissions in running instances.
+
 ## Source alpha preparation — September 9, 2026
 
 - Clean exported source: `npm ci --ignore-scripts` and `npm run check` passed

@@ -3422,7 +3422,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
+                  "anyOf": [
                     {
                       "type": "object",
                       "required": ["state", "commit", "articles", "components"],

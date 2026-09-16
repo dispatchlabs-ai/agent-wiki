@@ -1,4 +1,6 @@
 import { ControlStore } from "../src/control-store.mjs";
+import { fromJsonSchema } from "@modelcontextprotocol/server";
+import { openAPI } from "../src/api-contract.mjs";
 import { importTrace } from "../src/traces.mjs";
 import test from "node:test";
 import http from "node:http";
@@ -276,7 +278,14 @@ test("failed index transactions keep reader and search on one snapshot, then rec
   });
   const health = await request("/api/articles/health.json");
   assert.equal(health.status, 503);
-  assert.equal((await health.json()).commit, before);
+  const payload = await health.json();
+  assert.equal(payload.commit, before);
+  const schema =
+    openAPI().paths["/api/articles/health.json"].get.responses["503"].content[
+      "application/json"
+    ].schema;
+  const checked = await fromJsonSchema(schema)["~standard"].validate(payload);
+  assert.equal(checked.issues, undefined, JSON.stringify(checked.issues));
   assert.equal((await request("/api/articles/new/current.json")).status, 404);
   assert.equal(
     (await (await request("/api/articles/search?q=recovery")).json()).articles
