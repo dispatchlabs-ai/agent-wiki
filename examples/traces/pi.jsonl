@@ -1,0 +1,8 @@
+{"type":"session","version":3,"id":"synthetic-pi-cedar","timestamp":"2026-01-12T11:00:00Z","cwd":"/example/cedar"}
+{"type":"message","id":"u1","parentId":null,"timestamp":"2026-01-12T11:00:01Z","message":{"role":"user","content":[{"type":"text","text":"Summarize Cedar Instruments’ prototype plan."}]}}
+{"type":"message","id":"a1","parentId":"u1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Read the example notes."},{"type":"toolCall","id":"read-1","name":"read","arguments":{"path":"cedar.md"}}]}}
+{"type":"message","id":"t1","parentId":"a1","message":{"role":"toolResult","toolCallId":"read-1","toolName":"read","isError":false,"content":[{"type":"text","text":"Two-week prototype. Morgan owns the review."}]}}
+{"type":"message","id":"a2","parentId":"t1","message":{"role":"assistant","content":[{"type":"text","text":"Cedar will build a two-week prototype, with Morgan reviewing it."}]}}
+{"type":"branch_summary","id":"b1","parentId":"u1","summary":"Explore a shorter version of the answer."}
+{"type":"message","id":"a3","parentId":"b1","message":{"role":"assistant","content":[{"type":"text","text":"**Plan:** two-week prototype; Morgan reviews.\n\nThis alternate branch is synthetic."}]}}
+{"type":"compaction","id":"c1","parentId":"a3","summary":"The fictional prototype plan was summarized.","retainedTail":[{"role":"user","content":"This retained context must not become a new user message."}]}

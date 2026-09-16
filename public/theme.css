@@ -1,0 +1,60 @@
+/* Change the wiki palette here. Components use semantic variables only. */
+:root {
+  color-scheme: light;
+  --color-background: #ffffff;
+  --color-surface: #f5f8fa;
+  --color-text: #192c35;
+  --color-muted: #516672;
+  --color-link: #1a65a6;
+  --color-link-hover: #0f385c;
+  --color-link-visited: #54319f;
+  --color-border: #d9e2e7;
+  --color-input-border: #73848e;
+  --color-focus: #1a65a6;
+  --color-accent-surface: #eef5ff;
+  --color-action: #1a65a6;
+  --color-action-text: #ffffff;
+  --color-add-background: #e3f5e8;
+  --color-remove-background: #fde8eb;
+  --color-warning-background: #fff4d9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-background: #111b22;
+    --color-surface: #18252e;
+    --color-text: #e4edf1;
+    --color-muted: #a4b6c0;
+    --color-link: #8ab4f8;
+    --color-link-hover: #b8d3ff;
+    --color-link-visited: #c4a7e7;
+    --color-border: #354852;
+    --color-input-border: #80959f;
+    --color-focus: #8ab4f8;
+    --color-accent-surface: #20344d;
+    --color-action: #8ab4f8;
+    --color-action-text: #111b22;
+    --color-add-background: #173d2d;
+    --color-remove-background: #4a242d;
+    --color-warning-background: #463a20;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-background: #111b22;
+  --color-surface: #18252e;
+  --color-text: #e4edf1;
+  --color-muted: #a4b6c0;
+  --color-link: #8ab4f8;
+  --color-link-hover: #b8d3ff;
+  --color-link-visited: #c4a7e7;
+  --color-border: #354852;
+  --color-input-border: #80959f;
+  --color-focus: #8ab4f8;
+  --color-accent-surface: #20344d;
+  --color-action: #8ab4f8;
+  --color-action-text: #111b22;
+  --color-add-background: #173d2d;
+  --color-remove-background: #4a242d;
+  --color-warning-background: #463a20;
+}

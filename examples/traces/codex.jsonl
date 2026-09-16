@@ -1,0 +1,10 @@
+{"type":"session_meta","timestamp":"2026-01-12T10:00:00Z","payload":{"id":"synthetic-codex-atlas","cwd":"/example/atlas","originator":"codex"}}
+{"type":"event_msg","timestamp":"2026-01-12T10:00:01Z","payload":{"type":"task_started","turn_id":"turn-1"}}
+{"type":"event_msg","timestamp":"2026-01-12T10:00:02Z","payload":{"type":"user_message","message":"What did Morgan decide about Atlas Labs?"}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"What did Morgan decide about Atlas Labs?"}]}}
+{"type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Check the fictional project notes before answering."}]}}
+{"type":"response_item","payload":{"type":"function_call","name":"read_file","call_id":"call-1","arguments":"{\"path\":\"atlas.md\"}"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"Morgan approved a two-week prototype with Cedar Instruments."}}
+{"type":"response_item","timestamp":"2026-01-12T10:00:05Z","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Morgan approved a **two-week prototype** with Cedar Instruments.\n\nThis is a synthetic demonstration trace."}]}}
+{"type":"event_msg","payload":{"type":"agent_message","message":"Morgan approved a **two-week prototype** with Cedar Instruments.\n\nThis is a synthetic demonstration trace."}}
+{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}
