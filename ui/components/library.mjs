@@ -118,20 +118,25 @@ export function SearchPage({
   traceHTML,
   pending,
   fallbackURL,
+  evidenceAccess = true,
 }) {
   const q = params.get("q") || "";
-  const type = ["articles", "traces"].includes(params.get("type"))
-    ? params.get("type")
-    : "all";
+  const type = !evidenceAccess
+    ? "articles"
+    : ["articles", "traces"].includes(params.get("type"))
+      ? params.get("type")
+      : "all";
   const state = params.get("state") || "",
     topic = params.get("topic") || "",
     format = params.get("format") || "",
     machine = params.get("machine") || "";
-  const types = [
-    ["all", "All"],
-    ["articles", "Articles"],
-    ["traces", "Conversations"],
-  ];
+  const types = !evidenceAccess
+    ? [["articles", "Articles"]]
+    : [
+        ["all", "All"],
+        ["articles", "Articles"],
+        ["traces", "Conversations"],
+      ];
   const result = (title, id, html, loading) =>
     h(
       "section",
@@ -155,7 +160,9 @@ export function SearchPage({
     { className: "library-page" },
     h(PageHeading, {
       title: "Search the wiki",
-      description: "Find articles and the conversations behind them.",
+      description: evidenceAccess
+        ? "Find articles and the conversations behind them."
+        : "Find published articles.",
     }),
     h(SearchForm, {
       id: "search-query",
@@ -214,27 +221,28 @@ export function SearchPage({
               ["done", "Done"],
             ]),
           ),
-          h(
-            "fieldset",
-            { className: "ui-filter-group" },
-            h("legend", null, "Conversations"),
-            select("Trace harness", "format", format, [
-              ["", "All"],
-              ["codex", "Codex"],
-              ["pi", "pi"],
-              ["claude", "Claude Code"],
-            ]),
+          evidenceAccess &&
             h(
-              Field,
-              { label: "Trace machine", id: "library-machine" },
-              h("input", {
-                name: "machine",
-                defaultValue: machine,
-                maxLength: 100,
-                placeholder: "Any machine",
-              }),
+              "fieldset",
+              { className: "ui-filter-group" },
+              h("legend", null, "Conversations"),
+              select("Trace harness", "format", format, [
+                ["", "All"],
+                ["codex", "Codex"],
+                ["pi", "pi"],
+                ["claude", "Claude Code"],
+              ]),
+              h(
+                Field,
+                { label: "Trace machine", id: "library-machine" },
+                h("input", {
+                  name: "machine",
+                  defaultValue: machine,
+                  maxLength: 100,
+                  placeholder: "Any machine",
+                }),
+              ),
             ),
-          ),
           h(Button, { type: "submit" }, "Apply filters"),
           h(
             "a",

@@ -63,10 +63,7 @@ async function setup(
     agent: spec.agent,
     key: spec.key,
     privateKeyFile: keyFile,
-    scope:
-      role === "reader"
-        ? "wiki:read wiki:trace"
-        : "wiki:read wiki:trace wiki:write",
+    scope: role === "reader" ? "wiki:read" : "wiki:read wiki:trace wiki:write",
   };
   const app = createWiki({
     repo,
@@ -456,7 +453,7 @@ test("revocation while rendering a trace prevents release of its contents", asyn
     return { html: "HIDDEN EVIDENCE", records: ["HIDDEN EVIDENCE"] };
   };
   t.after(() => (TraceStore.prototype.read = original));
-  const s = await setup(t);
+  const s = await setup(t, { role: "editor" });
   const credential = new AgentCredential(s.config);
   const token = await credential.token();
   t.after(() => credential.close());
@@ -698,4 +695,72 @@ test("persistent machine edit retries retain receipts across independent token r
   assert.equal(retry.authority.credential, persistent.key);
   s.agents.revokeKey(persistent.agent, persistent.key);
   assert.equal((await save(b.accessToken)).status, 401);
+});
+
+test("editor agents need explicit trace scope for evidence tools, files, health and downloads", async (t) => {
+  const { evidenceFixture, evidenceId, fileId } =
+    await import("./evidence-fixture.mjs");
+  const evidence = await evidenceFixture();
+  t.after(() => evidence.close());
+  const s = await setup(t, {
+    role: "editor",
+    options: { evidenceUrl: evidence.url },
+  });
+  s.agents.configure(s.owner, s.spec.agent, {
+    instructions: "Use synthetic evidence",
+    tools: ["wiki.read", "wiki.trace", "wiki.file", "wiki.save"],
+  });
+  const full = await connectAgent(s.config);
+  t.after(() => full.close());
+  assert.ok(
+    (await full.client.listTools()).tools.some(
+      (tool) => tool.name === "wiki.file",
+    ),
+  );
+  const file = await full.client.callTool({
+    name: "wiki.file",
+    arguments: { asset: fileId },
+  });
+  assert.equal(file.isError, undefined, JSON.stringify(file));
+  const token = await full.credential.token();
+  assert.equal(
+    (await s.request(`/media/${fileId}?download=note.md`, token)).status,
+    200,
+  );
+  assert.equal(
+    (await s.request(`/conversations/${evidenceId}/`, token)).status,
+    200,
+  );
+  const narrow = await connectAgent({
+    ...s.config,
+    scope: "wiki:read wiki:write",
+  });
+  t.after(() => narrow.close());
+  assert.ok(
+    !(await narrow.client.listTools()).tools.some(
+      (tool) => tool.name === "wiki.file",
+    ),
+  );
+  const narrowToken = await narrow.credential.token();
+  const before = evidence.state.requests.length;
+  for (const route of [
+    `/api/files/${fileId}.json`,
+    `/media/${fileId}`,
+    `/api/traces/${evidenceId}.json`,
+  ])
+    assert.equal((await s.request(route, narrowToken)).status, 404);
+  const health = await (
+    await s.request("/api/articles/health.json", narrowToken)
+  ).json();
+  assert.equal(health.components.traceArchive, undefined);
+  assert.equal(evidence.state.requests.length, before);
+  s.control.grant(s.owner, s.spec.agent, "reader");
+  assert.equal(
+    (await s.request(`/api/files/${fileId}.json`, token)).status,
+    404,
+  );
+  assert.equal(
+    (await s.request("/api/articles/guide/current.json", token)).status,
+    200,
+  );
 });

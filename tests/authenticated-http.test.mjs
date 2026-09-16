@@ -461,7 +461,7 @@ test("revocation during asynchronous trace rendering denies the completed respon
     subject: "reader",
     name: "Reader",
   });
-  control.grant(actor, visitor.id, "reader");
+  control.grant(actor, visitor.id, "editor");
   const session = control.session(visitor.id);
   const response = request(`/api/traces/${"a".repeat(64)}.json`, {
     headers: { Cookie: `wiki_session=${session.token}` },
@@ -730,8 +730,8 @@ test("MCP retains the caller's session and rejects reader writes and forged CSRF
   );
 });
 
-test("external evidence, captured media and original API obey current space grants", async (t) => {
-  const { evidenceFixture, evidenceId, imageId } =
+test("article readers cannot retrieve evidence on any response surface", async (t) => {
+  const { evidenceFixture, evidenceId, imageId, fileId } =
     await import("./evidence-fixture.mjs");
   const fixture = await evidenceFixture();
   t.after(() => fixture.close());
@@ -741,38 +741,130 @@ test("external evidence, captured media and original API obey current space gran
   const reader = control.enroll({
     issuer: "https://id.example",
     subject: "evidence-reader",
-    name: "Evidence reader",
+    name: "Article reader",
   });
   const login = control.session(reader.id);
   const headers = { Cookie: `wiki_session=${login.token}` };
-  for (const route of [
+  const routes = [
     `/conversations/${evidenceId}/`,
+    `/conversations/${evidenceId}/dialogue.json`,
     `/media/${imageId}`,
-    `/files/${imageId}/`,
-    `/api/files/${imageId}.json`,
+    `/media/${fileId}?download=notes.md`,
+    `/files/${fileId}/`,
+    `/api/files/${fileId}.json`,
     "/api/evidence/v1/catalog",
     "/api/evidence/v1/health",
-  ]) {
-    assert.equal((await request(route, { headers })).status, 404, route);
+    "/api/evidence/v1/search?q=prototype",
+    "/api/traces/search?q=prototype",
+    `/api/traces/${evidenceId}.json`,
+    "/api/traces/catalog.json",
+    "/traces/",
+    `/api/evidence/v1/assets/${imageId}`,
+    "/conversations/chat-000000000000000000000000/",
+  ];
+  for (const role of [null, "reader"]) {
+    control.grant(actor, reader.id, role);
+    const before = fixture.state.requests.length;
+    for (const route of routes) {
+      const denied = await request(route, {
+        headers: { ...headers, Range: "bytes=0-10" },
+      });
+      assert.equal(denied.status, 404, `${role}: ${route}`);
+      assert.doesNotMatch(
+        await denied.text(),
+        /Prototype|Captured|fixture-host/,
+      );
+      assert.equal(
+        (await request(route, { headers: { Cookie: "" } })).status,
+        401,
+        route,
+      );
+    }
     assert.equal(
-      (await request(route, { headers: { Cookie: "" } })).status,
-      401,
-      route,
+      fixture.state.requests.length,
+      before,
+      "denied reads never contact the archive",
     );
   }
-  control.grant(actor, reader.id, "reader");
   assert.equal(
-    (await request("/api/evidence/v1/catalog", { headers })).status,
+    (await request("/api/articles/guide/current.json", { headers })).status,
     200,
   );
-  assert.equal((await request(`/media/${imageId}`, { headers })).status, 200);
+  const before = fixture.state.requests.length;
+  for (const route of [
+    "/search/?q=prototype&sync=1",
+    "/search/?q=prototype&type=traces&sync=1",
+    "/api/articles/health.json",
+  ]) {
+    const response = await request(route, { headers });
+    assert.equal(response.status, 200, route);
+    assert.doesNotMatch(
+      await response.text(),
+      /Prototype archive|captured prototype|fixture-host|traceArchive/,
+    );
+  }
+  assert.equal(fixture.state.requests.length, before);
+  const authoring = await (
+    await request("/api/articles/authoring.json", { headers })
+  ).json();
+  assert.equal(authoring.evidenceAccess, false);
+  assert.ok(
+    authoring.tools.every(
+      (name) => !name.startsWith("wiki.trace") && name !== "wiki.file",
+    ),
+  );
+  control.grant(actor, reader.id, "editor");
+  for (const route of routes.slice(0, -1)) {
+    const response = await request(route, { headers });
+    assert.equal(response.status, 200, route);
+    assert.equal(response.headers.get("cache-control"), "no-store", route);
+  }
   fixture.state.delay = 150;
-  const pending = request("/api/evidence/v1/search?q=prototype", { headers });
-  await new Promise((resolve) => setTimeout(resolve, 30));
-  control.grant(actor, reader.id, null);
-  const denied = await pending;
-  assert.equal(denied.status, 404);
-  assert.doesNotMatch(await denied.text(), /Prototype conversation/);
+  for (const route of [
+    "/api/evidence/v1/search?q=prototype",
+    "/search/?q=prototype&sync=1",
+    "/api/articles/health.json",
+  ]) {
+    control.grant(actor, reader.id, "editor");
+    const pending = request(route, { headers });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    control.grant(actor, reader.id, "reader");
+    const denied = await pending;
+    assert.equal(denied.status, 404, route);
+    assert.doesNotMatch(await denied.text(), /Prototype|captured prototype/);
+  }
+});
+
+test("late evidence revocation also blocks upstream error bodies", async (t) => {
+  const { evidenceFixture, imageId } = await import("./evidence-fixture.mjs");
+  const fixture = await evidenceFixture();
+  t.after(() => fixture.close());
+  fixture.state.failure = true;
+  fixture.state.delay = 150;
+  const { request, control, actor } = await server(t, {
+    evidenceUrl: fixture.url,
+  });
+  const editor = control.enroll({
+    issuer: "https://id.example",
+    subject: "late-editor",
+    name: "Editor",
+  });
+  const session = control.session(editor.id);
+  for (const route of [
+    "/api/evidence/v1/catalog",
+    `/media/${imageId}?download=source.png`,
+    "/api/articles/health.json",
+  ]) {
+    control.grant(actor, editor.id, "editor");
+    const pending = request(route, {
+      headers: { Cookie: `wiki_session=${session.token}` },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    control.grant(actor, editor.id, "reader");
+    const response = await pending;
+    assert.equal(response.status, 404);
+    assert.doesNotMatch(await response.text(), /restricted source detail/);
+  }
 });
 
 test("protected browser deep links offer sign in while machine requests retain 401", async (t) => {

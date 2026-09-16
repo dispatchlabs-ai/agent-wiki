@@ -57,9 +57,7 @@ const config = {
   key,
   privateKeyFile: keyFile,
   scope:
-    values.role === "editor"
-      ? "wiki:read wiki:trace wiki:write"
-      : "wiki:read wiki:trace",
+    values.role === "editor" ? "wiki:read wiki:trace wiki:write" : "wiki:read",
 };
 const tools = [
   "wiki.search",

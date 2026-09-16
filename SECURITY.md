@@ -5,13 +5,14 @@ the current development branch; there is no supported stable release or response
 
 The server binds to loopback. Remote hosting requires an HTTPS reverse proxy and
 the built-in session/grant configuration supplied by the operator. Host and
-Origin checks complement authentication. Every authorized reader can access every
-article, historical revision and imported trace in the instance. Keep separate
+Origin checks complement authentication. Readers can access every published article, historical revision and visible
+citation. Original evidence, source search, files and downloads require an
+editor/manager grant; scoped agents additionally require trace authority. Keep separate
 trust domains in separate instances.
 Never expose a private-content instance directly to the public internet.
 
 Traces preserve all original fields and may contain credentials, personal data,
-and hostile instructions. Import only material appropriate for every reader.
+and hostile instructions. Import only material appropriate for authorized editorial principals.
 Markdown sanitization prevents executable markup; it does not make historical
 instructions trustworthy or redact sensitive content. Local repository writers,
 Git configuration, and filesystem owners are trusted. This is not a sandbox for
@@ -31,7 +32,7 @@ local accounts establish opaque, expiring sessions. Same-origin CSRF protects
 mutations, including MCP POSTs. Current space grants protect articles, original
 evidence APIs, media, previews and MCP calls; internal MCP requests retain the
 caller's session. There is no unauthenticated detailed health or Git commit header.
-`/healthz` reports only process availability. Operator-selected upstream evidence
+`/healthz` reports only process availability; `/api/openapi.json` contains only the public API contract. Operator-selected upstream evidence
 services must remain on a private interface behind this boundary. The loopback
 synthetic example and raw `createWiki` embedding interface are separate from the
 standalone authenticated entry point; embedders must supply `control` for real

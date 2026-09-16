@@ -14,6 +14,7 @@ export function createWikiMcp({
   request,
   write,
   externalEvidence,
+  evidenceAccess = true,
   agentContext = () => null,
 }) {
   // Keep each tool call’s cancellation scoped without changing browser tools.
@@ -23,7 +24,7 @@ export function createWikiMcp({
   const tools = createWikiTools(
     (route, draft) => request(route, draft, signals.getStore()),
     write,
-    { externalEvidence },
+    { externalEvidence, evidenceAccess },
   ).map((tool) => ({ ...tool, schema: fromJsonSchema(tool.inputSchema) }));
   const handler = createMcpHandler(
     (context) => {

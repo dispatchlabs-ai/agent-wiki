@@ -146,7 +146,7 @@ export class RemoteAgents {
       params.get("resource") !== this.resource
     )
       invalid();
-    const scopes = (params.get("scope") || "wiki:read wiki:trace").split(" ");
+    const scopes = (params.get("scope") || "wiki:read").split(" ");
     if (!scopes.length || scopes.some((s) => !Object.hasOwn(scopeActions, s)))
       invalid("invalid_scope");
     const state = params.get("state") || "";

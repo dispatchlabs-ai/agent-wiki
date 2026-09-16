@@ -6,7 +6,13 @@ export const fileId = "b".repeat(64) + ".bin";
 export const imageId = "c".repeat(64) + ".png";
 export const pdfId = "d".repeat(64) + ".pdf";
 export async function evidenceFixture() {
-  const state = { delay: 0, offline: false, requests: [], harness: "claude" };
+  const state = {
+    delay: 0,
+    failure: false,
+    offline: false,
+    requests: [],
+    harness: "claude",
+  };
   const files = [
     {
       name: "notes.md",
@@ -68,6 +74,10 @@ export async function evidenceFixture() {
       res.writeHead(status, { "Content-Type": "application/json" });
       res.end(JSON.stringify(data));
     };
+    if (state.failure) {
+      await new Promise((resolve) => setTimeout(resolve, state.delay));
+      return json(503, { error: "restricted source detail" });
+    }
     if (state.offline) return json(503, { error: "offline" });
     const route = url.pathname.replace("/v1/", "");
     const hit = {
@@ -80,8 +90,11 @@ export async function evidenceFixture() {
       url: "/conversations/" + evidenceId + "/",
       snippet: "A captured prototype decision.",
     };
-    if (route === "health")
+    if (route === "health") {
+      if (state.delay)
+        await new Promise((resolve) => setTimeout(resolve, state.delay));
       return json(200, { state: "ready", conversations: 1 });
+    }
     if (route === "search") {
       if (state.delay) await new Promise((r) => setTimeout(r, state.delay));
       const included =

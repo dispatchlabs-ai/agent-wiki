@@ -1,3 +1,4 @@
+import { evidencePath } from "./authorization.mjs";
 import { decodeJwt, importJWK, jwtVerify } from "jose";
 import { WikiError } from "./errors.mjs";
 
@@ -172,8 +173,7 @@ export class AgentAuth {
     if (["/mcp", "/mcp/", "/api/agent/run"].includes(path)) return null;
     if (path === "/api/articles/edits") return "write";
     if (path.startsWith("/api/articles/")) return "read";
-    if (path.startsWith("/api/traces/") || path.startsWith("/api/evidence/v1/"))
-      return "trace";
+    if (evidencePath(path)) return "trace";
     throw new WikiError("NOT_FOUND", "Not found", 404);
   }
   require(token, action) {

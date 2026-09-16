@@ -1,3 +1,4 @@
+import { permits as rolePermits } from "./authorization.mjs";
 import { randomUUID } from "node:crypto";
 import { digest, secret } from "./control-store.mjs";
 import { WikiError } from "./errors.mjs";
@@ -97,8 +98,7 @@ export class AgentStore {
     const entries = scope([
       {
         space: "default",
-        actions:
-          role === "editor" ? ["read", "trace", "write"] : ["read", "trace"],
+        actions: role === "editor" ? ["read", "trace", "write"] : ["read"],
       },
     ]);
     const expires =
@@ -354,7 +354,7 @@ export class AgentStore {
   }
   hasSpace(principal, space, action) {
     const role = this.role(principal, space);
-    return action === "write" ? ["editor", "manager"].includes(role) : !!role;
+    return rolePermits(role, action);
   }
   validateScope(principal, entries) {
     for (const entry of entries)

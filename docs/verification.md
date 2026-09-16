@@ -123,6 +123,6 @@ private engineering history remains separate from public Git history.
 
 The public `scripts/check` gate installs the lockfile, builds browser assets, runs
 format/type/application checks and Chromium tests, then audits production dependencies.
-Automatic Linux checks run anonymously from public `main` through Palm's isolated
-local runner with Node 24.19.0; the exact SHA receives `omarchy/linux` status.
+Automatic Linux checks run anonymously from public `main` through the maintainer's isolated
+local runner with Node 24.19.0; the exact SHA receives a Linux check status.
 Release candidates also run this gate on a Mac. GitHub Actions is disabled.

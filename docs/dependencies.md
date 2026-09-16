@@ -1,6 +1,8 @@
 # Dependency review
 
-Reviewed September 9, 2026 against the npm registry and upstream release metadata.
+Historical inventory reviewed September 9, 2026 against registry and upstream metadata.
+The lockfile is authoritative for current dependencies. Current CI uses the portable
+`scripts/check` on maintainer equipment; GitHub Actions is disabled.
 
 At source-alpha preparation, all eight direct dependencies were at their latest stable versions. The five older
 transitive versions below are selected by upstream dependency ranges; no overrides
@@ -16,7 +18,7 @@ Node 24.19.0 (August 3; eligible September 2) is the tested runtime baseline.
 Node 24.21.0 (September 7; eligible October 7) is deferred for the runtime soak.
 [Node release index](https://nodejs.org/dist/index.json).
 
-CI uses checkout 7.0.1 (July 20; eligible August 19) and setup-node 7.0.0
+Historical source-alpha CI used checkout 7.0.1 (July 20; eligible August 19) and setup-node 7.0.0
 (July 14; eligible August 13), pinned to exact commits. Gitleaks 8.30.1
 (March 21; eligible April 4) is used for the release scan.
 [Checkout releases](https://github.com/actions/checkout/releases/tag/v7.0.1),

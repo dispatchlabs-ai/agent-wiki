@@ -2,7 +2,7 @@ import { editSchema } from "./edit-contract.js";
 
 /** @param {(url: string, draft?: any) => Promise<any>} request
  * @param {boolean} writable
- * @param {{externalEvidence?: boolean}} config */
+ * @param {{externalEvidence?: boolean, evidenceAccess?: boolean}} config */
 export function createWikiTools(request, writable, config = {}) {
   const id = { type: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" };
   /** @type {Array<{name: string, description: string, inputSchema: any, execute: (args: any) => Promise<any>}>} */
@@ -289,11 +289,13 @@ export function createWikiTools(request, writable, config = {}) {
     });
   return tools.filter(
     (t) =>
-      !config.externalEvidence ||
-      ![
-        "wiki.traceLines",
-        "wiki.traceProvenance",
-        "wiki.traceSessions",
-      ].includes(t.name),
+      (config.evidenceAccess !== false ||
+        !(t.name.startsWith("wiki.trace") || t.name === "wiki.file")) &&
+      (!config.externalEvidence ||
+        ![
+          "wiki.traceLines",
+          "wiki.traceProvenance",
+          "wiki.traceSessions",
+        ].includes(t.name)),
   );
 }

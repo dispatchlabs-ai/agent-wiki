@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.0 — 2026-09-16
+
+- **Breaking permission change:** readers retain published articles, history and
+  citations; original evidence requires editor/manager rights and agent trace
+  scope. Source search, previews, files, downloads and delayed provider errors
+  enforce the same boundary. Protected media is never publicly cached.
+- Add an authenticated HTTP CLI with human password login, browser OAuth, machine
+  credentials, search/read/create/edit/history, preview and evidence operations.
+  Include structured output, explicit revision/operation IDs, serialized token
+  refresh, safe uncertain-refresh handling and credential recovery.
+- Publish generated OpenAPI 3.1 and an operation-to-interface inventory. Add
+  behavioral parity, evidence-denial, revocation, retry and login regressions.
+- Fix bearer access to the external file tool; qualify platform/client boundaries,
+  update public setup/security documentation, and remove internal infrastructure
+  references from current public guidance.
+
+See [upgrade notes](docs/upgrading.md) before using existing reader credentials.
+No persisted article, trace, authentication or receipt format changes.
+
 ## 0.5.2 — 2026-09-16
 
 - Add explicitly non-expiring, individually revocable independent machine

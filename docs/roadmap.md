@@ -30,9 +30,9 @@ for setup and review expectations.
 ## Discuss before implementation
 
 Package/container distribution, new trace formats, and serving performance changes
-need a concrete user case and verification plan. Authentication inside the engine,
-multi-tenant permissions, plugin systems, and ingestion pipelines would materially
-change its scope; they are not scheduled commitments. Keep each proposal focused
+need a concrete user case and verification plan. Authentication, single-space roles and authenticated remote clients are supported.
+Multi-space permissions, plugin systems and ingestion pipelines remain proposals
+requiring an accepted user case; they are not scheduled commitments. Keep each proposal focused
 on the problem and the smallest useful change.
 
 ## Tell us where you got stuck

@@ -137,6 +137,20 @@ test("OIDC visitor has no access until a manager grants it, and logout ends sess
   await expect(row.getByRole("status")).toHaveText("Saved");
   await other.goto(base + "/wiki/guide/");
   await expect(other.locator("article")).toBeVisible();
+  await other.goto(base + "/search/?q=guide&type=traces&sync=1");
+  await expect(other.locator("#article-results")).toBeVisible();
+  await expect(other.locator("#trace-results")).toHaveCount(0);
+  await expect(other.getByLabel("Trace harness")).toHaveCount(0);
+  expect(
+    (await visitor.request.get(base + "/api/traces/search?q=guide")).status(),
+  ).toBe(404);
+  const tools = await (
+    await visitor.request.get(base + "/api/articles/authoring.json")
+  ).json();
+  expect(tools.evidenceAccess).toBe(false);
+  expect(tools.tools.some((name) => name.startsWith("wiki.trace"))).toBe(false);
+  await other.goto(base + "/wiki/guide/");
+
   await other.getByRole("button", { name: "Account menu" }).click();
   await other.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(

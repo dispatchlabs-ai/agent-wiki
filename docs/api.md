@@ -1,7 +1,9 @@
 # HTTP API and editing
 
-All JSON routes return `Cache-Control: no-store` and `X-Wiki-Commit` for the current
-reader snapshot. URLs are relative to the configured origin.
+All JSON routes return `Cache-Control: no-store`. There is no global Git commit
+header. URLs are relative to the configured origin. The versioned machine-readable
+[OpenAPI contract](openapi.json) is also served at `/api/openapi.json`; see the
+[operation inventory](interfaces.md) and [authenticated CLI](cli.md).
 
 | Method and path                                     | Result                                                                                      |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -28,7 +30,8 @@ Human views are `/`, `/search/?q=...`, `/wiki/ID/`, `/wiki/ID/history/`,
 `/wiki/ID/sources/` (optional `?revision=NUMBER`), and `/wiki/ID/edit/`. The form edits an
 existing page; create pages through the API, WebMCP, or ordinary Git commits.
 
-Health also reports article storage/index and trace archive/search components.
+Health reports article storage/index. Only editorial callers with trace authority
+receive trace archive/search and provider health components.
 A configured unavailable trace index degrades overall health without preventing
 article-only search or original trace/catalog reads. See [trace health and recovery](traces.md#degraded-operation).
 
@@ -67,7 +70,8 @@ returning a misleading GET link. Deadlines return `MCP_TIMEOUT` (503). Retry an 
 closing the MCP connection does not roll back an already committed edit.
 
 MCP and WebMCP use one tool catalog. Discovery reflects the archive provider and
-`WIKI_WRITE`; read-only deployments omit `wiki.save`. Trace reads default to
+`WIKI_WRITE` and current permissions; read-only deployments omit `wiki.save`, and
+article-only callers do not discover evidence tools. Trace reads default to
 dialogue and accept the same category, time and optional text-window controls.
 Calls use the existing loopback HTTP API, including the same writer, revision
 checks, atomic updates, evidence verification and retry receipts.
@@ -148,7 +152,9 @@ curl --fail-with-body http://127.0.0.1:4317/api/articles/edits \
 
 HTTP writing must be enabled. Requests require the configured Origin, Host,
 JSON content type, `X-Wiki-Write: 1`, and same-origin fetch metadata when present.
-The browser sends these automatically. The standalone locked writer is also usable:
+The browser sends these automatically. The ordinary CLI uses these same APIs. The standalone locked writer below is
+**trusted direct-storage administration**; it bypasses service grants and requires
+filesystem authority, so it must not be offered to ordinary hosted users:
 
 ```sh
 WIKI_REPO=/absolute/path/to/content node src/editor.mjs < draft.json

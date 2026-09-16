@@ -158,7 +158,7 @@ The connection file looks like this (the command fills in actual IDs):
   "agent": "AGENT-UUID",
   "key": "KEY-UUID",
   "privateKeyFile": "/home/you/.config/agent-wiki/researcher.key.pem",
-  "scope": "wiki:read wiki:trace"
+  "scope": "wiki:read"
 }
 ```
 
@@ -202,8 +202,7 @@ owner's current rights. Removing those rights or revoking the delegation blocks
 access even if the agent also has standing grants. An independent run uses its
 own grants. These authority modes never fall back to one another.
 
-The role determines the enrollment's maximum scope: reader permits article and
-trace reads; editor also permits writes. A connection may request a narrower
+The role determines the enrollment's maximum scope: reader permits published article reads; editor permits original evidence and writes. A connection may request a narrower
 scope. This foundation has only the `default` space; unknown spaces are denied.
 
 ## 3. Verify the connection
@@ -579,3 +578,10 @@ node scripts/agent-headers.mjs /absolute/machine.json --check
 `required = true` makes a connection failure visible at startup. Network, server,
 filesystem and deliberate revocation failures can still interrupt access; a
 persistent enrollment removes scheduled login expiry, not those dependencies.
+
+### Evidence boundary in 0.6.0
+
+Reader grants no longer allow trace evidence. Use `wiki:read` for article-only
+clients. Existing editorial clients need an editor grant and explicit `wiki:trace`
+scope; WIKI_WRITE can remain disabled. Revocation is checked on every request.
+See [upgrade notes](upgrading.md) and [interface coverage](interfaces.md).

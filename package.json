@@ -1,6 +1,6 @@
 {
   "name": "agent-wiki",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,11 +13,13 @@
     "example": "node scripts/example.mjs",
     "benchmark:serve": "node scripts/benchmark-serve.mjs",
     "benchmark": "node scripts/benchmark.mjs",
-    "check": "prettier --check . && npm run typecheck && npm test",
+    "check": "node scripts/contracts.mjs --check && prettier --check . && npm run typecheck && npm test",
     "format": "prettier --write .",
     "typecheck": "tsc --project tsconfig.json",
     "build:ui": "node scripts/build-ui.mjs",
-    "prepare": "npm run build:ui"
+    "prepare": "npm run build:ui",
+    "contract": "node scripts/contracts.mjs",
+    "wiki": "node bin/wiki.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

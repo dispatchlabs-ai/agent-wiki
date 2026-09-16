@@ -276,7 +276,13 @@ function traceProvenance(hit) {
   if (!(hit.snapshot_count > 1)) return "";
   return `<details><summary>Seen in ${hit.snapshot_count} snapshots</summary>${list(hit.provenance.map((p) => link(p.url, `Imported ${date(p.imported_at)} · line ${p.line}`)))}${hit.provenance_nextOffset !== null ? `<p>${link(`/traces/provenance/?key=${hit.logical_key}`, "All source citations")}</p>` : ""}</details>`;
 }
-export function searchView(wiki, params, articles, traces) {
+export function searchView(
+  wiki,
+  params,
+  articles,
+  traces,
+  evidenceAccess = true,
+) {
   return shell(
     "Search",
     renderToStaticMarkup(
@@ -285,6 +291,7 @@ export function searchView(wiki, params, articles, traces) {
         topics: topicNames(wiki),
         articleHTML: articleResults(articles, params),
         traceHTML: traceResults(traces, params),
+        evidenceAccess,
         pending: traces.pending,
         fallbackURL: queryLink(
           "/search/",

@@ -1,3 +1,5 @@
+import { openAPI } from "./api-contract.mjs";
+import { permits, evidencePath } from "./authorization.mjs";
 import { RemoteAgents, readOAuthForm } from "./remote-agents.mjs";
 import { agentsPage } from "./agents-ui.mjs";
 import { AgentStore } from "./agent-store.mjs";
@@ -141,22 +143,44 @@ export function createWiki({
       agentToken = null,
       agentAction = null,
       protectedResponse = false,
-      canWrite = write;
+      canWrite = write,
+      canTrace = !control,
+      responseAction = "read";
     const originalWriteHead = res.writeHead;
-    res.writeHead = function (status, ...args) {
-      if (status < 400 && protectedResponse) {
-        if (agentToken) agentAuth.require(agentToken, agentAction);
-        else {
-          if (!control.authenticate(token))
-            throw new WikiError("NOT_FOUND", "Not found", 404);
-          control.require(actor.id);
-        }
+    const authorizeResponse = () => {
+      if (!protectedResponse) return;
+      if (agentToken) agentAuth.require(agentToken, agentAction);
+      else {
+        if (!control.authenticate(token))
+          throw new WikiError("NOT_FOUND", "Not found", 404);
+        control.require(
+          actor.id,
+          responseAction === "trace" ? "editor" : "reader",
+        );
       }
+    };
+    res.writeHead = function (status, ...args) {
+      if (status < 400) authorizeResponse();
       return originalWriteHead.call(this, status, ...args);
     };
     let browserAsset = false,
       diagramDocument = false;
     const send = (status, value, type = "application/json") => {
+      if (protectedResponse) {
+        try {
+          authorizeResponse();
+        } catch {
+          protectedResponse = false;
+          return send(404, { error: "Not found", code: "NOT_FOUND" });
+        }
+      }
+      if (
+        status >= 400 &&
+        type === "application/json" &&
+        value?.error &&
+        !value.code
+      )
+        value = { ...value, code: `HTTP_${status}` };
       res.writeHead(status, {
         "Content-Type": `${type}; charset=utf-8`,
         ...(value?.transport === "file"
@@ -181,6 +205,8 @@ export function createWiki({
       if (req.headers.host !== new URL(origin).host)
         return send(403, { error: "Invalid host" });
       const url = new URL(req.url, origin);
+      if (url.pathname === "/api/openapi.json" && req.method === "GET")
+        return send(200, openAPI());
       if (req.method === "GET" && url.pathname === "/healthz")
         return send(200, { status: "ok" });
       if (agentAuth) {
@@ -270,6 +296,12 @@ export function createWiki({
         )
           return send(403, { error: "Invalid origin" });
         protectedResponse = true;
+        try {
+          agentAuth.require(agentToken, "trace");
+          canTrace = true;
+        } catch {
+          canTrace = false;
+        }
         try {
           agentAuth.require(agentToken, "write");
           canWrite = write;
@@ -576,7 +608,12 @@ export function createWiki({
             "text/html",
           );
         protectedResponse = true;
-        control.require(actor.id);
+        responseAction = evidencePath(url.pathname) ? "trace" : "read";
+        control.require(
+          actor.id,
+          responseAction === "trace" ? "editor" : "reader",
+        );
+        canTrace = permits(control.role(actor.id), "trace");
         if (
           localLogin &&
           req.method === "POST" &&
@@ -711,7 +748,8 @@ export function createWiki({
             : control
               ? { Cookie: `wiki_session=${token}`, "X-Wiki-CSRF": actor.csrf }
               : {},
-          () => (canWrite ? mcp : readMcp).handle(req, res, body),
+          () =>
+            mcpVariants.get(`${canWrite}:${canTrace}`).handle(req, res, body),
         );
       }
       if (req.method === "POST" && url.pathname === "/api/articles/preview") {
@@ -908,6 +946,12 @@ export function createWiki({
         ])
           if (upstream.headers.has(name))
             headers[name] = upstream.headers.get(name);
+        try {
+          authorizeResponse();
+        } catch (error) {
+          await upstream.body?.cancel();
+          throw error;
+        }
         res.writeHead(upstream.status, headers);
         if (upstream.body) await pipeline(upstream.body, res);
         else res.end();
@@ -930,9 +974,9 @@ export function createWiki({
             "content-length",
             "content-range",
             "accept-ranges",
-            "cache-control",
           ])
             if (upstream.headers.has(h)) headers[h] = upstream.headers.get(h);
+          headers["cache-control"] = "no-store";
           headers["x-content-type-options"] = "nosniff";
           headers["content-security-policy"] = "sandbox; default-src 'none'";
           const download = url.searchParams.get("download");
@@ -940,6 +984,12 @@ export function createWiki({
             headers["content-disposition"] =
               "attachment; filename*=UTF-8''" +
               encodeURIComponent(download.slice(0, 240));
+          try {
+            authorizeResponse();
+          } catch (error) {
+            await upstream.body?.cancel();
+            throw error;
+          }
           res.writeHead(upstream.status, headers);
           if (upstream.body) await pipeline(upstream.body, res);
           else res.end();
@@ -1206,6 +1256,10 @@ export function createWiki({
         }
       }
       if (url.pathname === "/api/articles/health.json") {
+        if (canTrace) {
+          responseAction = "trace";
+          if (agentToken) agentAction = "trace";
+        }
         const components = {
           articleStorage: {
             state: storageError ? "degraded" : "ready",
@@ -1215,9 +1269,13 @@ export function createWiki({
             state: indexError ? "degraded" : "ready",
             error: indexError,
           },
-          traceArchive: traceStore.health(),
-          traceSearch: traceSearchHealth(traces),
-          ...(evidence ? await evidence.health() : {}),
+          ...(canTrace
+            ? {
+                traceArchive: traceStore.health(),
+                traceSearch: traceSearchHealth(traces),
+                ...(evidence ? await evidence.health() : {}),
+              }
+            : {}),
         };
         const degraded = Object.values(components).some(
           (c) => !["ready", "disabled"].includes(c.state),
@@ -1240,10 +1298,12 @@ export function createWiki({
             "Committed wiki/**/*.md; stable lowercase hyphenated basenames; title and description frontmatter required. All wiki links must resolve. No build or model calls.",
           tools: createWikiTools(async () => {}, canWrite, {
             externalEvidence: !!evidence,
+            evidenceAccess: canTrace,
           }).map((tool) => tool.name),
           mcp: { url: origin + "/mcp", transport: "streamable-http" },
           write: canWrite,
           externalEvidence: !!evidence,
+          evidenceAccess: canTrace,
           access: control
             ? "Authenticated session and current space grant required. Mutations require exact Origin and session X-Wiki-CSRF. MCP retains the caller session."
             : "Synthetic loopback example or raw embedding interface. Supply control for authenticated hosting.",
@@ -1266,7 +1326,9 @@ export function createWiki({
           return send(400, { error: e.message });
         }
         if (url.pathname.startsWith("/api/")) return send(200, result);
+        if (canTrace) responseAction = "trace";
         const traceResult =
+          !canTrace ||
           url.searchParams.get("type") === "articles" ||
           !(url.searchParams.get("q") || "").trim()
             ? { indexed: false, results: [], nextOffset: null }
@@ -1280,7 +1342,7 @@ export function createWiki({
                 });
         return send(
           200,
-          searchView(wiki, url.searchParams, result, traceResult),
+          searchView(wiki, url.searchParams, result, traceResult, canTrace),
           "text/html",
         );
       }
@@ -1306,7 +1368,12 @@ export function createWiki({
             )
           : send(404, { error: "Unknown article or revision" });
       }
-      const key = wiki.head + String(canWrite) + url.pathname + url.search;
+      const key =
+        wiki.head +
+        String(canWrite) +
+        String(canTrace) +
+        url.pathname +
+        url.search;
       if (cache.has(key)) return send(200, cache.get(key), "text/html");
       let html;
       if (url.pathname === "/") html = home(wiki, url.searchParams);
@@ -1353,9 +1420,10 @@ export function createWiki({
     }
   });
   const mcpApi = new McpApiClient(server, origin);
-  const makeMcp = (writable) =>
+  const makeMcp = (writable, evidenceAccess) =>
     createWikiMcp({
       write: writable,
+      evidenceAccess,
       externalEvidence: !!evidence,
       agentContext: () => {
         const header = mcpIdentity.getStore()?.Authorization;
@@ -1374,12 +1442,17 @@ export function createWiki({
       request: (route, draft, signal) =>
         mcpApi.request(route, draft, signal, mcpIdentity.getStore()),
     });
-  const mcp = makeMcp(write);
-  const readMcp = write ? makeMcp(false) : mcp;
+  const mcpVariants = new Map();
+  for (const writable of [false, true])
+    for (const evidenceAccess of [false, true])
+      mcpVariants.set(
+        `${writable}:${evidenceAccess}`,
+        makeMcp(writable, evidenceAccess),
+      );
   server.on("close", () => {
     mcpApi.close();
-    void mcp.close().catch(console.error);
-    if (readMcp !== mcp) void readMcp.close().catch(console.error);
+    for (const mcp of mcpVariants.values())
+      void mcp.close().catch(console.error);
     void previews.close().catch(console.error);
     clearInterval(timer);
     index.close();

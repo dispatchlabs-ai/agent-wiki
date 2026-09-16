@@ -32,8 +32,8 @@ codex mcp login wiki --oauth-client-registration dcr --scopes wiki:read,wiki:tra
 ```
 
 The add command may start login itself. Complete browser sign-in and select the
-agent; run the separate login command if needed. Request only read/trace scopes
-when you do not want editing. Client support and command options vary by version;
+agent; run the separate login command if needed. Request only `wiki:read` for article access. Evidence additionally requires an
+editor grant and `wiki:trace`; omit `wiki:write` when you do not want editing. Client support and command options vary by version;
 use its native help. The server supports public dynamic client registration (DCR),
 Authorization Code with mandatory S256 PKCE, and rotating refresh tokens.
 

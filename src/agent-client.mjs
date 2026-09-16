@@ -124,7 +124,7 @@ export class AgentCredential {
       algorithm: "RS256",
       expectedIssuer: this.origin,
       jwtLifetimeSeconds: 60,
-      scope: this.config.scope || "wiki:read wiki:trace",
+      scope: this.config.scope || "wiki:read",
       claims: {
         wiki_key: this.config.key,
         wiki_run_duration: this.runLifetimeSeconds,
@@ -134,7 +134,7 @@ export class AgentCredential {
     try {
       await auth(provider, {
         serverUrl: new URL(this.config.endpoint),
-        scope: this.config.scope || "wiki:read wiki:trace",
+        scope: this.config.scope || "wiki:read",
         fetchFn: this.fetch,
       });
       const tokens = provider.tokens();

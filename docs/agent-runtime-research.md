@@ -239,7 +239,7 @@ claude --strict-mcp-config --mcp-config /absolute/path/to/wiki-mcp.json
 
 These are proposed configuration examples, not deployed files. The connection JSON
 references the protected private key; the MCP file contains paths, not key material.
-For permanent machine configuration, use Palm's Ansible deployment ownership.
+For permanent machine configuration, use your infrastructure configuration management.
 Keep existing Claude settings and other MCP connections when implementing this.
 
 For an application built with the **Claude Agent SDK**, pass the same server object

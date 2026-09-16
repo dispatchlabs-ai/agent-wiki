@@ -6,6 +6,22 @@ Named agents now have a [registration and credential setup](agent-setup.md).
 Multi-space composition and organization/group grants remain later milestones. The control store includes the organization and group records
 needed for that work; these do not yet add implicit membership or access.
 
+## Article and evidence permissions
+
+Reader grants cover published articles, article history, citations and unsaved
+Markdown preview. Editor/manager grants also allow original evidence, trace search,
+source catalogs, attachment previews and downloads, even when writes are disabled.
+Agent credentials additionally need matching `wiki:read`, `wiki:trace` or
+`wiki:write` scope. See [the complete interface inventory](interfaces.md).
+
+Reader search and health never query the source archive. Evidence routes authorize
+before lookup and recheck current rights before releasing asynchronous responses,
+including upstream failures. Protected media is never publicly cached. Citations
+and selected quotations already committed into an article remain published content.
+
+The [ordinary CLI](cli.md) uses these service permissions. Direct-storage scripts
+remain trusted operator maintenance and must not be distributed as remote clients.
+
 ## Operator setup
 
 Google sign-in connects directly to Google OIDC; no broker is required. Personal
