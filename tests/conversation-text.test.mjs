@@ -27,7 +27,7 @@ test("recognized envelope uses attachment cards while preserving the original", 
       nextOffset: null,
       previousOffset: null,
     },
-    { pages: new Map() },
+    [],
   );
   assert.match(
     html,

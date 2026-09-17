@@ -9,7 +9,6 @@ import {
   queryLink,
   renderMarkdown,
   list,
-  sources,
 } from "./render.mjs";
 import { conversationText } from "./conversation-text.mjs";
 import { attachmentsHTML } from "./attachments.mjs";
@@ -38,7 +37,7 @@ export function evidenceCatalog(params, result) {
     { active: "Conversations" },
   );
 }
-export async function evidenceView(data, wiki) {
+export async function evidenceView(data, cited = []) {
   const base = `/conversations/${encodeURIComponent(data.id)}/`;
   const messages = [];
   for (const m of data.messages || []) {
@@ -62,9 +61,6 @@ export async function evidenceView(data, wiki) {
     ...(data.related?.siblings || []),
   ].filter(
     (v, i, a) => v.id !== data.id && a.findIndex((x) => x.id === v.id) === i,
-  );
-  const cited = [...wiki.pages.values()].filter((p) =>
-    sources(p).some((s) => s.url.includes(`/conversations/${data.id}/`)),
   );
   const pagination = `<nav class="pagination" aria-label="Conversation pages">${data.previousOffset !== null ? link(queryLink(base, { after: data.after, before: data.before, limit: data.limit, kind: data.kind, offset: data.previousOffset }), "Previous messages") : ""}${data.nextOffset !== null ? link(queryLink(base, { after: data.after, before: data.before, limit: data.limit, kind: data.kind, offset: data.nextOffset }), "Next messages") : ""}</nav>`;
   return shell(

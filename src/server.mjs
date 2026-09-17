@@ -35,7 +35,8 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { GitWiki, wikiRepo } from "./git-wiki.mjs";
 import { WikiSearch } from "./wiki-search.mjs";
-import { article, sources, link, list, shell } from "./render.mjs";
+import { ArticleCitations } from "./article-citations.mjs";
+import { article, link, list, shell } from "./render.mjs";
 import {
   home,
   topics,
@@ -94,6 +95,7 @@ export function createWiki({
   const previews = new PreviewRenderer();
   const wiki = new GitWiki(repo),
     index = new WikiSearch(database),
+    citations = new ArticleCitations(),
     cache = new Map();
   let stats = index.sync(wiki),
     error = null,
@@ -165,6 +167,16 @@ export function createWiki({
     };
     let browserAsset = false,
       diagramDocument = false;
+    const responseHeaders = (type) => ({
+      "Content-Type": `${type}; charset=utf-8`,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      ...(browserAsset ? { "Access-Control-Allow-Origin": "*" } : {}),
+      "Referrer-Policy": "no-referrer",
+      "Content-Security-Policy": diagramDocument
+        ? "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'self'; sandbox allow-scripts"
+        : "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; frame-src 'self'",
+    });
     const send = (status, value, type = "application/json") => {
       if (protectedResponse) {
         try {
@@ -181,25 +193,23 @@ export function createWiki({
         !value.code
       )
         value = { ...value, code: `HTTP_${status}` };
-      res.writeHead(status, {
-        "Content-Type": `${type}; charset=utf-8`,
-        ...(value?.transport === "file"
-          ? { "Content-Length": value.size }
-          : {}),
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-        ...(browserAsset ? { "Access-Control-Allow-Origin": "*" } : {}),
-        "Referrer-Policy": "no-referrer",
-        "Content-Security-Policy": diagramDocument
-          ? "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'self'; sandbox allow-scripts"
-          : "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; frame-src 'self'",
-      });
-      if (value?.transport === "file") {
-        return pipeline(fs.createReadStream(value.path), res).finally(() =>
-          fs.promises.rm(value.directory, { recursive: true, force: true }),
-        );
-      }
+      res.writeHead(status, responseHeaders(type));
       res.end(type === "application/json" ? JSON.stringify(value) : value);
+    };
+    // Only the verified local trace-range route may supply a spool. Ordinary
+    // article/provider JSON must never select filesystem reads or cleanup paths.
+    const sendTraceLines = async (spool) => {
+      try {
+        authorizeResponse();
+        if (res.destroyed) return;
+        res.writeHead(200, {
+          ...responseHeaders("application/json"),
+          "Content-Length": spool.size,
+        });
+        await pipeline(fs.createReadStream(spool.path), res);
+      } finally {
+        await fs.promises.rm(spool.directory, { recursive: true, force: true });
+      }
     };
     try {
       if (req.headers.host !== new URL(origin).host)
@@ -1050,7 +1060,16 @@ export function createWiki({
             params,
           );
           if (conversation[2] || conversation[3]) return send(200, data);
-          return send(200, await evidenceView(data, wiki), "text/html");
+          return send(
+            200,
+            await evidenceView(
+              data,
+              citations.citing(wiki, `/conversations/${data.id}/`, {
+                contains: true,
+              }),
+            ),
+            "text/html",
+          );
         }
       }
       if (
@@ -1191,7 +1210,7 @@ export function createWiki({
             Number(url.searchParams.get("end")),
           );
           return result
-            ? await send(200, result)
+            ? await sendTraceLines(result)
             : send(404, { error: "Unknown trace or source range" });
         } catch (e) {
           if (res.headersSent) {
@@ -1230,11 +1249,7 @@ export function createWiki({
           );
           if (!result) return send(404, { error: "Unknown trace or page" });
           if (traceRoute[1]) {
-            const cited = [...wiki.pages.values()].filter((p) =>
-              sources(p).some((s) =>
-                s.url.startsWith(`/traces/${traceRoute[1]}/`),
-              ),
-            );
+            const cited = citations.citing(wiki, `/traces/${traceRoute[1]}/`);
             return send(
               200,
               result.html.replace(

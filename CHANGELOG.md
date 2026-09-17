@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Keep external evidence responses and article metadata separate from internal
+  trace-file streaming and cleanup. Preserve authorization and clean up verified
+  range files even when access is revoked before the response.
+- Cache extracted article citations by Git blob for imported and external
+  conversation readers. Reuse unchanged articles and refresh citations after
+  committed edits without rebuilding the site.
+
 ## 0.6.1 — 2026-09-17
 
 - Fix inline-code contrast in light and dark themes by using the background
