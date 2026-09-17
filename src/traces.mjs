@@ -12,11 +12,22 @@ import { WikiError } from "./errors.mjs";
 import { Worker } from "node:worker_threads";
 export const TRACE_VERSION = 1;
 export const TRACE_PAGE_SIZE = 100;
-export const MAX_TRACE_BYTES = 128 * 1024 * 1024;
+export const MAX_TRACE_BYTES = Number(
+  process.env.WIKI_TRACE_MAX_BYTES ?? 128 * 1024 * 1024,
+);
+if (
+  !Number.isSafeInteger(MAX_TRACE_BYTES) ||
+  MAX_TRACE_BYTES < 1 ||
+  MAX_TRACE_BYTES > 512 * 1024 * 1024
+)
+  throw new Error(
+    "WIKI_TRACE_MAX_BYTES must be an integer from 1 through 536870912",
+  );
+export const TRACE_SIZE_ERROR = `Trace exceeds ${MAX_TRACE_BYTES} byte limit`;
 export const digest = (bytes) =>
   createHash("sha256").update(bytes).digest("hex");
 export function parseRecords(bytes) {
-  if (bytes.length > MAX_TRACE_BYTES) throw new Error("Trace exceeds 128 MiB");
+  if (bytes.length > MAX_TRACE_BYTES) throw new Error(TRACE_SIZE_ERROR);
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   return text.split(/\r?\n/).flatMap((line, index) => {
     if (!line.trim()) return [];
@@ -42,7 +53,7 @@ export function detectFormat(records) {
 export function importTrace(root, source, title) {
   const before = archiveStamp(root);
   if (fs.statSync(source).size > MAX_TRACE_BYTES)
-    throw new Error("Trace exceeds 128 MiB");
+    throw new Error(TRACE_SIZE_ERROR);
   const bytes = fs.readFileSync(source),
     records = parseRecords(bytes),
     format = detectFormat(records),

@@ -10,6 +10,7 @@ import {
   parseRecords,
   detectFormat,
   MAX_TRACE_BYTES,
+  TRACE_SIZE_ERROR,
   TRACE_PAGE_SIZE as PAGE_SIZE,
 } from "./traces.mjs";
 import { escape, link, renderMarkdown, shell } from "./render.mjs";
@@ -61,7 +62,7 @@ async function run({
     return spoolTraceLines(root, metadata, start, end, directory);
   const filename = path.join(root, metadata.id, "source.jsonl");
   if (fs.statSync(filename).size > MAX_TRACE_BYTES)
-    throw new Error("Trace exceeds 128 MiB");
+    throw new Error(TRACE_SIZE_ERROR);
   const bytes = fs.readFileSync(filename);
   if (digest(bytes) !== metadata.id)
     throw new Error("Trace integrity check failed");

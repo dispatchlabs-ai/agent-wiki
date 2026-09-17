@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.6.2 — 2026-09-17
+
+- Allow operators to configure the imported trace byte limit consistently across
+  import, indexing, rendering and source-line reads. The default stays 128 MiB;
+  larger immutable snapshots can be served without splitting their evidence.
+- No persisted-data migration is required. Keep the setting consistent between
+  operator commands and the running service.
+
 - Document the Ubuntu under WSL2 walkthrough and Chromium's system-library
   prerequisites for browser contributors.
 - Keep external evidence responses and article metadata separate from internal

@@ -10,6 +10,7 @@ import {
   parseRecords,
   digest,
   MAX_TRACE_BYTES,
+  TRACE_SIZE_ERROR,
   TRACE_PAGE_SIZE,
 } from "./traces.mjs";
 import { project } from "./trace-format.mjs";
@@ -66,7 +67,7 @@ export function indexTraces(root) {
       if (db.prepare("SELECT 1 FROM snapshots WHERE id=?").get(m.id)) continue;
       const source = path.join(root, m.id, "source.jsonl");
       if (fs.statSync(source).size > MAX_TRACE_BYTES)
-        throw Error("Trace exceeds 128 MiB");
+        throw Error(TRACE_SIZE_ERROR);
       const bytes = fs.readFileSync(source);
       if (digest(bytes) !== m.id) throw Error("Trace integrity check failed");
       const records = parseRecords(bytes),

@@ -177,7 +177,7 @@ test("range verification enforces the archive limit before and during streaming"
   fs.truncateSync(source, MAX_TRACE_BYTES + 1);
   await assert.rejects(
     spoolTraceLines(root, metadata, 1, 1, directory),
-    /exceeds 128 MiB/,
+    /exceeds 134217728 byte limit/,
   );
   assert.deepEqual(fs.readdirSync(directory), []);
   fs.truncateSync(source, 1);
@@ -194,7 +194,7 @@ test("range verification enforces the archive limit before and during streaming"
   try {
     await assert.rejects(
       spoolTraceLines(root, metadata, 1, 1, directory),
-      /exceeds 128 MiB/,
+      /exceeds 134217728 byte limit/,
     );
     assert.ok(
       fs.statSync(path.join(directory, "verified.jsonl")).size <=
