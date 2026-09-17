@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.6.3 — 2026-09-17
+
+- Read writer input as a complete asynchronous stream before acquiring the Git
+  writer lock. Large or delayed article batches no longer fail with `EAGAIN` on
+  nonblocking stdin; revision checks, atomic commits and exact retries remain.
+- Add piped UTF-8 and large HTTP batch/retry regressions.
+- No configuration or persisted-data migration is required.
+
 ## 0.6.2 — 2026-09-17
 
 - Allow operators to configure the imported trace byte limit consistently across
