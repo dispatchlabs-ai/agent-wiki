@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import http from "node:http";
+import { createServer } from "node:net";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -31,6 +31,19 @@ const engine = fileURLToPath(new URL("../", import.meta.url));
 async function setup(t) {
   const repo = fixture(t),
     control = new ControlStore(path.join(repo, ".git/control.sqlite3"));
+  const portServer = createServer();
+  let app, evidence;
+  t.after(async () => {
+    if (app) {
+      await new Promise((resolve) => {
+        app.close(resolve);
+        app.closeAllConnections();
+      });
+    }
+    await new Promise((resolve) => portServer.close(resolve));
+    control.close();
+    await evidence?.close();
+  });
   const owner = control.bootstrap({
     issuer: "https://id.example",
     subject: "owner",
@@ -44,13 +57,11 @@ async function setup(t) {
   const password = "synthetic interface test password";
   control.acceptInvitation(invitation.token, await hashPassword(password));
   control.grant(owner, invitation.id, "editor");
-  const portServer = http.createServer().listen(0, "127.0.0.1");
+  portServer.listen(0, "127.0.0.1");
   await once(portServer, "listening");
-  const port = portServer.address().port;
-  await new Promise((resolve) => portServer.close(resolve));
-  const origin = `http://127.0.0.1:${port}`;
-  const evidence = await evidenceFixture();
-  const app = createWiki({
+  const origin = `http://127.0.0.1:${portServer.address().port}`;
+  evidence = await evidenceFixture();
+  app = createWiki({
     repo,
     origin,
     control,
@@ -59,14 +70,9 @@ async function setup(t) {
     development: true,
     evidenceUrl: evidence.url,
   });
-  app.listen(port, "127.0.0.1");
+  // Adopt the bound listener without releasing its port during setup.
+  app.listen(portServer);
   await once(app, "listening");
-  t.after(async () => {
-    app.closeAllConnections();
-    await new Promise((resolve) => app.close(resolve));
-    control.close();
-    await evidence.close();
-  });
   const config = path.join(repo, ".git/cli.json");
   const cli = (args, input = "") =>
     new Promise((resolve, reject) => {

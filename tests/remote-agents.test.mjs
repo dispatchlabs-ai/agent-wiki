@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import http from "node:http";
+import { createServer } from "node:net";
 import { once } from "node:events";
 import { createHash } from "node:crypto";
 import { ControlStore } from "../src/control-store.mjs";
@@ -15,6 +15,18 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 async function setup(t) {
   const repo = fixture(t),
     control = new ControlStore(path.join(repo, ".git/control.sqlite3"));
+  const portServer = createServer();
+  let app;
+  t.after(async () => {
+    if (app) {
+      await new Promise((resolve) => {
+        app.close(resolve);
+        app.closeAllConnections();
+      });
+    }
+    await new Promise((resolve) => portServer.close(resolve));
+    control.close();
+  });
   const owner = control.bootstrap({
     issuer: "https://id.example",
     subject: "owner",
@@ -46,27 +58,19 @@ async function setup(t) {
   });
   control.grant(owner, editor.id, "editor");
   agents.permission(owner, editor.id, other, "invoke", true);
-  const portServer = http.createServer().listen(0, "127.0.0.1");
+  portServer.listen(0, "127.0.0.1");
   await once(portServer, "listening");
-  const port = portServer.address().port;
-  await new Promise((r) => portServer.close(r));
-  const origin = `http://127.0.0.1:${port}`;
-  const app = createWiki({
+  const origin = `http://127.0.0.1:${portServer.address().port}`;
+  app = createWiki({
     repo,
     origin,
     control,
     write: true,
     development: true,
   });
-  app.listen(port, "127.0.0.1");
+  // Adopt the bound listener without releasing its port during setup.
+  app.listen(portServer);
   await once(app, "listening");
-  t.after(async () => {
-    await new Promise((r) => {
-      app.close(r);
-      app.closeAllConnections();
-    });
-    control.close();
-  });
   const remote = new RemoteAgents(agents, origin);
   const registration = remote.register({
     client_name: "Synthetic client",

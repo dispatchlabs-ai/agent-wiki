@@ -8,7 +8,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import http from "node:http";
+import { createServer } from "node:net";
 import { once } from "node:events";
 import { randomUUID, generateKeyPairSync } from "node:crypto";
 import { SignJWT, importPKCS8 } from "jose";
@@ -40,13 +40,22 @@ async function setup(
   { role = "reader", mode = "independent", options = {} } = {},
 ) {
   const repo = fixture(t);
-  const portServer = http.createServer();
+  const control = new ControlStore(path.join(repo, ".git", "control.sqlite3"));
+  const portServer = createServer();
+  let app;
+  t.after(async () => {
+    if (app) {
+      await new Promise((resolve) => {
+        app.close(resolve);
+        app.closeAllConnections();
+      });
+    }
+    await new Promise((resolve) => portServer.close(resolve));
+    control.close();
+  });
   portServer.listen(0, "127.0.0.1");
   await once(portServer, "listening");
-  const port = portServer.address().port;
-  await new Promise((resolve) => portServer.close(resolve));
-  const origin = `http://127.0.0.1:${port}`;
-  const control = new ControlStore(path.join(repo, ".git", "control.sqlite3"));
+  const origin = `http://127.0.0.1:${portServer.address().port}`;
   const owner = control.bootstrap({
     issuer: "https://id.example",
     subject: "owner",
@@ -65,7 +74,7 @@ async function setup(
     privateKeyFile: keyFile,
     scope: role === "reader" ? "wiki:read" : "wiki:read wiki:trace wiki:write",
   };
-  const app = createWiki({
+  app = createWiki({
     repo,
     origin,
     control,
@@ -73,15 +82,9 @@ async function setup(
     development: true,
     ...options,
   });
-  app.listen(port, "127.0.0.1");
+  // Adopt the bound listener without releasing its port during setup.
+  app.listen(portServer);
   await once(app, "listening");
-  t.after(async () => {
-    await new Promise((resolve) => {
-      app.close(resolve);
-      app.closeAllConnections();
-    });
-    control.close();
-  });
   const request = (route, token, init = {}) =>
     fetch(origin + route, {
       ...init,
