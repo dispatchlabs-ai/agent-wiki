@@ -4,7 +4,6 @@ import { ControlStore, digest } from "./control-store.mjs";
 import { validateEvidence, verifyDraftEvidence } from "./evidence-quotes.mjs";
 import { WikiError } from "./errors.mjs";
 import { editSchema } from "../public/edit-contract.js";
-import fs from "node:fs";
 import path from "node:path";
 import { withWriterLock } from "./writer-lock.mjs";
 import { fileURLToPath } from "node:url";
@@ -234,14 +233,20 @@ export function saveGitEdits(
   return { ...receipt, commit };
 }
 
+async function readDraft() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
 if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const repo = wikiRepo();
   try {
+    const draft = await readDraft();
     await withWriterLock(repo, async () => {
-      const draft = JSON.parse(fs.readFileSync(0, "utf8"));
       let result;
       let control;
       try {
