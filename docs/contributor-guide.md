@@ -24,7 +24,10 @@ never introduce a second authoritative conversation representation.
 Linux and macOS are supported through the portable directory writer lock. Node
 24.19.0 is the tested minimum for the built-in SQLite implementation. CI runs the
 core suite on both platforms with 24.19.0 and 26.6.0; an engines lower bound is not proof that every
-intervening or future runtime works. Chromium exercises the actual editor and
+intervening or future runtime works. For Windows, follow the
+[Ubuntu under WSL2 walkthrough](getting-started.md#windows-with-wsl2) and
+[browser dependency setup](../CONTRIBUTING.md); native Windows server support
+remains unverified. Chromium exercises the actual editor and
 module loading. `tests/browser/webmcp.spec.mjs` enables experimental web-platform features in the
 pinned Chromium and exercises native `document.modelContext` registration and
 execution with synthetic content. It tests read and write flows without a mock

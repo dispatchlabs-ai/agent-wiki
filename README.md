@@ -36,7 +36,8 @@ local process running. A browser is optional for the agent; you can open the URL
 ## Try it manually
 
 Requires **Linux or macOS, Node 24.19+, and Git**. Node's built-in SQLite
-is used; no database server is needed.
+is used; no database server is needed. On Windows, run the commands in
+[Ubuntu under WSL2](docs/getting-started.md#windows-with-wsl2).
 
 ```sh
 git clone https://github.com/dispatchlabs-ai/agent-wiki.git

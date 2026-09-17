@@ -6,6 +6,8 @@ Git, Node 24.19+ and npm on Linux or macOS. Use your existing model account; the
 contains no model. This downloads public dependencies and creates only a new local
 checkout and its disposable example state. Do not read private content or change
 persistent client settings. Do not publish the editable example to a network.
+On Windows, use the [Ubuntu under WSL2 setup](getting-started.md#windows-with-wsl2)
+and run the engine commands in the Linux filesystem.
 
 ## Start a clean example
 

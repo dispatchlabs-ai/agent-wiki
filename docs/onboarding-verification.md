@@ -1,5 +1,69 @@
 # Onboarding and discovery verification
 
+## Windows and WSL2 — September 17, 2026
+
+The local walkthrough passed on public `main`
+[`f696b83`](https://github.com/dispatchlabs-ai/agent-wiki/commit/f696b83b69d6e8b4e12451e0d704d24dadf3bbac),
+which includes work newer than v0.6.1. A fresh clone, dependencies and the
+synthetic content repository lived in Ubuntu's ext4 filesystem. The Windows
+guest ran in an x86-64 QEMU/KVM VM with nested virtualization enabled,
+4 virtual CPUs and 16 GiB RAM.
+
+| Component       | Version                                                      |
+| --------------- | ------------------------------------------------------------ |
+| Windows         | Windows 11 Enterprise Evaluation 25H2, build 26200.6584      |
+| WSL             | 2.7.14.0; distribution confirmed as WSL2                     |
+| Linux           | Ubuntu 24.04.5 LTS; kernel 6.18.33.2-microsoft-standard-WSL2 |
+| Linux runtime   | Node 24.19.0, npm 11.17.0, Git 2.43.0                        |
+| Windows runtime | Node 24.19.0, npm 11.17.0                                    |
+| Browsers        | Linux Chromium 151.0.7922.34; Windows Edge 153.0.4234.46     |
+| Clients         | Official MCP SDK 2.0.0; Playwright 1.62.1                    |
+
+`npm ci` and `npm run check` passed, including all 149 application tests. The
+initial contributor browser commands exposed two environment prerequisites:
+
+- `npx playwright install chromium` downloaded the browser, but launching it
+  failed because `libnspr4.so` was absent. Installing Chromium's system packages
+  with `npx playwright install --with-deps chromium` resolved that failure.
+- With WSLg's `DISPLAY` and `WAYLAND_DISPLAY` inherited, Chromium loaded pages
+  but produced no animation frames; ordinary clicks waited for element stability
+  until their deadlines. An isolated static page reproduced the problem while
+  JavaScript timers advanced normally. Clearing either variable alone did not
+  help; clearing both for the process restored frames and ordinary clicks. The
+  internal Chromium/WSLg cause remains unverified.
+
+The corrected commands are recorded in [Contributing](../CONTRIBUTING.md):
+
+```sh
+npx playwright install --with-deps chromium
+env -u DISPLAY -u WAYLAND_DISPLAY npm run test:browser
+```
+
+All 65 browser tests then passed in 4.2 minutes with the existing 30-second test
+deadline, one worker and no retries. This changes only the command's environment;
+the desktop environment and repository browser configuration remain unchanged.
+
+The example ran with its default `npm run example` command and loopback binding.
+Separate MCP SDK processes inside WSL and on Windows reached
+`http://127.0.0.1:4317/mcp`. Both completed discovery, search/read, original trace
+reading, complete citation URLs and unsaved preview without changing the article
+revision. Windows Edge followed both original citation anchors, preserved the
+existing Markdown while adding the tutorial note, previewed it, retained the
+draft, saved revision 2 and inspected History and Compare.
+
+The original server process was stopped and its listener confirmed closed before
+restarting the same command. Windows Edge and Linux headless Chromium then read
+the saved note, revision 2, both citations and its comparison. Linux Chromium used
+the display-variable correction above. MCP clients on both sides confirmed the
+saved article's exact Git blob after restart; the content repository's Git HEAD
+was unchanged and the shipped examples were untouched. Browser screenshots were
+visually inspected, and the walkthrough reported no page JavaScript errors.
+
+These checks used synthetic data, the official SDK and browser automation;
+no model client or real account was enrolled. They qualify this Ubuntu-on-WSL2
+configuration and the two client locations. Native Windows server support, WSL1
+and other WSL graphics configurations remain unverified.
+
 ## September 16, 2026 — native client citations
 
 The manual walkthrough on source `4744b9b` connected Codex CLI 0.154.0 to the

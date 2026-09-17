@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document the Ubuntu under WSL2 walkthrough and Chromium's system-library
+  prerequisites for browser contributors.
 - Keep external evidence responses and article metadata separate from internal
   trace-file streaming and cleanup. Preserve authorization and clean up verified
   range files even when access is revoked before the response.

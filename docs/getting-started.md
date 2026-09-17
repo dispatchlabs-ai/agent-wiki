@@ -26,6 +26,26 @@ The server creates `.runtime/example`, a separate Git repository containing thre
 fictional articles, and imports the two bundled conversation snapshots. It enables
 local editing and never pushes. Your example edits survive a restart.
 
+### Windows with WSL2
+
+Set up [WSL2 with Ubuntu](https://learn.microsoft.com/en-us/windows/wsl/install)
+first; `wsl --list --verbose` in PowerShell should report version **2** for the
+distribution. Install Git and Node 24.19+ inside Ubuntu, then run the commands
+above from your Linux home directory. Keep the checkout in the Linux filesystem,
+such as `~/agent-wiki`, rather than `/mnt/c`; see Microsoft's
+[file storage guidance](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems).
+
+Keep `npm run example` running in Ubuntu. Open `http://127.0.0.1:4317` in your
+Windows browser. An MCP client inside WSL uses `http://127.0.0.1:4317/mcp` on
+Linux loopback. A Windows-host MCP client can use that same URL through WSL's
+[Windows-to-Linux localhost access](https://learn.microsoft.com/en-us/windows/wsl/networking#accessing-linux-networking-apps-from-windows-localhost).
+Keep the example's loopback binding; do not expose it to the LAN.
+
+The [verification record](onboarding-verification.md#windows-and-wsl2--september-17-2026)
+identifies the tested environment and client scope. This runs the Linux server
+under WSL2; native Windows server support remains unverified. Browser contributors
+also need the [Chromium system prerequisites](../CONTRIBUTING.md).
+
 ## Follow a claim to its evidence
 
 Open **Atlas Labs**. Its Current work section describes a two-week prototype with
