@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 — 2026-09-17
+
+- Fix inline-code contrast in light and dark themes by using the background
+  surface color instead of the secondary text color.
+- No configuration or persisted-data migration is required.
 
 - Give MCP clients the configured wiki origin and guidance to return complete
   article and source citations, retaining page and line anchors.

@@ -269,10 +269,10 @@
       color: var(--typeset-muted);
     }
 
-    /* Inline code. */
+    /* Inline code. Wiki muted is a text color; code backgrounds use surfaces. */
     &:where(:not(pre) > code) {
       background-color: var(
-        --color-muted,
+        --color-surface,
         color-mix(in oklab, currentColor 8%, transparent)
       );
       font-family: var(--typeset-font-mono);
@@ -284,7 +284,7 @@
     /* Code blocks. */
     &:where(pre) {
       background-color: var(
-        --color-muted,
+        --color-surface,
         color-mix(in oklab, currentColor 8%, transparent)
       );
       font-family: var(--typeset-font-mono);
