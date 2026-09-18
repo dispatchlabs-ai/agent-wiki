@@ -149,7 +149,13 @@ export class WikiApiClient {
     return this.fetchFn(target, {
       ...init,
       redirect: "error",
-      signal: init.signal || AbortSignal.timeout(30000),
+      // Source verification can take longer than a small metadata request.
+      // Honor caller cancellation without imposing a hidden trace-size ceiling.
+      signal:
+        init.signal ||
+        (target.pathname.startsWith("/api/traces/")
+          ? undefined
+          : AbortSignal.timeout(30000)),
     });
   }
   async token() {

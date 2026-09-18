@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.8.1 — 2026-09-18
+
+- Remove hidden 30-second transport deadlines for CLI trace reads and machine MCP transport. The stdio adapter now allows a one-hour tool request by default, configurable with `requestTimeoutMs`; caller cancellation still applies. Authentication and ordinary metadata requests keep their short deadlines.
+
 ## 0.8.0 — 2026-09-18
 
 - Operator enrollment supports explicit maximum credential scopes, allowing trace researchers to read evidence without publishing. MCP reads no longer impose an implicit deadline; cancellation and explicitly configured deadlines remain available.

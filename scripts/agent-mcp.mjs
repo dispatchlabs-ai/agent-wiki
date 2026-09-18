@@ -10,6 +10,13 @@ if (!filename)
     "Usage: node scripts/agent-mcp.mjs /absolute/agent.json [--check]",
   );
 const config = JSON.parse(fs.readFileSync(filename, "utf8"));
+const requestTimeoutMs = config.requestTimeoutMs ?? 3600000;
+if (
+  !Number.isSafeInteger(requestTimeoutMs) ||
+  requestTimeoutMs < 1 ||
+  requestTimeoutMs > 2147483647
+)
+  throw Error("requestTimeoutMs must be a positive timer duration");
 let connection;
 try {
   connection = await connectAgent(config);
@@ -44,7 +51,7 @@ try {
         (args, extra) =>
           connection.client.callTool(
             { name: tool.name, arguments: args },
-            { signal: extra.mcpReq.signal },
+            { signal: extra.mcpReq.signal, timeout: requestTimeoutMs },
           ),
       );
     const transport = new StdioServerTransport();

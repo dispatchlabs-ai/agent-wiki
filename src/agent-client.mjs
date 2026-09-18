@@ -92,7 +92,9 @@ export class AgentCredential {
       const response = await fetchFn(input, {
         ...init,
         redirect: "error",
-        signal: init.signal || AbortSignal.timeout(30000),
+        signal:
+          init.signal ||
+          (target.pathname === "/mcp" ? undefined : AbortSignal.timeout(30000)),
       });
       if (target.pathname === "/oauth/token" && response.ok) {
         const result = await response.clone().json();

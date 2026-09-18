@@ -422,3 +422,25 @@ test("expired CLI sessions can log out and sign in again without printing creden
   assert.equal((await f.cli(["logout", "--forget"])).result.revoked, false);
   assert.equal((await f.cli(args, f.password)).code, 0);
 });
+
+test("CLI trace transport honors cancellation without imposing a short read deadline", async () => {
+  const signals = [];
+  const api = new WikiApiClient(
+    { origin: "https://wiki.example", kind: "oauth" },
+    {
+      fetch: async (_url, init) => {
+        signals.push(init.signal);
+        return new Response("{}");
+      },
+    },
+  );
+  await api.fetch("/api/traces/" + "a".repeat(64) + ".json");
+  assert.equal(signals.pop(), undefined);
+  const abort = new AbortController();
+  await api.fetch("/api/traces/" + "a".repeat(64) + ".json", {
+    signal: abort.signal,
+  });
+  assert.equal(signals.pop(), abort.signal);
+  await api.fetch("/api/articles/catalog.json");
+  assert.ok(signals.pop() instanceof AbortSignal);
+});

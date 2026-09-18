@@ -824,3 +824,22 @@ test("operator scopes keep a trace researcher from acquiring publication tokens"
     /scope exceeds/,
   );
 });
+
+test("machine MCP transport honors caller cancellation and keeps authentication bounded", async (t) => {
+  const s = await setup(t);
+  const signals = [];
+  const credential = new AgentCredential(s.config, {
+    fetch: async (_url, init) => {
+      signals.push(init.signal);
+      return new Response("{}");
+    },
+  });
+  t.after(() => credential.close());
+  await credential.fetch(s.origin + "/mcp");
+  assert.equal(signals.pop(), undefined);
+  const abort = new AbortController();
+  await credential.fetch(s.origin + "/mcp", { signal: abort.signal });
+  assert.equal(signals.pop(), abort.signal);
+  await credential.fetch(s.origin + "/.well-known/oauth-authorization-server");
+  assert.ok(signals.pop() instanceof AbortSignal);
+});

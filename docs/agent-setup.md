@@ -596,3 +596,11 @@ Changing that profile cannot obtain a write token. Reserve the full
 `wiki:read wiki:trace wiki:write` scope for the accountable publisher, and keep
 private keys on their owning runtime. Existing registrations without an explicit
 scope retain their role's previous default permissions.
+
+Large cold trace reads can take longer than metadata calls. The HTTP CLI does
+not add a fixed deadline to trace reads. The stdio MCP adapter defaults to a
+one-hour SDK tool deadline; set a positive `requestTimeoutMs` in its connection
+file to change that budget (maximum 2,147,483,647 ms). The calling harness may
+still have its own deadline. Use the HTTP CLI for independent verification and
+retain exact operation IDs when retrying writes. Caller cancellation and current
+access checks remain in effect.
