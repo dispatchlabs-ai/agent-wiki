@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.8.5 — 2026-09-18
+
+- Keep token renewal and sign-in available while article edits prepare Git history
+  and objects. Previously, slow edits held the authentication database's write
+  lock, causing renewal timeouts and misleading MCP reconnect prompts.
+- Preserve revocation serialization with a final permission check and a short
+  transaction around the atomic Git reference update. Retries still require
+  current authority and retain their original durable receipt.
+- No configuration or persisted-data migration is required.
+
 ## 0.8.4 — 2026-09-18
 
 - Keep broad native trace searches off the serving process's main thread. Search

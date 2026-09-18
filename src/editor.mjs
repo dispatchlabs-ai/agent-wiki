@@ -44,6 +44,7 @@ export function saveGitEdits(
   verified = new Map(),
   actor = null,
   authority = null,
+  publish = (fn) => fn(),
 ) {
   if (
     !draft ||
@@ -80,7 +81,7 @@ export function saveGitEdits(
     const tree = git(repo, ["ls-tree", "-rz", commit, "--", "wiki"]).split(
       "\0",
     );
-    return {
+    const result = {
       ...prior.receipt,
       state: "already-saved",
       articles: prior.receipt.articles.map((a) => {
@@ -117,6 +118,8 @@ export function saveGitEdits(
       }),
       commit,
     };
+    // Returning an existing receipt must also recheck current authority.
+    return publish(() => result);
   }
   const files = {},
     results = [],
@@ -229,6 +232,7 @@ export function saveGitEdits(
     wiki.head,
     files,
     draft.updates.map((u) => u.summary).join("; "),
+    publish,
   );
   return { ...receipt, commit };
 }
@@ -305,17 +309,21 @@ if (
           },
           process.env.WIKI_EVIDENCE_URL,
         );
-        const publish = () => {
-          const current = authorize();
-          return saveGitEdits(
-            repo,
-            draft,
-            verified,
-            current.actor,
-            current.authority,
-          );
+        const publish = (commit) => {
+          const checked = () => {
+            authorize();
+            return commit();
+          };
+          return control ? control.transaction(checked) : checked();
         };
-        result = control ? control.transaction(publish) : publish();
+        result = saveGitEdits(
+          repo,
+          draft,
+          verified,
+          initial.actor,
+          initial.authority,
+          publish,
+        );
       } finally {
         control?.close();
       }

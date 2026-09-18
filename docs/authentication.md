@@ -141,10 +141,15 @@ sign-in flow, and `/healthz` carry no content and remain public. Responses have 
 global Git commit header and use `Cache-Control: no-store`. Async responses recheck
 current membership before release; broken control-store queries fail closed.
 
-The writer takes its portable directory Git lock and then an immediate control-store
-transaction, rechecks the session and editor grant, and retains that transaction
-through local Git publication. Grant changes serialize against this transaction.
+The writer takes its portable directory Git lock and prepares validation, article
+history, and Git objects without holding a control-store write transaction. Token
+renewal and sign-in remain available during this preparation. Immediately before
+the compare-and-swap update of the published Git reference, it takes an immediate
+control-store transaction and rechecks the session/token and editor grant. Only
+that reference update runs inside the transaction; worktree synchronization and
+remote push follow outside it. Grant changes serialize against publication.
 If revocation wins, a queued write fails. If publication wins, its commit remains.
+An idempotent retry also rechecks current authority before returning its receipt.
 HTTP operation receipts use actor-scoped storage identities, retain the public
 operation ID, and include the trusted actor ID; payload actor fields cannot change
 attribution. This is not yet the full SQL/Git crash-recovery journal in milestone 4.

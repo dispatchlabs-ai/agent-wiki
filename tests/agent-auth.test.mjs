@@ -3,7 +3,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { TraceStore } from "../src/traces.mjs";
-import { GitWiki } from "../src/git-wiki.mjs";
+import { GitWiki, git } from "../src/git-wiki.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -21,6 +21,109 @@ import { fixture, update } from "./helpers.mjs";
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const pem = pair.privateKey.export({ type: "pkcs8", format: "pem" });
 const publicKey = { ...pair.publicKey.export({ format: "jwk" }), alg: "RS256" };
+
+for (const revoke of [false, true]) {
+  test(
+    `token renewal remains available during edit preparation; revoke=${revoke}`,
+    { timeout: 15000 },
+    async (t) => {
+      const s = await setup(t, { role: "editor" });
+      const credential = new AgentCredential(s.config);
+      t.after(() => credential.close());
+      const token = await credential.token();
+      const head = git(s.repo, ["rev-parse", "HEAD"]);
+      const shim = path.join(s.repo, ".git", "git-shim");
+      fs.mkdirSync(shim);
+      const ready = path.join(shim, "ready");
+      const release = path.join(shim, "release");
+      const realGit = spawnSync("which", ["git"], {
+        encoding: "utf8",
+      }).stdout.trim();
+      fs.writeFileSync(
+        path.join(shim, "git"),
+        `#!/bin/sh
+if [ "$3" = "read-tree" ]; then
+  touch "$WIKI_TEST_READY"
+  count=0
+  while [ ! -f "$WIKI_TEST_RELEASE" ]; do
+    count=$((count + 1))
+    [ "$count" -lt 1000 ] || exit 70
+    sleep 0.01
+  done
+fi
+exec "${realGit}" "$@"
+`,
+        { mode: 0o700 },
+      );
+      const child = spawn(
+        process.execPath,
+        [fileURLToPath(new URL("../src/editor.mjs", import.meta.url))],
+        {
+          env: {
+            ...process.env,
+            PATH: `${shim}${path.delimiter}${process.env.PATH}`,
+            WIKI_REPO: s.repo,
+            WIKI_CONTROL: s.control.filename,
+            WIKI_HTTP_WRITE: "1",
+            WIKI_GIT_LOCKED: "0",
+            WIKI_PUSH: "0",
+            WIKI_AGENT_TOKEN: token,
+            WIKI_AGENT_AUDIENCE: s.origin + "/mcp",
+            WIKI_EVIDENCE_URL: "",
+            WIKI_SESSION: "",
+            WIKI_TEST_READY: ready,
+            WIKI_TEST_RELEASE: release,
+          },
+          stdio: ["pipe", "pipe", "pipe"],
+        },
+      );
+      let out = "",
+        err = "";
+      child.stdout.on("data", (data) => (out += data));
+      child.stderr.on("data", (data) => (err += data));
+      const closed = once(child, "close");
+      try {
+        child.stdin.end(
+          JSON.stringify({
+            operation_id: "renew-during-write",
+            updates: [update("created")],
+          }),
+        );
+        const deadline = Date.now() + 10000;
+        while (
+          !fs.existsSync(ready) &&
+          child.exitCode === null &&
+          Date.now() < deadline
+        )
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.ok(
+          fs.existsSync(ready),
+          err || "writer did not reach preparation gate",
+        );
+        // A held writer transaction must fail quickly rather than stall the suite.
+        s.control.db.exec("PRAGMA busy_timeout=150");
+        credential.expires = 0;
+        assert.notEqual(await credential.token(), token);
+        if (revoke) s.agents.revokeKey(s.spec.agent, s.spec.key);
+        fs.writeFileSync(release, "");
+        const [code] = await closed;
+        if (revoke) {
+          assert.equal(code, 1, out);
+          assert.equal(JSON.parse(err.trim().split("\n").at(-1)).status, 404);
+          assert.equal(git(s.repo, ["rev-parse", "HEAD"]), head);
+        } else {
+          assert.equal(code, 0, err);
+          assert.equal(JSON.parse(out).state, "saved");
+          assert.ok(new GitWiki(s.repo).current("created"));
+        }
+        assert.equal(git(s.repo, ["status", "--porcelain"]), "");
+      } finally {
+        fs.writeFileSync(release, "");
+        await closed;
+      }
+    },
+  );
+}
 function registration(name = "Researcher") {
   return {
     version: 1,

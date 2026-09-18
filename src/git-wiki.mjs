@@ -267,7 +267,13 @@ export class GitWiki {
 // Called while holding the repository's advisory writer lock. A private Git
 // index creates a commit without staging, overwriting or committing user files.
 // update-ref provides compare-and-swap even against writers that ignore the lock.
-export function commitFiles(repo, expectedHead, files, message) {
+export function commitFiles(
+  repo,
+  expectedHead,
+  files,
+  message,
+  publish = (fn) => fn(),
+) {
   if (git(repo, ["symbolic-ref", "--short", "HEAD"]) !== "main")
     throw new WikiError("BRANCH_CONFLICT", "Wiki edits require main", 409);
   if (git(repo, ["status", "--porcelain"]))
@@ -300,7 +306,11 @@ export function commitFiles(repo, expectedHead, files, message) {
     const commit = git(repo, ["commit-tree", tree, "-p", expectedHead], {
       input: message + "\n",
     });
-    git(repo, ["update-ref", "refs/heads/main", commit, expectedHead]);
+    // Object preparation can be slow. Serialize authorization/revocation only
+    // around the atomic visibility change, never around that preparation.
+    publish(() =>
+      git(repo, ["update-ref", "refs/heads/main", commit, expectedHead]),
+    );
     // Bring only committed task paths into the real index/worktree. A repository
     // lock serializes service writers; human edits must not race this operation.
     git(repo, [
