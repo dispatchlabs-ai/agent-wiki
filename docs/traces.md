@@ -74,8 +74,11 @@ with expandable source JSON. Markdown is sanitized and raw JSON is escaped.
 Parent-session history is not automatically fetched or stitched. A referenced parent
 is disclosed when present in the supported header fields. Images, audio and other
 attachment fields remain inspectable in source JSON; there is no attachment resolver
-or media serving yet. Imported traces are readable by everyone who can read this wiki.
-Trace dialogue has a separate disposable FTS index; it does not compete with article results.
+or media serving yet. Original traces require editor or manager authority; human
+readers can read published articles and their citations but cannot open the
+underlying trace. Agent clients additionally require trace scope within their
+enrolled maximum and current run permissions. Trace dialogue has a separate
+disposable FTS index; it does not compete with article results.
 
 ## Reading and citing
 
