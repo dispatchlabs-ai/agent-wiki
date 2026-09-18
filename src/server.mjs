@@ -18,6 +18,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createWikiMcp } from "./mcp.mjs";
 import { McpApiClient } from "./mcp-response.mjs";
 import { PreviewRenderer } from "./preview.mjs";
+import { TraceSearchPool } from "./trace-search-pool.mjs";
 import { createWikiTools } from "../public/wiki-tools.js";
 import { disclosureOptions } from "./trace-disclosure.mjs";
 import { EvidenceClient } from "./evidence-client.mjs";
@@ -50,11 +51,7 @@ import {
 } from "./views.mjs";
 import { TraceStore } from "./traces.mjs";
 import { catalogOptions } from "./trace-catalog.mjs";
-import {
-  searchTraces,
-  traceSearchHealth,
-  traceProvenance,
-} from "./trace-search.mjs";
+import { traceSearchHealth, traceProvenance } from "./trace-search.mjs";
 const assetRoot = fileURLToPath(new URL("../public/", import.meta.url));
 export function createWiki({
   repo = wikiRepo(),
@@ -68,6 +65,7 @@ export function createWiki({
   auth = null,
   localLogin = false,
   development = false,
+  traceSearchPool = null,
 } = {}) {
   if (control && control.filename === ":memory:")
     throw Error("Durable control store required");
@@ -93,6 +91,7 @@ export function createWiki({
     throw Error("Configure either WIKI_TRACES or WIKI_EVIDENCE_URL");
   const evidence = evidenceUrl ? new EvidenceClient(evidenceUrl) : null;
   const traceStore = new TraceStore(traces);
+  const traceSearches = traceSearchPool || new TraceSearchPool();
   const previews = new PreviewRenderer();
   const wiki = new GitWiki(repo),
     index = new WikiSearch(database),
@@ -120,11 +119,11 @@ export function createWiki({
       error = indexError = e.message;
     }
   }
-  async function htmlTraceSearch(query, options) {
+  async function htmlTraceSearch(query, options, signal) {
     try {
       return evidence
         ? await evidence.search(query, options)
-        : searchTraces(traces, query, options);
+        : await traceSearches.search(traces, query, options, signal);
     } catch (e) {
       if (e instanceof WikiError && e.code === "INVALID_SEARCH") throw e;
       return {
@@ -139,6 +138,12 @@ export function createWiki({
   const timer = setInterval(refresh, 1000);
   timer.unref();
   const server = http.createServer(async (req, res) => {
+    const requestAbort = new AbortController();
+    const cancelRequest = () => {
+      if (!res.writableEnded) requestAbort.abort();
+    };
+    req.once("aborted", cancelRequest);
+    res.once("close", cancelRequest);
     let actor = null,
       token = null,
       agentToken = null,
@@ -1111,10 +1116,14 @@ export function createWiki({
         const q = url.searchParams.get("q") || "";
         const result = !q.trim()
           ? { indexed: false, results: [], nextOffset: null }
-          : await htmlTraceSearch(q, {
-              offset: Number(url.searchParams.get("offset") || 0),
-              format: url.searchParams.get("format") || "",
-            });
+          : await htmlTraceSearch(
+              q,
+              {
+                offset: Number(url.searchParams.get("offset") || 0),
+                format: url.searchParams.get("format") || "",
+              },
+              requestAbort.signal,
+            );
         return send(
           200,
           tracesView(
@@ -1183,7 +1192,12 @@ export function createWiki({
             200,
             evidence
               ? await evidence.search(url.searchParams.get("q") || "", options)
-              : searchTraces(traces, url.searchParams.get("q") || "", options),
+              : await traceSearches.search(
+                  traces,
+                  url.searchParams.get("q") || "",
+                  options,
+                  requestAbort.signal,
+                ),
           );
         } catch (e) {
           return send(e instanceof WikiError ? e.status : 503, {
@@ -1342,12 +1356,16 @@ export function createWiki({
             ? { indexed: false, results: [], nextOffset: null }
             : evidence && url.searchParams.get("sync") !== "1"
               ? { indexed: false, results: [], nextOffset: null, pending: true }
-              : await htmlTraceSearch(url.searchParams.get("q") || "", {
-                  limit: 20,
-                  offset: Number(url.searchParams.get("traceOffset") || 0),
-                  format: url.searchParams.get("format") || "",
-                  machine: url.searchParams.get("machine") || "",
-                });
+              : await htmlTraceSearch(
+                  url.searchParams.get("q") || "",
+                  {
+                    limit: 20,
+                    offset: Number(url.searchParams.get("traceOffset") || 0),
+                    format: url.searchParams.get("format") || "",
+                    machine: url.searchParams.get("machine") || "",
+                  },
+                  requestAbort.signal,
+                );
         return send(
           200,
           searchView(wiki, url.searchParams, result, traceResult, canTrace),
@@ -1472,6 +1490,7 @@ export function createWiki({
     for (const mcp of mcpVariants.values())
       void mcp.close().catch(console.error);
     void previews.close().catch(console.error);
+    void traceSearches.close().catch(console.error);
     clearInterval(timer);
     index.close();
     traceStore.close();

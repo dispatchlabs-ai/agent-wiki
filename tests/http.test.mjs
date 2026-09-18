@@ -11,6 +11,7 @@ import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createWiki } from "../src/server.mjs";
+import { TraceSearchPool } from "../src/trace-search-pool.mjs";
 import { GitWiki, git } from "../src/git-wiki.mjs";
 import { registerTools } from "../public/client.js";
 import { fixture, update, commit } from "./helpers.mjs";
@@ -62,8 +63,60 @@ async function server(t, options = {}) {
       },
       body: JSON.stringify(draft),
     });
-  return { repo, request, save };
+  return { repo, request, save, base };
 }
+
+test("a cancelled trace query cannot block health or the next search", async (t) => {
+  const until = async (check) => {
+    for (let i = 0; i < 1000; i++) {
+      if (check()) return;
+      await new Promise(setImmediate);
+    }
+    assert.fail("Timed out waiting for trace-search process state");
+  };
+  const pool = new TraceSearchPool({
+    workers: 1,
+    childUrl: new URL("./fixtures/trace-search-child.mjs", import.meta.url),
+  });
+  const traces = path.join(fixture(t), ".git", "traces");
+  fs.mkdirSync(traces);
+  const { request, base } = await server(t, {
+    traces,
+    traceSearchPool: pool,
+  });
+  let stalledRequest;
+  const stalled = new Promise((resolve) => {
+    stalledRequest = http.request(
+      `${base}/api/traces/search?q=hang`,
+      { headers: { Host: "wiki.test" } },
+      (response) => response.resume().once("end", () => resolve(response)),
+    );
+    stalledRequest.once("error", resolve);
+    stalledRequest.end();
+  });
+  await until(() => pool.children.size === 1);
+  const started = Date.now();
+  const health = await request("/api/articles/health.json");
+  assert.ok([200, 503].includes(health.status));
+  assert.ok(Date.now() - started < 1000, "health must stay responsive");
+  stalledRequest.destroy(Error("Synthetic caller disconnect"));
+  assert.equal(
+    (
+      await Promise.race([
+        stalled,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(Error("Abort did not close search")), 1000),
+        ),
+      ])
+    ).name,
+    "Error",
+  );
+  await until(() => pool.children.size === 0);
+  const recovered = await (
+    await request("/api/traces/search?q=recovered")
+  ).json();
+  assert.equal(recovered.results[0].snippet, "recovered");
+});
 test("selective article reads pin citations, preserve full edits, and distinguish revisions", async (t) => {
   const { repo, request, save } = await server(t);
   const filename = path.join(repo, "wiki/guide.md");

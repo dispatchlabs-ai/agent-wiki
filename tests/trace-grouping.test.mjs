@@ -106,6 +106,41 @@ test("fallback grouping requires a verified identical prefix and a session ident
     [1, 1, 1, 2],
   );
 });
+test("late snippets stay attached to their selected physical dialogue rows", (t) => {
+  const repo = fixture(t),
+    root = path.join(repo, ".git", "traces"),
+    source = path.join(repo, ".git", "source.jsonl");
+  fs.writeFileSync(
+    source,
+    [
+      { type: "session", id: "snippet-rows" },
+      {
+        type: "message",
+        id: "first",
+        message: { role: "user", content: "Needle first distinct text" },
+      },
+      {
+        type: "message",
+        id: "second",
+        message: { role: "assistant", content: "Needle second distinct text" },
+      },
+    ]
+      .map(JSON.stringify)
+      .join("\n"),
+  );
+  importTrace(root, source, "Snippet rows");
+  indexTraces(root);
+  const byLine = new Map(
+    searchTraces(root, "Needle").results.map((result) => [
+      result.line,
+      result.snippet,
+    ]),
+  );
+  assert.match(byLine.get(2), /first distinct/);
+  assert.doesNotMatch(byLine.get(2), /second distinct/);
+  assert.match(byLine.get(3), /second distinct/);
+  assert.doesNotMatch(byLine.get(3), /first distinct/);
+});
 test("Claude UUIDs keep logical dialogue identity across growing snapshots", (t) => {
   const repo = fixture(t),
     root = path.join(repo, ".git", "traces"),

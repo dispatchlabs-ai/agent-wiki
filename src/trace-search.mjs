@@ -148,16 +148,20 @@ export function searchTraces(
   if (!root || !fs.existsSync(filename(root)))
     return { indexed: false, results: [], nextOffset: null };
   const db = new DatabaseSync(filename(root), { readOnly: true });
+  let transaction = false;
   try {
     if (db.prepare("SELECT value FROM version").get()?.value !== SEARCH_VERSION)
       return { indexed: false, results: [], nextOffset: null };
     if (!terms.length) return { indexed: true, results: [], nextOffset: null };
+    db.exec("BEGIN");
+    transaction = true;
+    const match = terms.map((t) => `"${t}"*`).join(" AND ");
     const rows = db
       .prepare(
         `
       WITH matches AS MATERIALIZED (
-        SELECT snapshot AS id,line,page,role,logical_key,s.title,s.format,s.session_id,s.imported_at,
-          snippet(dialogue,5,'','',' … ',30) AS snippet,rank AS relevance
+        SELECT dialogue.rowid AS dialogue_rowid,snapshot AS id,line,page,role,logical_key,
+          s.title,s.format,s.session_id,s.imported_at,rank AS relevance
         FROM dialogue JOIN snapshots s ON s.id=snapshot
         WHERE dialogue MATCH ? AND (?='' OR s.format=?)
       ), ranked AS (
@@ -167,15 +171,11 @@ export function searchTraces(
       ) SELECT * FROM ranked WHERE representative=1 ORDER BY group_rank,logical_key LIMIT ? OFFSET ?
     `,
       )
-      .all(
-        terms.map((t) => `"${t}"*`).join(" AND "),
-        format,
-        format,
-        limit + 1,
-        offset,
-      );
-
-    return {
+      .all(match, format, format, limit + 1, offset);
+    const snippet = db.prepare(
+      "SELECT snippet(dialogue,5,'','',' … ',30) AS value FROM dialogue WHERE rowid=CAST(? AS INTEGER) AND dialogue MATCH ?",
+    );
+    const result = {
       indexed: true,
       results: rows.slice(0, limit).map((r) => {
         const { representative, relevance, group_rank, ...rest } = r;
@@ -190,7 +190,7 @@ export function searchTraces(
           ),
           session_id: rest.session_id === null ? null : String(rest.session_id),
           imported_at: String(rest.imported_at),
-          snippet: String(rest.snippet),
+          snippet: String(snippet.get(rest.dialogue_rowid, match).value),
           logical_key: String(rest.logical_key),
         };
         const evidence = provenancePage(db, hit.logical_key, 5, 0);
@@ -205,6 +205,12 @@ export function searchTraces(
       }),
       nextOffset: rows.length > limit ? offset + limit : null,
     };
+    db.exec("COMMIT");
+    transaction = false;
+    return result;
+  } catch (error) {
+    if (transaction) db.exec("ROLLBACK");
+    throw error;
   } finally {
     db.close();
   }

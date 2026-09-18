@@ -179,6 +179,13 @@ tools, thinking, and model-context records. Original records remain available in
 the trace reader. Native Claude, Codex and pi snapshots use the same browser,
 HTTP, MCP and WebMCP search operation and may be filtered by `format`.
 
+Local dialogue queries run in a bounded pool of two disposable processes with a
+queue of eight. Broad searches do not block article reads or health responses on
+the serving process. Disconnecting the HTTP or MCP caller kills its active search
+process, and the occupied slot is retained until that process exits. Search has no
+candidate, source, or fixed-time cutoff: relevance is calculated over every match,
+then snippets are generated only for the selected page of logical results.
+
 Results paginate logical events, not snapshot rows. Identity uses a harness-native
 event ID within `(format, session_id)` where available (pi entry IDs; supported
 Codex response/completed-item IDs). Otherwise, byte-identical prefixes from the

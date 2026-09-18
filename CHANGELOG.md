@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.8.4 — 2026-09-18
+
+- Keep broad native trace searches off the serving process's main thread. Search
+  processes and their queue are bounded, and a caller disconnect kills its active
+  SQLite query before the slot is reused.
+- Preserve complete relevance ranking, logical-event deduplication, provenance,
+  and source semantics while generating snippets only for selected results.
+- No persisted-data migration or index rebuild is required.
+
 ## 0.8.3 — 2026-09-18
 
 - Return indexed native Claude dialogue from browser, HTTP, MCP and WebMCP trace
