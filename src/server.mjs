@@ -123,9 +123,7 @@ export function createWiki({
     try {
       return evidence
         ? await evidence.search(query, options)
-        : options.format === "claude"
-          ? { indexed: true, results: [], nextOffset: null }
-          : searchTraces(traces, query, options);
+        : searchTraces(traces, query, options);
     } catch (e) {
       if (e instanceof WikiError && e.code === "INVALID_SEARCH") throw e;
       return {
@@ -1184,13 +1182,7 @@ export function createWiki({
             200,
             evidence
               ? await evidence.search(url.searchParams.get("q") || "", options)
-              : options.format === "claude"
-                ? { indexed: true, results: [], nextOffset: null }
-                : searchTraces(
-                    traces,
-                    url.searchParams.get("q") || "",
-                    options,
-                  ),
+              : searchTraces(traces, url.searchParams.get("q") || "", options),
           );
         } catch (e) {
           return send(e instanceof WikiError ? e.status : 503, {

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.8.2 — 2026-09-18
+
+- Return indexed native Claude dialogue from browser, HTTP, MCP and WebMCP trace
+  search. The prior server adapters incorrectly replaced valid Claude search
+  results with an empty successful response.
+- No persisted-data migration or index rebuild is required.
+
 ## 0.8.1 — 2026-09-18
 
 - Remove hidden 30-second transport deadlines for CLI trace reads and machine MCP transport. The stdio adapter now allows a one-hour tool request by default, configurable with `requestTimeoutMs`; caller cancellation still applies. Authentication and ordinary metadata requests keep their short deadlines.
