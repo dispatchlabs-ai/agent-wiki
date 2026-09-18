@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { GitWiki, wikiRepo } from "./git-wiki.mjs";
 import { WikiSearch } from "./wiki-search.mjs";
 import { ArticleCitations } from "./article-citations.mjs";
+import { articleReadOptions, selectArticle } from "./article-read.mjs";
 import { article, link, list, shell } from "./render.mjs";
 import {
   home,
@@ -1366,6 +1367,8 @@ export function createWiki({
       );
       if (api) {
         const [, id, view] = api;
+        const selection =
+          view === "history" ? null : articleReadOptions(url.searchParams);
         const result =
           view === "history"
             ? wiki.history(id).length
@@ -1377,8 +1380,15 @@ export function createWiki({
         return result
           ? send(
               200,
-              view === "current"
-                ? { ...result, backlinks: index.backlinks(id) }
+              selection
+                ? selectArticle(
+                    view === "current" &&
+                      (!selection.fields ||
+                        selection.fields.includes("backlinks"))
+                      ? { ...result, backlinks: index.backlinks(id) }
+                      : result,
+                    selection,
+                  )
                 : result,
             )
           : send(404, { error: "Unknown article or revision" });

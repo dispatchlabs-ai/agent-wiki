@@ -61,6 +61,21 @@ bound to the credential's stable authority. The connection file and key must be
 owned regular files with mode 0600. Reader enrollments default to `wiki:read`;
 editor enrollments can additionally request trace and write scopes.
 
+## Read selected passages
+
+```sh
+node bin/wiki.mjs read guide --fields title,sections --json
+node bin/wiki.mjs read guide --revision 2 --section section-deployment --fields title,body --json
+node bin/wiki.mjs read guide --fields revision_id --json
+```
+
+Section anchors come from search or the outline. A section includes its nested
+subsections; `--section ''` selects the introduction. Selective responses retain
+revision identity and a stable citation URL and are marked `partial: true`.
+Use the returned revision number for further passages from the same version.
+See [selection semantics](api.md#selective-article-reads). Omit both selectors and
+read current again before editing; a selected body is not a complete replacement.
+
 ## Create, edit and retry
 
 Prepare one update in `article.json` outside the content checkout:

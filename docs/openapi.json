@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Agent Wiki HTTP API",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "description": "Single-space Git-backed wiki. Reader permits published articles, history and citations; editor/manager permits original evidence independently of WIKI_WRITE. Bearer callers additionally need matching read/write/trace run scope. All clients use the same server and writer. Human-only account/agent administration is intentionally excluded from machine credentials. HTML navigation and MCP JSON-RPC have their own documented contracts. See docs/api.md and docs/interfaces.md."
   },
   "servers": [{ "url": "/" }],
@@ -228,7 +228,7 @@
     "/api/articles/{id}/{revision}.json": {
       "get": {
         "operationId": "wiki.read",
-        "description": "Read current Markdown, metadata, revision ID and backlinks, or a numbered historical revision.",
+        "description": "Read an article or numbered revision. Optional section uses a search/outline anchor (empty for overview), including subsections. fields selects top-level fields; sections returns an outline. Partial reads retain revision identity and citation URL. Omit selectors for a complete read before editing.",
         "x-wiki-permission": "read",
         "security": [{ "browserSession": [] }, { "bearerAuth": [] }],
         "responses": {
@@ -237,36 +237,88 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "id",
-                    "title",
-                    "description",
-                    "body",
-                    "revision_id"
-                  ],
-                  "properties": {
-                    "id": { "type": "string" },
-                    "title": { "type": "string" },
-                    "description": { "type": "string" },
-                    "body": { "type": "string" },
-                    "revision_id": { "type": "string" },
-                    "backlinks": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": true
-                      }
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "title",
+                        "description",
+                        "body",
+                        "revision_id"
+                      ],
+                      "properties": {
+                        "id": { "type": "string" },
+                        "title": { "type": "string" },
+                        "description": { "type": "string" },
+                        "body": { "type": "string" },
+                        "revision_id": { "type": "string" },
+                        "backlinks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        }
+                      },
+                      "additionalProperties": true
                     },
-                    "evidence": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": true
-                      }
+                    {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "revision_id",
+                        "number",
+                        "commit",
+                        "url",
+                        "partial"
+                      ],
+                      "properties": {
+                        "id": { "type": "string" },
+                        "title": { "type": "string" },
+                        "description": { "type": "string" },
+                        "body": { "type": "string" },
+                        "revision_id": { "type": "string" },
+                        "backlinks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "number": { "type": "integer", "minimum": 1 },
+                        "commit": { "type": "string" },
+                        "url": { "type": "string" },
+                        "partial": { "const": true },
+                        "section": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "sections": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        }
+                      },
+                      "additionalProperties": true
                     }
-                  },
-                  "additionalProperties": true
+                  ]
                 }
               }
             }
@@ -442,6 +494,28 @@
               "pattern": "^(current|[1-9][0-9]*|[a-f0-9]{40})$",
               "description": "current, revision number, or Git commit"
             }
+          },
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+              }
+            },
+            "style": "form",
+            "explode": false
           }
         ]
       }

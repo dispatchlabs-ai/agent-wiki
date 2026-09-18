@@ -29,17 +29,32 @@ export function createWikiTools(request, writable, config = {}) {
     {
       name: "wiki.read",
       description:
-        "Read current Markdown, metadata, revision ID and backlinks, or a numbered historical revision.",
+        "Read an article or numbered revision. Optional section uses a search/outline anchor (empty for overview), including subsections. fields selects top-level fields; sections returns an outline. Partial reads retain revision identity and citation URL. Omit selectors for a complete read before editing.",
       inputSchema: {
         type: "object",
-        properties: { id, revision: { type: "integer", minimum: 1 } },
+        properties: {
+          id,
+          revision: { type: "integer", minimum: 1 },
+          section: { type: "string" },
+          fields: {
+            type: "array",
+            minItems: 1,
+            maxItems: 32,
+            items: { type: "string", pattern: "^[a-zA-Z][a-zA-Z0-9_]*$" },
+          },
+        },
         required: ["id"],
         additionalProperties: false,
       },
-      execute: ({ id, revision }) =>
-        request(
-          `/api/articles/${encodeURIComponent(id)}/${revision || "current"}.json`,
-        ),
+      execute: ({ id, revision, section, fields }) => {
+        const params = new URLSearchParams();
+        if (section !== undefined) params.set("section", section);
+        if (fields !== undefined) params.set("fields", fields.join(","));
+        return request(
+          `/api/articles/${encodeURIComponent(id)}/${revision || "current"}.json` +
+            (params.size ? `?${params}` : ""),
+        );
+      },
     },
     {
       name: "wiki.history",

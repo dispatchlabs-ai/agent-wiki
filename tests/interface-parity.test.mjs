@@ -174,6 +174,42 @@ test("same human gets consistent HTTP, CLI, MCP and WebMCP reads, writes, confli
   assert.deepEqual((await f.cli(["read", "guide"])).result, read);
   assert.deepEqual(await call("wiki.read", { id: "guide" }), read);
   assert.deepEqual(await webcall("wiki.read", { id: "guide" }), read);
+  for (const args of [
+    { fields: ["revision_id"] },
+    { fields: ["title", "sections"] },
+    { section: "", fields: ["title", "body"], revision: 1 },
+  ]) {
+    const query = new URLSearchParams({ fields: args.fields.join(",") });
+    const cliArgs = ["read", "guide", "--fields", args.fields.join(",")];
+    if (args.section !== undefined) {
+      query.set("section", args.section);
+      cliArgs.push("--section", args.section);
+    }
+    if (args.revision) cliArgs.push("--revision", String(args.revision));
+    const selected = await api.request(
+      `/api/articles/guide/${args.revision || "current"}.json?${query}`,
+    );
+    await validateResponse(
+      "/api/articles/{id}/{revision}.json",
+      "get",
+      selected,
+    );
+    assert.equal(selected.partial, true);
+    assert.equal(selected.revision_id, read.revision_id);
+    assert.equal(
+      selected.body,
+      args.fields.includes("body") ? read.body : undefined,
+    );
+    assert.deepEqual((await f.cli(cliArgs)).result, selected);
+    assert.deepEqual(
+      await call("wiki.read", { id: "guide", ...args }),
+      selected,
+    );
+    assert.deepEqual(
+      await webcall("wiki.read", { id: "guide", ...args }),
+      selected,
+    );
+  }
   const search = await api.request("/api/articles/search?q=guide");
   await validateResponse("/api/articles/search", "get", search);
   for (const result of [

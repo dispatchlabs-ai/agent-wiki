@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.8.2 — 2026-09-18
+
+- Add optional section and top-level field selection to current and historical
+  article reads across HTTP, MCP, WebMCP and CLI. Outline and metadata reads avoid
+  returning article bodies. Selected sections preserve original Markdown and nested
+  subsections, with revision identity, stable citations and an explicit partial
+  marker. Complete reads remain unchanged and are required before editing.
+  No configuration or persisted-data migration is required.
+
 ## 0.8.1 — 2026-09-18
 
 - Remove hidden 30-second transport deadlines for CLI trace reads and machine MCP transport. The stdio adapter now allows a one-hour tool request by default, configurable with `requestTimeoutMs`; caller cancellation still applies. Authentication and ordinary metadata requests keep their short deadlines.
