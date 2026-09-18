@@ -7,78 +7,44 @@ import {
 import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { WikiError } from "./errors.mjs";
 import { Worker } from "node:worker_threads";
 export const TRACE_VERSION = 1;
 export const TRACE_PAGE_SIZE = 100;
-export const MAX_TRACE_BYTES = Number(
-  process.env.WIKI_TRACE_MAX_BYTES ?? 128 * 1024 * 1024,
-);
-if (
-  !Number.isSafeInteger(MAX_TRACE_BYTES) ||
-  MAX_TRACE_BYTES < 1 ||
-  MAX_TRACE_BYTES > 512 * 1024 * 1024
-)
-  throw new Error(
-    "WIKI_TRACE_MAX_BYTES must be an integer from 1 through 536870912",
-  );
-export const TRACE_SIZE_ERROR = `Trace exceeds ${MAX_TRACE_BYTES} byte limit`;
-export const digest = (bytes) =>
-  createHash("sha256").update(bytes).digest("hex");
-export function parseRecords(bytes) {
-  if (bytes.length > MAX_TRACE_BYTES) throw new Error(TRACE_SIZE_ERROR);
-  const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  return text.split(/\r?\n/).flatMap((line, index) => {
-    if (!line.trim()) return [];
-    let value;
-    try {
-      value = JSON.parse(line);
-    } catch {
-      throw new Error(`Invalid JSON on source line ${index + 1}`);
-    }
-    if (!value || typeof value !== "object" || Array.isArray(value))
-      throw new Error(`Expected object on source line ${index + 1}`);
-    return [{ line: index + 1, value }];
-  });
-}
-/** @returns {import("./contracts.mjs").Harness} */
-export function detectFormat(records) {
-  const first = records[0]?.value;
-  if (first?.type === "session_meta") return "codex";
-  if (first?.type === "session") return "pi";
-  throw new Error("Expected a Codex session_meta or pi session header");
-}
+import { inspectTrace } from "./trace-source.mjs";
+export {
+  digest,
+  parseRecords,
+  detectFormat,
+  inspectTrace,
+} from "./trace-source.mjs";
 /** @returns {import("./contracts.mjs").TraceMetadata} */
 export function importTrace(root, source, title) {
   const before = archiveStamp(root);
-  if (fs.statSync(source).size > MAX_TRACE_BYTES)
-    throw new Error(TRACE_SIZE_ERROR);
-  const bytes = fs.readFileSync(source),
-    records = parseRecords(bytes),
-    format = detectFormat(records),
-    id = digest(bytes);
-  const metadata = {
-    id,
-    format,
-    title: String(title || `${format} session`).slice(0, 300),
-    bytes: bytes.length,
-    records: records.length,
-    session_id: records[0].value.payload?.id || records[0].value.id || null,
-    imported_at: new Date().toISOString(),
-  };
   fs.mkdirSync(root, { recursive: true });
-  const target = path.join(root, id);
-  if (fs.existsSync(target))
-    return JSON.parse(
-      fs.readFileSync(path.join(target, "metadata.json"), "utf8"),
-    );
   const temporary = path.join(root, `.import-${randomUUID()}`);
   fs.mkdirSync(temporary);
+  let target;
   try {
-    fs.writeFileSync(path.join(temporary, "source.jsonl"), bytes, {
-      mode: 0o444,
-    });
+    const copy = path.join(temporary, "source.jsonl");
+    fs.copyFileSync(source, copy, fs.constants.COPYFILE_EXCL);
+    fs.chmodSync(copy, 0o444);
+    const { id, format, bytes, records, header } = inspectTrace(copy);
+    const metadata = {
+      id,
+      format,
+      bytes,
+      records,
+      title: String(title || `${format} session`).slice(0, 300),
+      session_id: header.payload?.id || header.id || null,
+      imported_at: new Date().toISOString(),
+    };
+    target = path.join(root, id);
+    if (fs.existsSync(target))
+      return JSON.parse(
+        fs.readFileSync(path.join(target, "metadata.json"), "utf8"),
+      );
     fs.writeFileSync(
       path.join(temporary, "metadata.json"),
       JSON.stringify(metadata, null, 2),

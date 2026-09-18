@@ -41,44 +41,40 @@ export function disclosureOptions(params) {
 export function disclose(events, id, options) {
   const eventTime = (m) =>
     typeof m.timestamp === "number" ? m.timestamp : Date.parse(m.timestamp);
-  const projected = events.flatMap((event, index) => {
-    const { value, blocks, ...metadata } = event;
-    const base = {
-      ...metadata,
-      sourceUrl: `/traces/${id}/?page=${Math.floor(index / 100) + 1}#line-${event.line}`,
-    };
-    if (blocks?.length && ["user", "assistant"].includes(event.kind)) {
-      const texts = blocks
-        .filter((b) => b.type === "text")
-        .map((b) => b.text || "");
-      const extra = blocks
-        .filter((b) => b.type !== "text")
-        .map((block) => ({
-          ...base,
-          kind:
-            block.type === "toolCall"
-              ? "tool"
-              : block.type === "thinking"
-                ? "reasoning"
-                : "context",
-          text:
-            block.type === "thinking"
-              ? block.thinking || block.text || ""
-              : JSON.stringify(block),
-        }));
-      return [
-        ...(texts.length ? [{ ...base, text: texts.join("\n\n") }] : []),
-        ...extra,
-      ];
+  function* projectParts() {
+    let index = 0;
+    for (const event of events) {
+      const { value, blocks, ...metadata } = event;
+      const base = {
+        ...metadata,
+        sourceUrl: `/traces/${id}/?page=${Math.floor(index++ / 100) + 1}#line-${event.line}`,
+      };
+      if (blocks?.length && ["user", "assistant"].includes(event.kind)) {
+        const texts = blocks
+          .filter((b) => b.type === "text")
+          .map((b) => b.text || "");
+        const extra = blocks
+          .filter((b) => b.type !== "text")
+          .map((block) => ({
+            ...base,
+            kind:
+              block.type === "toolCall"
+                ? "tool"
+                : block.type === "thinking"
+                  ? "reasoning"
+                  : "context",
+            text:
+              block.type === "thinking"
+                ? block.thinking || block.text || ""
+                : JSON.stringify(block),
+          }));
+        yield* [
+          ...(texts.length ? [{ ...base, text: texts.join("\n\n") }] : []),
+          ...extra,
+        ];
+      } else yield base;
     }
-    return [base];
-  });
-  const parts = new Map();
-  const items = projected.map((m) => {
-    const part = parts.get(m.line) || 0;
-    parts.set(m.line, part + 1);
-    return { ...m, id: `line-${m.line}-part-${part}` };
-  });
+  }
   const category = (m) =>
     ["user", "assistant"].includes(m.kind)
       ? "dialogue"
@@ -86,36 +82,45 @@ export function disclose(events, id, options) {
         ? m.kind
         : "context";
   const { kind, after, before, page } = options;
-  const selected = items.filter(
-    (m) =>
-      category(m) === kind &&
-      (!options.event || m.id === options.event) &&
-      ((!after && !before) ||
-        (Number.isFinite(eventTime(m)) &&
-          (!after || eventTime(m) >= Date.parse(after)) &&
-          (!before || eventTime(m) < Date.parse(before)))),
-  );
+  const counts = { dialogue: 0, tool: 0, reasoning: 0, context: 0 },
+    messages = [];
+  let total = 0,
+    undatedCount = 0,
+    previousLine,
+    part = 0;
+  for (const item of projectParts()) {
+    part = item.line === previousLine ? part + 1 : 0;
+    previousLine = item.line;
+    const m = { ...item, id: `line-${item.line}-part-${part}` };
+    const categoryName = category(m),
+      time = eventTime(m);
+    counts[categoryName]++;
+    if (categoryName === kind && !Number.isFinite(time)) undatedCount++;
+    if (
+      categoryName !== kind ||
+      (options.event && m.id !== options.event) ||
+      ((after || before) &&
+        (!Number.isFinite(time) ||
+          (after && time < Date.parse(after)) ||
+          (before && time >= Date.parse(before))))
+    )
+      continue;
+    if (total >= (page - 1) * 100 && total < page * 100)
+      messages.push(textWindow(m, options));
+    total++;
+  }
   return {
     id,
     kind,
     after,
     before,
     page,
-    pages: Math.max(1, Math.ceil(selected.length / 100)),
-    total: selected.length,
-    nextPage: page * 100 < selected.length ? page + 1 : null,
-    undatedCount: items.filter(
-      (m) => category(m) === kind && !Number.isFinite(eventTime(m)),
-    ).length,
-    counts: Object.fromEntries(
-      ["dialogue", "tool", "reasoning", "context"].map((k) => [
-        k,
-        items.filter((m) => category(m) === k).length,
-      ]),
-    ),
-    eventFound: options.event ? selected.length > 0 : null,
-    messages: selected
-      .slice((page - 1) * 100, page * 100)
-      .map((m) => textWindow(m, options)),
+    pages: Math.max(1, Math.ceil(total / 100)),
+    total,
+    nextPage: page * 100 < total ? page + 1 : null,
+    undatedCount,
+    counts,
+    eventFound: options.event ? total > 0 : null,
+    messages,
   };
 }

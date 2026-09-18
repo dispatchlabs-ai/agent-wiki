@@ -25,15 +25,18 @@ There are no prebuilt conversation pages. Rendered results live in a
 64 MiB / 256-entry LRU cache keyed by parser version, snapshot hash and page. Concurrent
 requests for the same page share work. Two workers run at once, with a queue of 32,
 a 30-second deadline and a 512 MiB worker heap limit. Each page contains at most 100
-source records. Imports default to a 128 MiB UTF-8 JSONL limit. Operators can set
-`WIKI_TRACE_MAX_BYTES` to a positive integer byte count up to 536870912 (512 MiB).
-Use the same value for importing, indexing and serving; workers inherit it.
-For example, `WIKI_TRACE_MAX_BYTES=268435456` permits 256 MiB snapshots without
-splitting or changing their original records. Invalid values reject startup.
-Raising the file limit does not raise the renderer's heap or deadline: provision
-and verify enough memory and CPU for the intended archive. Decompress compressed
-archives before importing. Cold page requests parse the complete snapshot; pagination
-bounds displayed record counts, not parsing work or the size of an individual record.
+source records. There is no trace-file byte limit. Import and indexing read JSONL
+incrementally; rendered reads retain the selected page and compact cross-record
+annotations instead of the complete source. Source-line responses stream through
+temporary disk storage. Original bytes and physical line citations are unchanged.
+
+`WIKI_TRACE_MAX_BYTES` is no longer used. Decompress compressed archives before
+importing. Cold reads still verify every source byte and scan the records needed
+for cross-record annotations. Pagination bounds displayed record counts, not the
+size of an individual record. Memory therefore depends on individual records, the
+selected response and annotation counts; disk and CPU must fit the archive. Worker
+heap, concurrency and request deadlines remain operational resource controls, not
+file-size acceptance policies.
 
 Malformed JSON rejects the import with its source line. A corrupt source fails the
 next cold read rather than rendering altered content. Cached pages already represent
@@ -206,9 +209,6 @@ offsets may be any nonnegative safe integer; original source access is unchanged
 Browser search links to `/traces/provenance/?key=LOGICAL_KEY`, with next-page links.
 An ordinary SQLite evidence index supports lookup without scanning all FTS rows.
 
-Range spooling enforces the configured archive byte limit both before opening the
-stream and while copying it, including files that grow after the initial stat.
-This does not limit the requested line count within an accepted snapshot.
 Only a complete stable metadata scan certifies the catalog stamp; overlapping
 imports leave it invalid until reconciled, so a concurrent snapshot cannot disappear
 from an apparently current index.

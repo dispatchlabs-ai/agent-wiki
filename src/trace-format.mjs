@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // Pure format interpretation. Keep original records intact; unknown variants
 // remain context. Rendering, filesystem access and worker lifecycle live elsewhere.
 const textOf = (value) => {
@@ -73,58 +74,63 @@ function describe(record, format) {
   }
   return base;
 }
-/**
- * Project source records into dialogue/context annotations without changing values.
- * @param {import("./contracts.mjs").SourceRecord[]} records
- * @returns {import("./contracts.mjs").TraceEvent[]}
- * @param {"codex"|"pi"} format
- */
-export function project(records, format) {
-  const events = records.map((record) => describe(record, format));
-  if (format === "pi") {
-    const latest = new Map();
-    for (const event of events)
-      if (event.value.id) latest.set(event.value.id, event);
-    let previous = null;
-    for (const event of events) {
-      const r = event.value;
-      event.superseded = r.id && latest.get(r.id) !== event;
+// Only cross-record annotations are retained between passes. Source values and
+// dialogue text are never accumulated across the whole snapshot.
+export function projectionContext(records) {
+  const latest = new Map(),
+    positions = new Map();
+  let paginated = false,
+    format,
+    ordinal = 0;
+  for (const { line, value } of records) {
+    format ??= value.type === "session" ? "pi" : "codex";
+    positions.set(line, ordinal++);
+    if (format === "pi" && value.id) latest.set(value.id, line);
+    if (
+      value.payload?.history_mode === "paginated" ||
+      (value.payload?.type === "item_completed" &&
+        ["UserMessage", "AgentMessage", "Reasoning"].includes(
+          value.payload?.item?.type,
+        ))
+    )
+      paginated = true;
+  }
+  return { latest, positions, paginated };
+}
+
+export function* projectRecords(records, format, context) {
+  let previous = null,
+    turn = 0,
+    seen = new Map();
+  for (const record of records) {
+    const event = describe(record, format),
+      r = event.value;
+    if (format === "pi") {
+      event.superseded = r.id && context.latest.get(r.id) !== event.line;
       if (r.id && r.type !== "session" && !event.superseded) {
-        event.parentLine = latest.get(r.parentId)?.line || null;
+        event.parentLine = context.latest.get(r.parentId) || null;
         event.branch = previous !== null && r.parentId !== previous;
         previous = r.id;
       }
-    }
-  } else {
-    const paginated = records.some(
-      ({ value }) =>
-        value.payload?.history_mode === "paginated" ||
-        (value.payload?.type === "item_completed" &&
-          ["UserMessage", "AgentMessage", "Reasoning"].includes(
-            value.payload?.item?.type,
-          )),
-    );
-    for (const event of events) {
+    } else {
       if (
-        paginated &&
-        event.value.type === "response_item" &&
+        context.paginated &&
+        r.type === "response_item" &&
         event.kind === "user"
       ) {
         event.kind = "context";
         event.label = "Recorded model context (paginated history)";
       }
-    }
-    let turn = 0,
-      seen = new Map();
-    for (const event of events) {
-      const p = event.value.payload || {};
+      const p = r.payload || {};
       if (["task_started", "turn_started"].includes(p.type)) {
         turn++;
         seen = new Map();
       }
       event.turn = turn;
       if (["user", "assistant"].includes(event.kind) && event.text) {
-        const key = `${event.kind}:${event.text}`;
+        const key = createHash("sha256")
+          .update(JSON.stringify([event.kind, event.text]))
+          .digest("hex");
         const group = seen.get(key) || [];
         const counterpart = group.find(
           (other) => !other.streams.has(event.stream),
@@ -141,6 +147,15 @@ export function project(records, format) {
         event.text = `Recorded rollback: ${json(p)}`;
       }
     }
+    yield event;
   }
-  return events;
+}
+
+/**
+ * @param {import("./contracts.mjs").SourceRecord[]} records
+ * @param {"codex"|"pi"} format
+ * @returns {import("./contracts.mjs").TraceEvent[]}
+ */
+export function project(records, format) {
+  return [...projectRecords(records, format, projectionContext(records))];
 }

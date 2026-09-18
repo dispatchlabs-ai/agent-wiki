@@ -1,6 +1,5 @@
 import { Readable } from "node:stream";
 import { spoolTraceLines } from "../src/trace-lines.mjs";
-import { MAX_TRACE_BYTES } from "../src/traces.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -165,40 +164,26 @@ test("large explicit ranges are disk-spooled without entering the rendered cache
   }
 });
 
-test("range verification enforces the archive limit before and during streaming", async (t) => {
+test("range verification rejects changed input before publishing a response", async (t) => {
   const { root, metadata } = archive(
     t,
-    JSON.stringify({ type: "session", id: "size" }),
+    JSON.stringify({ type: "session", id: "changed" }),
   );
   const source = path.join(root, metadata.id, "source.jsonl"),
-    directory = path.join(root, "spool-limit");
+    directory = path.join(root, "spool-changed");
   fs.mkdirSync(directory);
-  fs.chmodSync(source, 0o600);
-  fs.truncateSync(source, MAX_TRACE_BYTES + 1);
-  await assert.rejects(
-    spoolTraceLines(root, metadata, 1, 1, directory),
-    /exceeds 134217728 byte limit/,
-  );
-  assert.deepEqual(fs.readdirSync(directory), []);
-  fs.truncateSync(source, 1);
   const original = fs.createReadStream;
   fs.createReadStream = (file, options) =>
     String(file) === source
-      ? Readable.from(
-          (function* () {
-            const chunk = Buffer.alloc(1024 * 1024);
-            for (let i = 0; i < 129; i++) yield chunk;
-          })(),
-        )
+      ? Readable.from([
+          Buffer.from('{"type":"session","id":"changed"}\n'),
+          Buffer.from('{"type":"extra"}\n'),
+        ])
       : original(file, options);
   try {
     await assert.rejects(
       spoolTraceLines(root, metadata, 1, 1, directory),
-      /exceeds 134217728 byte limit/,
-    );
-    assert.ok(
-      fs.statSync(path.join(directory, "verified.jsonl")).size <=
-        MAX_TRACE_BYTES,
+      /integrity check failed/,
     );
     assert.equal(fs.existsSync(path.join(directory, "response.json")), false);
   } finally {

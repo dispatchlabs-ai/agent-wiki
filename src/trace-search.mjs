@@ -1,19 +1,13 @@
 // @ts-check
 import { scanMetadata } from "./trace-metadata.mjs";
 // Disposable dialogue index. Original JSONL remains the only trace authority.
-import { createHash } from "node:crypto";
 import { WikiError } from "./errors.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import {
-  parseRecords,
-  digest,
-  MAX_TRACE_BYTES,
-  TRACE_SIZE_ERROR,
-  TRACE_PAGE_SIZE,
-} from "./traces.mjs";
-import { project } from "./trace-format.mjs";
+import { digest, TRACE_PAGE_SIZE } from "./traces.mjs";
+import { inspectTrace, readRecords } from "./trace-source.mjs";
+import { projectRecords } from "./trace-format.mjs";
 export const SEARCH_VERSION = 3;
 const filename = (root) => path.join(root, "search.sqlite3");
 function logicalEventKey(event, metadata, prefix) {
@@ -66,24 +60,16 @@ export function indexTraces(root) {
     for (const m of catalog) {
       if (db.prepare("SELECT 1 FROM snapshots WHERE id=?").get(m.id)) continue;
       const source = path.join(root, m.id, "source.jsonl");
-      if (fs.statSync(source).size > MAX_TRACE_BYTES)
-        throw Error(TRACE_SIZE_ERROR);
-      const bytes = fs.readFileSync(source);
-      if (digest(bytes) !== m.id) throw Error("Trace integrity check failed");
-      const records = parseRecords(bytes),
-        events = project(records, m.format);
-      const prefixes = new Map(),
-        hash = createHash("sha256");
-      let at = 0,
-        line = 1;
-      for (let i = 0; i <= bytes.length; i++)
-        if (i === bytes.length || bytes[i] === 10) {
-          hash.update(bytes.subarray(at, i));
-          prefixes.set(line, hash.copy().digest("hex"));
-          if (i < bytes.length) hash.update(bytes.subarray(i, i + 1));
-          line++;
-          at = i + 1;
-        }
+      const inspected = inspectTrace(source, {
+        expectedId: m.id,
+        project: true,
+      });
+      if (inspected.format !== m.format) throw Error("Trace format mismatch");
+      const events = projectRecords(
+        readRecords(source, { expectedId: m.id, prefixes: true }),
+        m.format,
+        inspected.context,
+      );
       db.prepare("INSERT INTO snapshots VALUES(?,?,?,?,?)").run(
         m.id,
         m.title,
@@ -92,13 +78,15 @@ export function indexTraces(root) {
         m.imported_at,
       );
       const insert = db.prepare("INSERT INTO dialogue VALUES(?,?,?,?,?,?)");
-      events.forEach((event, i) => {
+      let ordinal = 0;
+      for (const event of events) {
+        const i = ordinal++;
         if (
           !["user", "assistant"].includes(event.kind) ||
           event.mirrorOf ||
           event.superseded
         )
-          return;
+          continue;
         const text = event.blocks?.length
           ? event.blocks
               .filter((b) => b.type === "text")
@@ -106,7 +94,7 @@ export function indexTraces(root) {
               .join("\n")
           : event.text;
         if (text) {
-          const key = logicalEventKey(event, m, prefixes.get(event.line));
+          const key = logicalEventKey(event, m, event.prefix);
           db.prepare("INSERT OR IGNORE INTO evidence VALUES(?,?,?,?)").run(
             key,
             m.id,
@@ -122,7 +110,7 @@ export function indexTraces(root) {
             text,
           );
         }
-      });
+      }
       added++;
     }
     db.exec("COMMIT");

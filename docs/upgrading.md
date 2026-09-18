@@ -1,5 +1,14 @@
 # Upgrading
 
+## 0.7.0 — complete traces without a file-size cutoff
+
+The imported-trace size policy has been removed. Delete `WIKI_TRACE_MAX_BYTES`
+from operator and service configuration; it no longer limits accepted files.
+Import, search indexing and reads process the complete original snapshot
+incrementally. Existing snapshots, accounts, indexes and citations need no migration.
+Resource use still depends on individual records, selected responses, annotation
+counts and full-source integrity I/O; see [trace handling](traces.md).
+
 ## 0.6.0 — article readers and editorial evidence
 
 This minor initial-development release intentionally narrows `reader` authority.

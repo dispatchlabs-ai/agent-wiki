@@ -2,19 +2,12 @@
 import { disclose } from "./trace-disclosure.mjs";
 import { WikiError } from "./errors.mjs";
 import { spoolTraceLines } from "./trace-lines.mjs";
-import fs from "node:fs";
 import path from "node:path";
 import { parentPort, workerData } from "node:worker_threads";
-import {
-  digest,
-  parseRecords,
-  detectFormat,
-  MAX_TRACE_BYTES,
-  TRACE_SIZE_ERROR,
-  TRACE_PAGE_SIZE as PAGE_SIZE,
-} from "./traces.mjs";
+import { TRACE_PAGE_SIZE as PAGE_SIZE } from "./traces.mjs";
+import { inspectTrace, readRecords } from "./trace-source.mjs";
 import { escape, link, renderMarkdown, shell } from "./render.mjs";
-import { project } from "./trace-format.mjs";
+import { projectRecords } from "./trace-format.mjs";
 export { project } from "./trace-format.mjs";
 const json = (value) =>
   typeof value === "string" ? value : JSON.stringify(value, null, 2);
@@ -61,22 +54,30 @@ async function run({
   if (start !== undefined)
     return spoolTraceLines(root, metadata, start, end, directory);
   const filename = path.join(root, metadata.id, "source.jsonl");
-  if (fs.statSync(filename).size > MAX_TRACE_BYTES)
-    throw new Error(TRACE_SIZE_ERROR);
-  const bytes = fs.readFileSync(filename);
-  if (digest(bytes) !== metadata.id)
-    throw new Error("Trace integrity check failed");
-  const records = parseRecords(bytes);
-  if (detectFormat(records) !== metadata.format)
+  const inspected = inspectTrace(filename, {
+    expectedId: metadata.id,
+    project: true,
+  });
+  if (inspected.format !== metadata.format)
     throw new Error("Trace format mismatch");
-  const events = project(records, metadata.format),
-    pages = Math.max(1, Math.ceil(events.length / PAGE_SIZE));
+  const events = projectRecords(
+    readRecords(filename, { expectedId: metadata.id }),
+    metadata.format,
+    inspected.context,
+  );
+  const pages = Math.max(1, Math.ceil(inspected.records / PAGE_SIZE));
   if (disclosure) return disclose(events, metadata.id, disclosure);
   if (page > pages) return null;
-  const selected = events.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    positions = new Map(events.map((event, index) => [event.line, index]));
+  const selected = [],
+    positions = inspected.context.positions;
+  let index = 0;
+  for (const event of events) {
+    if (index >= (page - 1) * PAGE_SIZE && index < page * PAGE_SIZE)
+      selected.push(event);
+    index++;
+  }
   const pagination = `<nav>${page > 1 ? link(`?page=${page - 1}`, "Previous") + " · " : ""}Page ${page} of ${pages}${page < pages ? " · " + link(`?page=${page + 1}`, "Next") : ""}</nav>`;
-  const header = records[0].value;
+  const header = inspected.header;
   const parent =
     header.parentSession ||
     header.lineage?.parentSessionId ||
@@ -84,7 +85,7 @@ async function run({
     header.payload?.history_base;
   const html = shell(
     metadata.title,
-    `<p class="breadcrumb">${link("/traces/", "Conversations")} / ${escape(metadata.format)}</p><h1>${escape(metadata.title)}</h1><p class="lede">${events.length} source records · ${escape(metadata.format)} conversation</p><div class="layout"><div>${parent ? '<p class="trace-notice">This session references earlier history. This snapshot displays only records it contains; parent history is not automatically imported.</p>' : ""}<div class="tabs" role="group" aria-label="Trace display"><button type="button" data-trace-mode="dialogue" aria-pressed="true">Dialogue</button><button type="button" data-trace-mode="records" aria-pressed="false">Source records</button></div><p class="meta">Dialogue is expanded; tool and context records remain available below.</p>${pagination}${(await Promise.all(selected.map((event) => renderEvent(event, metadata.id, positions)))).join("")}${pagination}</div><aside class="sidebar"><details data-responsive-details open><summary>Conversation details</summary><dl class="trace-details"><dt>Harness</dt><dd>${escape(metadata.format)}</dd><dt>Source records</dt><dd>${events.length}</dd><dt>Snapshot</dt><dd>${escape(metadata.id)}</dd>${metadata.session_id ? `<dt>Session</dt><dd>${escape(metadata.session_id)}</dd>` : ""}</dl></details><section><h2>On this page</h2><ul class="link-list">${selected
+    `<p class="breadcrumb">${link("/traces/", "Conversations")} / ${escape(metadata.format)}</p><h1>${escape(metadata.title)}</h1><p class="lede">${inspected.records} source records · ${escape(metadata.format)} conversation</p><div class="layout"><div>${parent ? '<p class="trace-notice">This session references earlier history. This snapshot displays only records it contains; parent history is not automatically imported.</p>' : ""}<div class="tabs" role="group" aria-label="Trace display"><button type="button" data-trace-mode="dialogue" aria-pressed="true">Dialogue</button><button type="button" data-trace-mode="records" aria-pressed="false">Source records</button></div><p class="meta">Dialogue is expanded; tool and context records remain available below.</p>${pagination}${(await Promise.all(selected.map((event) => renderEvent(event, metadata.id, positions)))).join("")}${pagination}</div><aside class="sidebar"><details data-responsive-details open><summary>Conversation details</summary><dl class="trace-details"><dt>Harness</dt><dd>${escape(metadata.format)}</dd><dt>Source records</dt><dd>${inspected.records}</dd><dt>Snapshot</dt><dd>${escape(metadata.id)}</dd>${metadata.session_id ? `<dt>Session</dt><dd>${escape(metadata.session_id)}</dd>` : ""}</dl></details><section><h2>On this page</h2><ul class="link-list">${selected
       .filter((ev) => ["user", "assistant"].includes(ev.kind) && !ev.mirrorOf)
       .slice(0, 20)
       .map(
@@ -99,7 +100,7 @@ async function run({
     format: metadata.format,
     page,
     pages,
-    total_records: events.length,
+    total_records: inspected.records,
     records: selected,
     html,
   };

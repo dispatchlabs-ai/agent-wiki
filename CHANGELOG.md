@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.7.0 — 2026-09-17
+
+- Remove the imported trace-file byte limit and `WIKI_TRACE_MAX_BYTES` setting.
+  Complete snapshots are accepted regardless of their total byte size.
+- Stream JSONL import, search indexing and page/disclosure reads without loading
+  the complete source into memory. Preserve exact source bytes, branching,
+  mirror annotations, search provenance and stable physical-line citations.
+- Retain worker resource controls and streamed source-line responses. No persisted
+  data migration is needed; remove the obsolete setting from deployment configuration.
+- Exercise a snapshot above the former 512 MiB ceiling with a 128 MiB importer/indexer
+  heap, including first/last page reads, disclosure, search and source-line access.
+
 ## 0.6.3 — 2026-09-17
 
 - Read writer input as a complete asynchronous stream before acquiring the Git
