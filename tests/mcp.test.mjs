@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { importTrace } from "../src/traces.mjs";
+import { indexTraces } from "../src/trace-search.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
@@ -128,6 +129,36 @@ test("regular MCP shares WebMCP schemas, reads, preview and read-only discovery"
     ).isError,
     true,
   );
+});
+
+test("regular MCP searches registered native Claude dialogue", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "wiki-mcp-claude-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, "native-claude.jsonl");
+  fs.writeFileSync(
+    source,
+    [
+      { type: "queue-operation", sessionId: "synthetic-claude-mcp" },
+      {
+        type: "user",
+        sessionId: "synthetic-claude-mcp",
+        uuid: "synthetic-mcp-user",
+        parentUuid: null,
+        message: { role: "user", content: "Find the synthetic MCP needle." },
+      },
+    ]
+      .map(JSON.stringify)
+      .join("\n"),
+  );
+  importTrace(root, source, "Synthetic Claude MCP search");
+  indexTraces(root);
+  const { call } = await setup(t, false, { traces: root });
+  const result = (
+    await call("wiki.traceSearch", { q: "needle", format: "claude" })
+  ).value;
+  assert.equal(result.indexed, true);
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0].format, "claude");
 });
 
 test("MCP writes retain receipts, revisions and HTTP error codes", async (t) => {

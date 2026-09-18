@@ -397,6 +397,61 @@ test("trace HTML and JSON routes share snapshots and validate page requests", as
   assert.equal((await request(`/traces/${"0".repeat(64)}/`)).status, 404);
 });
 
+test("registered native Claude dialogue is searchable through HTML, API and WebMCP", async (t) => {
+  const repo = fixture(t),
+    traces = path.join(repo, ".git", "traces"),
+    source = path.join(repo, ".git", "native-claude.jsonl");
+  fs.writeFileSync(
+    source,
+    [
+      { type: "queue-operation", sessionId: "synthetic-claude-search" },
+      {
+        type: "user",
+        sessionId: "synthetic-claude-search",
+        uuid: "synthetic-user",
+        parentUuid: null,
+        message: { role: "user", content: "Review staging search readiness." },
+      },
+      {
+        type: "assistant",
+        sessionId: "synthetic-claude-search",
+        uuid: "synthetic-assistant",
+        parentUuid: "synthetic-user",
+        message: { role: "assistant", content: "The staging search is ready." },
+      },
+    ]
+      .map(JSON.stringify)
+      .join("\n"),
+  );
+  importTrace(traces, source, "Synthetic Claude search");
+  indexTraces(traces);
+  const { request } = await server(t, { repo, traces });
+  const api = await (
+    await request("/api/traces/search?q=staging&format=claude")
+  ).json();
+  assert.equal(api.indexed, true);
+  assert.equal(api.results.length, 2);
+  assert.ok(api.results.every((result) => result.format === "claude"));
+  const html = await request("/traces/?q=staging&format=claude");
+  assert.equal(html.status, 200);
+  assert.match(await html.text(), /Synthetic Claude search/);
+
+  const original = globalThis.fetch;
+  globalThis.fetch = request;
+  t.after(() => {
+    globalThis.fetch = original;
+  });
+  const registered = [];
+  await registerTools(
+    { registerTool: async (tool) => registered.push(tool) },
+    false,
+  );
+  const webmcp = await registered
+    .find((tool) => tool.name === "wiki.traceSearch")
+    .execute({ q: "staging", format: "claude" });
+  assert.equal(webmcp.results.length, 2);
+});
+
 test("unchanged saves and mixed batches return existing revisions on retries", async (t) => {
   const repo = fixture(t);
   const { request } = await server(t, { repo, write: true });

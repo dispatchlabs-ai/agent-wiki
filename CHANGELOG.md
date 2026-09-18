@@ -4,6 +4,10 @@
 
 ## 0.8.2 — 2026-09-18
 
+- Return indexed native Claude dialogue from browser, HTTP, MCP and WebMCP trace
+  search. The prior server adapters incorrectly replaced valid Claude search
+  results with an empty successful response.
+- No persisted-data migration or index rebuild is required.
 - Add optional section and top-level field selection to current and historical
   article reads across HTTP, MCP, WebMCP and CLI. Outline and metadata reads avoid
   returning article bodies. Selected sections preserve original Markdown and nested

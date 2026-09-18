@@ -176,7 +176,8 @@ to 300 characters and 30 terms. Limits are 1–40 and offsets 0–10,000. Follow
 Search reflects the last successful indexing run. It includes user/assistant text,
 including alternate branches, but excludes marked mirrors, superseded entries,
 tools, thinking, and model-context records. Original records remain available in
-the trace reader.
+the trace reader. Native Claude, Codex and pi snapshots use the same browser,
+HTTP, MCP and WebMCP search operation and may be filtered by `format`.
 
 Results paginate logical events, not snapshot rows. Identity uses a harness-native
 event ID within `(format, session_id)` where available (pi entry IDs; supported
