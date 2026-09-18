@@ -1,5 +1,13 @@
 # Upgrading
 
+## 0.8.2 — optional selective article reads
+
+Existing reads return the same complete articles. Clients can opt into section,
+outline and field selection using the [read API](api.md#selective-article-reads).
+Refresh MCP tool discovery to see the new arguments in clients that cache schemas.
+Keep full current reads before edits. No configuration or persisted-data migration
+is required for this addition.
+
 ## 0.7.0 — complete traces without a file-size cutoff
 
 The imported-trace size policy has been removed. Delete `WIKI_TRACE_MAX_BYTES`

@@ -25,6 +25,44 @@ characters / 30 terms. Results group a bounded 400-section candidate set by arti
 exhaustive count. Empty queries list articles within the same bound. SQL/FTS operators
 are not accepted as executable query syntax.
 
+### Selective article reads
+
+Current and historical article reads accept optional `section` and `fields` query
+parameters. The same options are available on `wiki.read` through MCP/WebMCP and
+the CLI. Omitting both returns the existing complete response, including current
+backlinks, for editing and revision checks.
+
+- `section=section-deployment` selects the exact Markdown from that heading through
+  its nested subsections, stopping before the next heading of equal or higher level.
+  Use the anchor from search or the outline; `section=` selects only the introduction
+  before the first heading. Missing anchors return `UNKNOWN_ARTICLE_SECTION` (404).
+  Fenced code is not a heading; duplicate and formatted headings use the same
+  anchors as the rendered page and search. Selection preserves whitespace and links.
+- `fields=title,body` selects top-level response fields. Use `fields=revision_id`
+  for a compact freshness check or `fields=title,sections` for an outline of
+  `{anchor, heading, depth}` entries. Custom metadata fields can be selected too;
+  absent fields are omitted. MCP uses a string array, such as `["title", "body"]`.
+  HTTP/CLI use comma-separated names (1–32 names, letters/digits/underscores,
+  starting with a letter). Duplicate query parameters and malformed names return
+  `INVALID_ARTICLE_SELECTION` (400).
+
+Every selective response includes `partial: true`, `id`, `revision_id`, `number`,
+`commit`, and a revision-specific `url`, even when those fields were not requested.
+Section reads also include `{anchor, heading, depth}` in `section` and append the
+anchor to that citation URL. A missing `body` means it was not requested, not that
+the article is empty. Outline and metadata reads do not return the body; excluding
+backlinks also avoids their lookup. Selected text has no implicit truncation.
+
+```json
+{"id":"guide","fields":["title","sections"]}
+{"id":"guide","revision":2,"section":"section-deployment","fields":["title","body"]}
+```
+
+Pin subsequent section reads to the returned `number` when combining passages
+from one revision. Read the **complete current article again before editing**;
+a partial body must never be used as the replacement for a full article. These
+selectors do not change authorization, revision-conflict checks, or save semantics.
+
 Human views are `/`, `/search/?q=...`, `/wiki/ID/`, `/wiki/ID/history/`,
 `/wiki/ID/revision/NUMBER/` (or COMMIT), `/wiki/ID/compare/?from=1&to=2`,
 `/wiki/ID/sources/` (optional `?revision=NUMBER`), and `/wiki/ID/edit/`. The form edits an

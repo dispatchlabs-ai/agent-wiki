@@ -28,6 +28,8 @@ Usage: node bin/wiki.mjs <command> [arguments] [--json] [--config FILE]
   whoami                       Shows the authenticated actor and authority.
   search QUERY                 Search articles [--limit N --offset N --topic T].
   read ID [--revision N]        Read current or historical article Markdown.
+      [--section ANCHOR] [--fields title,body] selects a partial read.
+      --fields sections lists anchors; omit selectors before editing.
   history ID                   Read attributed Git history.
   create ID --file JSON --operation-id ID
   edit ID --file JSON --revision BLOB --operation-id ID
@@ -66,6 +68,8 @@ try {
       scope: { type: "string" },
       file: { type: "string" },
       revision: { type: "string" },
+      section: { type: "string" },
+      fields: { type: "string" },
       "operation-id": { type: "string" },
       page: { type: "string" },
       start: { type: "string" },
@@ -197,10 +201,15 @@ try {
             `/api/${command === "search" ? "articles" : "traces"}/search?${query}`,
           );
         }
-        if (command === "read")
+        if (command === "read") {
+          const selection = new URLSearchParams();
+          for (const key of ["section", "fields"])
+            if (values[key] !== undefined) selection.set(key, values[key]);
           return api.request(
-            `/api/articles/${id()}/${encodeURIComponent(values.revision || "current")}.json`,
+            `/api/articles/${id()}/${encodeURIComponent(values.revision || "current")}.json` +
+              (selection.size ? `?${selection}` : ""),
           );
+        }
         if (command === "history")
           return api.request(`/api/articles/${id()}/history.json`);
         if (command === "trace") {

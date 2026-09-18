@@ -105,7 +105,25 @@ const receipt = {
   additionalProperties: true,
 };
 const responseSchemas = {
-  "wiki.read": page,
+  "wiki.read": {
+    anyOf: [
+      page,
+      {
+        type: "object",
+        required: ["id", "revision_id", "number", "commit", "url", "partial"],
+        properties: {
+          ...page.properties,
+          number: { type: "integer", minimum: 1 },
+          commit: string,
+          url: string,
+          partial: { const: true },
+          section: object,
+          sections: { type: "array", items: object },
+        },
+        additionalProperties: true,
+      },
+    ],
+  },
   "wiki.save": receipt,
   "wiki.preview": {
     type: "object",
@@ -165,6 +183,7 @@ function parameters(input, route) {
     in: route.includes(`{${name}}`) ? "path" : "query",
     required: route.includes(`{${name}}`) || !!input.required?.includes(name),
     schema,
+    ...(schema.type === "array" ? { style: "form", explode: false } : {}),
   }));
 }
 function fields(properties, required = Object.keys(properties)) {

@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { createWiki } from "../src/server.mjs";
 import { GitWiki, git } from "../src/git-wiki.mjs";
 import { registerTools } from "../public/client.js";
-import { fixture, update } from "./helpers.mjs";
+import { fixture, update, commit } from "./helpers.mjs";
 async function server(t, options = {}) {
   const repo = options.repo || fixture(t),
     origin = "http://wiki.test";
@@ -64,6 +64,71 @@ async function server(t, options = {}) {
     });
   return { repo, request, save };
 }
+test("selective article reads pin citations, preserve full edits, and distinguish revisions", async (t) => {
+  const { repo, request, save } = await server(t);
+  const filename = path.join(repo, "wiki/guide.md");
+  fs.appendFileSync(
+    filename,
+    "\n## Deployment\nOriginal.\n\n### Recovery\nKeep this.\n\n## Next\nOther.\n",
+  );
+  commit(repo, "Add synthetic sections");
+  const full = await (await request("/api/articles/guide/current.json")).json();
+  const selected = await (
+    await request(
+      "/api/articles/guide/current.json?section=section-deployment&fields=title,body",
+    )
+  ).json();
+  assert.equal(
+    selected.body,
+    "## Deployment\nOriginal.\n\n### Recovery\nKeep this.\n\n",
+  );
+  assert.equal(selected.revision_id, full.revision_id);
+  assert.equal(
+    selected.url,
+    `/wiki/guide/revision/${full.number}/#section-deployment`,
+  );
+  assert.equal(
+    (await request("/api/articles/guide/1.json?section=section-deployment"))
+      .status,
+    404,
+  );
+  const missing = await request(
+    "/api/articles/guide/current.json?section=missing",
+  );
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).code, "UNKNOWN_ARTICLE_SECTION");
+  assert.equal(
+    (await request("/api/articles/guide/current.json?fields=title,,body"))
+      .status,
+    400,
+  );
+  const edited = {
+    ...update("guide", full.body.replace("Original.", "Updated.")),
+    expected_revision_id: full.revision_id,
+  };
+  assert.equal(
+    (await save({ operation_id: "selective-full-edit", updates: [edited] }))
+      .status,
+    200,
+  );
+  const historical = await (
+    await request(
+      `/api/articles/guide/${full.number}.json?section=section-deployment&fields=title,body`,
+    )
+  ).json();
+  assert.deepEqual(historical, selected);
+  const current = await (
+    await request("/api/articles/guide/current.json")
+  ).json();
+  assert.equal(current.body, edited.body);
+  assert.deepEqual(current.custom, full.custom);
+  assert.equal(current.partial, undefined);
+  assert.equal(
+    (await save({ operation_id: "selective-stale-edit", updates: [edited] }))
+      .status,
+    409,
+  );
+});
 test("HTTP reads, same-origin writes, idempotent retries and revision conflicts", async (t) => {
   const { request, save, repo } = await server(t);
   assert.equal((await request("/")).status, 200);

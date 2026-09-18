@@ -8,6 +8,12 @@
   search. The prior server adapters incorrectly replaced valid Claude search
   results with an empty successful response.
 - No persisted-data migration or index rebuild is required.
+- Add optional section and top-level field selection to current and historical
+  article reads across HTTP, MCP, WebMCP and CLI. Outline and metadata reads avoid
+  returning article bodies. Selected sections preserve original Markdown and nested
+  subsections, with revision identity, stable citations and an explicit partial
+  marker. Complete reads remain unchanged and are required before editing.
+  No configuration or persisted-data migration is required.
 
 ## 0.8.1 — 2026-09-18
 

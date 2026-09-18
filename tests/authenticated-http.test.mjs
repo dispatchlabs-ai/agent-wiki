@@ -407,6 +407,8 @@ test("all content routes deny visitors, enforce current grants and hide commit m
     "/api/articles/catalog.json",
     "/api/articles/search?q=guide",
     "/api/articles/guide/current.json",
+    "/api/articles/guide/current.json?fields=title,sections",
+    "/api/articles/guide/current.json?section=missing&fields=body",
     "/api/articles/guide/history.json",
     "/api/articles/guide/1.json",
     "/api/articles/health.json",
