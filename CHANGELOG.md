@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.8.0 — 2026-09-18
+
+- Operator enrollment supports explicit maximum credential scopes, allowing trace researchers to read evidence without publishing. MCP reads no longer impose an implicit deadline; cancellation and explicitly configured deadlines remain available.
+- Add native Claude Code JSONL snapshots alongside Codex and pi. Claude sources
+  need no synthetic header: session identity is discovered from native records,
+  UUIDs preserve logical event identity across growing snapshots, and dialogue,
+  thinking, tool calls/results and unknown context retain their source fields and
+  permanent physical-line citations. Existing archives need no migration; rebuild
+  the disposable dialogue index to search newly imported Claude snapshots.
+
+- Remove the fixed trace-read deadline, which rejected complete large snapshots
+  on slower storage after their successful import. Full-source integrity checks
+  and original-line retrieval can finish regardless of elapsed reading time.
+  Worker concurrency, queue and heap bounds remain in place. No data migration.
+
 ## 0.7.0 — 2026-09-17
 
 - Remove the imported trace-file byte limit and `WIKI_TRACE_MAX_BYTES` setting.

@@ -106,6 +106,36 @@ test("fallback grouping requires a verified identical prefix and a session ident
     [1, 1, 1, 2],
   );
 });
+test("Claude UUIDs keep logical dialogue identity across growing snapshots", (t) => {
+  const repo = fixture(t),
+    root = path.join(repo, ".git", "traces"),
+    source = path.join(repo, ".git", "claude.jsonl"),
+    rows = [
+      { type: "queue-operation", sessionId: "claude-growing" },
+      {
+        type: "user",
+        sessionId: "claude-growing",
+        uuid: "stable-user-event",
+        parentUuid: null,
+        message: { role: "user", content: "Claude logical evidence" },
+      },
+    ];
+  for (let index = 0; index < 2; index++) {
+    fs.writeFileSync(source, rows.map(JSON.stringify).join("\n"));
+    const metadata = importTrace(root, source, "Claude growing");
+    metadata.imported_at = `2026-09-18T00:00:0${index}.000Z`;
+    fs.writeFileSync(
+      path.join(root, metadata.id, "metadata.json"),
+      JSON.stringify(metadata),
+    );
+    rows.push({ type: "system", sessionId: "claude-growing", index });
+  }
+  indexTraces(root);
+  const result = searchTraces(root, "logical", { format: "claude" });
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0].snapshot_count, 2);
+  assert.equal(result.results[0].format, "claude");
+});
 test("catalog index pages independently, follows imports and removals, and rebuilds after corruption", (t) => {
   const repo = fixture(t),
     root = path.join(repo, ".git", "traces"),

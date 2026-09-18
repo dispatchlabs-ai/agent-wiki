@@ -1,7 +1,7 @@
 // Shared checked boundaries. Harness payloads remain open because original
 // records include fields outside the supported projection; they are never erased.
 /**
- * @typedef {"codex"|"pi"} Harness
+ * @typedef {"codex"|"pi"|"claude"} Harness
  * @typedef {{commit:string,created_at:string,summary:string,filename:string,number:number,url:string}} RevisionRef
  * @typedef {RevisionRef & {id:string,title:string,description:string,body:string,revision_id:string,revisionCount:number,topic:string,related:string[],questions:string[],sources:object[]}} ArticleRevision
  * @typedef {{id:string,format:Harness,title:string,bytes:number,records:number,session_id:string|null,imported_at:string,url?:string}} TraceMetadata

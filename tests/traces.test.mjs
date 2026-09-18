@@ -8,7 +8,9 @@ import {
   TraceStore,
   parseRecords,
   digest,
+  detectFormat,
 } from "../src/traces.mjs";
+import { disclosureOptions, disclose } from "../src/trace-disclosure.mjs";
 import { project } from "../src/trace-worker.mjs";
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "wiki-traces-"));
@@ -19,6 +21,22 @@ function fixture(t) {
   });
   return { root, store };
 }
+test("an explicit caller deadline rejects a read without damaging its source or later reads", async (t) => {
+  const { root, store } = fixture(t);
+  const metadata = importTrace(
+    root,
+    new URL("../examples/traces/codex.jsonl", import.meta.url),
+  );
+  const short = new TraceStore(root, { timeout: 1 });
+  t.after(() => short.close());
+  await assert.rejects(short.read(metadata.id), /timed out/);
+  const complete = await store.read(metadata.id);
+  assert.equal(complete.total_records, metadata.records);
+  assert.equal(
+    digest(fs.readFileSync(path.join(root, metadata.id, "source.jsonl"))),
+    metadata.id,
+  );
+});
 test("Codex imports exact bytes; JIT reads deduplicate concurrent work and reuse cache", async (t) => {
   const { root, store } = fixture(t),
     source = new URL("../examples/traces/codex.jsonl", import.meta.url);
@@ -55,6 +73,144 @@ test("pi preserves alternate branches, reasoning, tool calls and compaction with
   assert.equal(result.records.filter((r) => r.kind === "user").length, 1);
   assert.equal(result.records.find((r) => r.value.id === "b1").parentLine, 2);
   assert.equal(result.records.length, 8);
+});
+test("native Claude JSONL needs no header and preserves identity, blocks, source lines and unknown records", async (t) => {
+  const { root, store } = fixture(t),
+    source = path.join(root, "claude.jsonl"),
+    rows = [
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        sessionId: "claude-session",
+        version: "2.1.119",
+      },
+      {
+        type: "summary",
+        summary: "Synthetic compacted context",
+        leafUuid: "summary-leaf",
+      },
+      {
+        type: "system",
+        subtype: "turn_duration",
+        sessionId: "claude-session",
+        uuid: "system-1",
+        parentUuid: null,
+        version: "2.1.238",
+      },
+      {
+        type: "user",
+        sessionId: "claude-session",
+        uuid: "user-1",
+        parentUuid: "system-1",
+        timestamp: "2026-09-18T12:00:00.000Z",
+        version: "2.1.238",
+        message: { role: "user", content: "Synthetic question" },
+      },
+      {
+        type: "assistant",
+        sessionId: "claude-session",
+        uuid: "assistant-1",
+        parentUuid: "user-1",
+        timestamp: "2026-09-18T12:00:01.000Z",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "thinking",
+              thinking: "Synthetic thought",
+              signature: "sig",
+            },
+            {
+              type: "tool_use",
+              id: "tool-1",
+              name: "Read",
+              input: { file_path: "/synthetic" },
+            },
+          ],
+        },
+      },
+      {
+        type: "user",
+        sessionId: "claude-session",
+        uuid: "user-2",
+        parentUuid: "assistant-1",
+        timestamp: "2026-09-18T12:00:02.000Z",
+        toolUseResult: { status: "ok", extra: "preserved" },
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-1",
+              content: "Synthetic output",
+            },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        sessionId: "claude-session",
+        uuid: "assistant-2",
+        parentUuid: "user-2",
+        timestamp: "2026-09-18T12:00:03.000Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Synthetic answer" }],
+        },
+      },
+      {
+        type: "future-record",
+        sessionId: "claude-session",
+        future: { nested: true },
+      },
+    ];
+  fs.writeFileSync(source, rows.map(JSON.stringify).join("\n") + "\n");
+  assert.equal(detectFormat(parseRecords(fs.readFileSync(source))), "claude");
+  for (const first of [rows, [rows[1], ...rows.slice(2)], rows.slice(2)])
+    assert.equal(
+      detectFormat(
+        parseRecords(Buffer.from(first.map(JSON.stringify).join("\n"))),
+      ),
+      "claude",
+    );
+  const metadata = importTrace(root, source, "Claude synthetic");
+  assert.equal(metadata.format, "claude");
+  assert.equal(metadata.session_id, "claude-session");
+  assert.equal(metadata.id, digest(fs.readFileSync(source)));
+  const result = await store.read(metadata.id);
+  assert.deepEqual(
+    result.records.map((record) => record.value),
+    rows,
+  );
+  assert.equal(result.records[3].parentLine, 3);
+  assert.equal(result.records[4].kind, "tool");
+  assert.equal(result.records[5].kind, "tool");
+  assert.equal(result.records[6].kind, "assistant");
+  assert.equal(result.records[7].kind, "context");
+  assert.match(result.html, /Thinking/);
+  assert.match(result.html, /Tool call/);
+  assert.match(result.html, /Tool result/);
+  assert.match(
+    result.html,
+    /Parent · <a href="\/traces\/.+?#line-3">source line 3<\/a>/,
+  );
+  assert.match(result.html, /id="line-8"/);
+  const events = project(parseRecords(fs.readFileSync(source)), "claude");
+  const options = (kind) => disclosureOptions(new URLSearchParams({ kind }));
+  assert.deepEqual(disclose(events, metadata.id, options("dialogue")).counts, {
+    dialogue: 2,
+    tool: 2,
+    reasoning: 1,
+    context: 4,
+  });
+  assert.equal(
+    disclose(events, metadata.id, options("tool")).messages.length,
+    2,
+  );
+  assert.equal(
+    disclose(events, metadata.id, options("reasoning")).messages[0].text,
+    "Synthetic thought",
+  );
 });
 test("invalid records reject import and tampered snapshots fail closed", async (t) => {
   const { root, store } = fixture(t),

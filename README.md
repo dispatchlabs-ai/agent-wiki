@@ -61,10 +61,10 @@ For managed HTTPS hosting, example mode also accepts `WIKI_ORIGIN` and
 
 For individuals and small trusted teams who want a shared knowledge collection
 that humans and agents can search and maintain. Articles live in a separate Git
-repository; optional Codex and pi snapshots preserve original conversation evidence.
+repository; optional Codex, Claude Code and pi snapshots preserve original conversation evidence.
 Edits appear after commit without rebuilding the site.
 
-**Version 0.7.0 — initial development source release.** Linux and macOS are
+**Version 0.8.0 — initial development source release.** Linux and macOS are
 supported; native Windows is not verified. The quickstart uses `main`, which may
 include unreleased work. See [verification](docs/onboarding-verification.md),
 [changelog](CHANGELOG.md), and [release policy](docs/releases.md).

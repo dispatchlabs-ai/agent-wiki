@@ -28,7 +28,10 @@ test("mixed pi records disclose dialogue before tool and thinking blocks", () =>
       value: {
         type: "message",
         timestamp: "2026-01-01T10:01:00Z",
-        message: { role: "toolResult", content: "RESULT" },
+        message: {
+          role: "toolResult",
+          content: [{ type: "text", text: "RESULT" }],
+        },
       },
     },
   ];

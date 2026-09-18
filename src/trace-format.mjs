@@ -35,6 +35,36 @@ function describe(record, format) {
       base.text = r.summary || "";
     return base;
   }
+  if (format === "claude") {
+    const message = r.message || {},
+      blocks = Array.isArray(message.content) ? message.content : [];
+    base.timestamp = r.timestamp ?? null;
+    base.label = r.type || message.role || "Claude record";
+    base.stream = "claude";
+    if (["user", "assistant"].includes(r.type)) {
+      const role = ["user", "assistant"].includes(message.role)
+        ? message.role
+        : r.type;
+      const hasText =
+        typeof message.content === "string" ||
+        blocks.some((block) => block?.type === "text");
+      const hasTool = blocks.some((block) =>
+        ["tool_use", "tool_result"].includes(block?.type),
+      );
+      const hasThinking = blocks.some((block) => block?.type === "thinking");
+      base.kind = hasText
+        ? role
+        : hasTool
+          ? "tool"
+          : hasThinking
+            ? "reasoning"
+            : role;
+      base.label = role;
+      base.text = textOf(message.content);
+      base.blocks = blocks;
+    }
+    return base;
+  }
   if (r.type === "response_item") {
     base.label = p.type;
     if (p.type === "message") {
@@ -83,9 +113,17 @@ export function projectionContext(records) {
     format,
     ordinal = 0;
   for (const { line, value } of records) {
-    format ??= value.type === "session" ? "pi" : "codex";
+    format ??=
+      value.type === "session"
+        ? "pi"
+        : value.type === "session_meta"
+          ? "codex"
+          : typeof value.sessionId === "string"
+            ? "claude"
+            : undefined;
     positions.set(line, ordinal++);
     if (format === "pi" && value.id) latest.set(value.id, line);
+    if (format === "claude" && value.uuid) latest.set(value.uuid, line);
     if (
       value.payload?.history_mode === "paginated" ||
       (value.payload?.type === "item_completed" &&
@@ -112,6 +150,11 @@ export function* projectRecords(records, format, context) {
         event.branch = previous !== null && r.parentId !== previous;
         previous = r.id;
       }
+    } else if (format === "claude") {
+      event.parentLine = r.parentUuid
+        ? context.latest.get(r.parentUuid) || null
+        : null;
+      event.branch = Boolean(r.parentUuid && !event.parentLine);
     } else {
       if (
         context.paginated &&
@@ -153,7 +196,7 @@ export function* projectRecords(records, format, context) {
 
 /**
  * @param {import("./contracts.mjs").SourceRecord[]} records
- * @param {"codex"|"pi"} format
+ * @param {"codex"|"pi"|"claude"} format
  * @returns {import("./contracts.mjs").TraceEvent[]}
  */
 export function project(records, format) {

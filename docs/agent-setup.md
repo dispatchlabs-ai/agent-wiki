@@ -585,3 +585,14 @@ Reader grants no longer allow trace evidence. Use `wiki:read` for article-only
 clients. Existing editorial clients need an editor grant and explicit `wiki:trace`
 scope; WIKI_WRITE can remain disabled. Revocation is checked on every request.
 See [upgrade notes](upgrading.md) and [interface coverage](interfaces.md).
+
+## Restrict a research credential
+
+An editor role permits trace access, but a drafting worker need not be able to
+publish. Generate its key with `--role editor --scope 'wiki:read wiki:trace'`.
+The public registration records this maximum scope; operator enrollment rejects
+scopes outside the selected role. The runtime profile requests the same scope.
+Changing that profile cannot obtain a write token. Reserve the full
+`wiki:read wiki:trace wiki:write` scope for the accountable publisher, and keep
+private keys on their owning runtime. Existing registrations without an explicit
+scope retain their role's previous default permissions.

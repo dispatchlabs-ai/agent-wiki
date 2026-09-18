@@ -30,14 +30,14 @@ export function importTrace(root, source, title) {
     const copy = path.join(temporary, "source.jsonl");
     fs.copyFileSync(source, copy, fs.constants.COPYFILE_EXCL);
     fs.chmodSync(copy, 0o444);
-    const { id, format, bytes, records, header } = inspectTrace(copy);
+    const { id, format, bytes, records, session_id } = inspectTrace(copy);
     const metadata = {
       id,
       format,
       bytes,
       records,
       title: String(title || `${format} session`).slice(0, 300),
-      session_id: header.payload?.id || header.id || null,
+      session_id,
       imported_at: new Date().toISOString(),
     };
     target = path.join(root, id);
@@ -64,7 +64,7 @@ export function importTrace(root, source, title) {
   return result;
 }
 export class TraceStore {
-  constructor(root, { maxBytes = 64 * 1024 * 1024, timeout = 30000 } = {}) {
+  constructor(root, { maxBytes = 64 * 1024 * 1024, timeout = 0 } = {}) {
     this.root = root;
     this.maxBytes = maxBytes;
     this.timeout = timeout;
@@ -105,7 +105,7 @@ export class TraceStore {
       const value = JSON.parse(
         fs.readFileSync(path.join(this.root, id, "metadata.json"), "utf8"),
       );
-      if (value.id !== id || !["codex", "pi"].includes(value.format))
+      if (value.id !== id || !["codex", "pi", "claude"].includes(value.format))
         return null;
       return { ...value, url: `/traces/${id}/` };
     } catch {
@@ -235,10 +235,15 @@ export class TraceStore {
         }
         this.pump();
       };
-      const timer = setTimeout(
-        () => finish(new Error("Trace rendering timed out")),
-        this.timeout,
-      );
+      // Full-source integrity reads take time proportional to source bytes and
+      // storage throughput. A fixed deadline becomes an implicit file-size cap.
+      const timer =
+        this.timeout > 0
+          ? setTimeout(
+              () => finish(new Error("Trace rendering timed out")),
+              this.timeout,
+            )
+          : undefined;
       worker.once(
         "message",
         (/** @type {import("./contracts.mjs").WorkerMessage} */ value) =>

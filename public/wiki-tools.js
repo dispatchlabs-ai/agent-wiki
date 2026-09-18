@@ -101,7 +101,7 @@ export function createWikiTools(request, writable, config = {}) {
       inputSchema: {
         type: "object",
         properties: {
-          format: { type: "string", enum: ["codex", "pi"] },
+          format: { type: "string", enum: ["codex", "pi", "claude"] },
           session_id: { type: "string", maxLength: 1000 },
           limit: { type: "integer", minimum: 1, maximum: 100 },
           offset: { type: "integer", minimum: 0, maximum: 10000 },
@@ -142,7 +142,7 @@ export function createWikiTools(request, writable, config = {}) {
             type: "string",
             enum: config.externalEvidence
               ? ["codex", "pi", "claude"]
-              : ["codex", "pi"],
+              : ["codex", "pi", "claude"],
           },
           ...(config.externalEvidence
             ? {

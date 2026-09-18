@@ -8,12 +8,17 @@ import { DatabaseSync } from "node:sqlite";
 import { digest, TRACE_PAGE_SIZE } from "./traces.mjs";
 import { inspectTrace, readRecords } from "./trace-source.mjs";
 import { projectRecords } from "./trace-format.mjs";
-export const SEARCH_VERSION = 3;
+export const SEARCH_VERSION = 4;
 const filename = (root) => path.join(root, "search.sqlite3");
 function logicalEventKey(event, metadata, prefix) {
   const r = event.value,
     p = r.payload || {};
-  const native = metadata.format === "pi" ? r.id : p.item?.id || p.id;
+  const native =
+    metadata.format === "pi"
+      ? r.id
+      : metadata.format === "claude"
+        ? r.uuid
+        : p.item?.id || p.id;
   const session =
     typeof metadata.session_id === "string" && metadata.session_id;
   // A byte-identical prefix proves shared lineage; equal text alone does not.
@@ -126,7 +131,7 @@ export function searchTraces(
   { limit = 20, offset = 0, format = "" } = {},
 ) {
   if (
-    !["", "codex", "pi"].includes(format) ||
+    !["", "codex", "pi", "claude"].includes(format) ||
     typeof query !== "string" ||
     query.length > 300 ||
     !Number.isInteger(limit) ||

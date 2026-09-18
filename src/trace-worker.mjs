@@ -15,7 +15,12 @@ async function renderEvent(event, id, positionByLine) {
   const { value: r, line, kind } = event;
   const anchor = (target) =>
     `/traces/${id}/?page=${Math.floor(positionByLine.get(target) / PAGE_SIZE) + 1}#line-${target}`;
-  const notice = `${event.branch ? `<p class="trace-notice">Branch change · parent ${event.parentLine ? link(anchor(event.parentLine), `source line ${event.parentLine}`) : escape(r.parentId) + " (not in this snapshot)"}</p>` : ""}${event.superseded ? '<p class="trace-notice">Superseded entry revision; original retained.</p>' : ""}${event.mirrorOf ? `<p>Duplicate event representation of ${link(anchor(event.mirrorOf), `source line ${event.mirrorOf}`)}.</p>` : ""}`;
+  const parentId = r.parentUuid ?? r.parentId;
+  const parentNotice =
+    r.parentUuid && event.parentLine
+      ? `<p class="trace-notice">Parent · ${link(anchor(event.parentLine), `source line ${event.parentLine}`)}</p>`
+      : "";
+  const notice = `${parentNotice}${event.branch ? `<p class="trace-notice">Branch change · parent ${event.parentLine ? link(anchor(event.parentLine), `source line ${event.parentLine}`) : escape(parentId) + " (not in this snapshot)"}</p>` : ""}${event.superseded ? '<p class="trace-notice">Superseded entry revision; original retained.</p>' : ""}${event.mirrorOf ? `<p>Duplicate event representation of ${link(anchor(event.mirrorOf), `source line ${event.mirrorOf}`)}.</p>` : ""}`;
   let content = "";
   if (event.blocks?.length) {
     for (const [blockIndex, block] of event.blocks.entries()) {
@@ -26,8 +31,10 @@ async function renderEvent(event, id, positionByLine) {
         );
       else if (block.type === "thinking")
         content += `<details><summary>Thinking</summary>${await renderMarkdown(block.thinking || block.text || "", `line-${line}-block-${blockIndex}`)}</details>`;
-      else if (block.type === "toolCall")
+      else if (["toolCall", "tool_use"].includes(block.type))
         content += `<details><summary>Tool call · ${escape(block.name)}</summary><pre>${escape(json(block))}</pre></details>`;
+      else if (block.type === "tool_result")
+        content += `<details><summary>Tool result</summary><pre>${escape(json(block))}</pre></details>`;
       else
         content += `<p>Recorded ${escape(block.type || "content")} block — inspect the source record below.</p>`;
     }

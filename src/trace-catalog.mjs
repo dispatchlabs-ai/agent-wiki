@@ -12,7 +12,7 @@ export function catalogOptions(params) {
     !Number.isSafeInteger(offset) ||
     offset < 0 ||
     offset > 10000 ||
-    !["", "codex", "pi"].includes(format) ||
+    !["", "codex", "pi", "claude"].includes(format) ||
     session_id.length > 1000
   )
     throw new WikiError("INVALID_CATALOG", "Invalid trace catalog parameters");

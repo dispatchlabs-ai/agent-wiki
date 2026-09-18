@@ -28,16 +28,35 @@ export function parseRecords(bytes) {
 
 /** @returns {import("./contracts.mjs").Harness} */
 export function detectFormat(records) {
-  const first = records[0]?.value;
-  if (first?.type === "session_meta") return "codex";
-  if (first?.type === "session") return "pi";
-  throw new Error("Expected a Codex session_meta or pi session header");
+  /** @type {import("./contracts.mjs").Harness|undefined} */
+  let format;
+  for (const record of records) {
+    const value = record?.value ?? record;
+    if (value?.type === "session_meta") return "codex";
+    if (value?.type === "session") return "pi";
+    if (
+      typeof value?.sessionId === "string" &&
+      (typeof value.uuid === "string" ||
+        "parentUuid" in value ||
+        "message" in value ||
+        [
+          "queue-operation",
+          "system",
+          "permission-mode",
+          "fork-context-ref",
+          "last-prompt",
+        ].includes(value.type))
+    )
+      format = "claude";
+  }
+  if (format) return format;
+  throw new Error("Expected a native Codex, pi, or Claude Code JSONL trace");
 }
 
 // Consumers must exhaust the iterator before publishing results: the final hash
 // verifies every byte, including unselected records and a terminating newline.
 /**
- * @typedef {{id: string, bytes: number, records: number, header: any, format: import("./contracts.mjs").Harness}} TraceInspection
+ * @typedef {{id: string, bytes: number, records: number, header: any, format: import("./contracts.mjs").Harness, session_id: string|null}} TraceInspection
  */
 /** @param {string} filename
  * @param {{expectedId?: string, summary?: Partial<TraceInspection>, prefixes?: boolean}} options */
@@ -52,7 +71,9 @@ export function* readRecords(
     line = 1,
     bytes = 0,
     records = 0,
-    header;
+    header,
+    format,
+    sessionId;
   const decode = (last) => {
     const raw = fragments.length ? Buffer.concat([...fragments, last]) : last;
     fragments = [];
@@ -79,6 +100,15 @@ export function* readRecords(
         const record = decode(part);
         if (record) {
           header ??= record.value;
+          sessionId ??=
+            typeof record.value.sessionId === "string"
+              ? record.value.sessionId
+              : undefined;
+          try {
+            format ??= detectFormat([record]);
+          } catch {
+            // Native Claude files may begin with summary or queue metadata.
+          }
           records++;
           yield {
             ...record,
@@ -94,6 +124,15 @@ export function* readRecords(
       const record = decode(Buffer.alloc(0));
       if (record) {
         header ??= record.value;
+        sessionId ??=
+          typeof record.value.sessionId === "string"
+            ? record.value.sessionId
+            : undefined;
+        try {
+          format ??= detectFormat([record]);
+        } catch {
+          // Keep scanning until a harness-identifying record appears.
+        }
         records++;
         yield {
           ...record,
@@ -109,7 +148,8 @@ export function* readRecords(
       bytes,
       records,
       header,
-      format: detectFormat(header ? [{ value: header }] : []),
+      format: format || detectFormat(header ? [{ value: header }] : []),
+      session_id: sessionId ?? header?.payload?.id ?? header?.id ?? null,
     });
   } finally {
     fs.closeSync(fd);

@@ -1,7 +1,7 @@
 # Agent traces
 
 Articles remain Markdown in Git. Traces have their own authoritative storage:
-original Codex or pi JSONL snapshots, imported explicitly into `WIKI_TRACES`.
+original Codex, Claude Code or pi JSONL snapshots, imported explicitly into `WIKI_TRACES`.
 No personal session directories are scanned. The example imports two fictional
 sessions into `.runtime/traces` and links to them from the Traces navigation.
 
@@ -23,8 +23,11 @@ The catalog queries an independent SQLite metadata projection. Opening a trace s
 the source SHA-256, parses the original records and renders the requested page.
 There are no prebuilt conversation pages. Rendered results live in a
 64 MiB / 256-entry LRU cache keyed by parser version, snapshot hash and page. Concurrent
-requests for the same page share work. Two workers run at once, with a queue of 32,
-a 30-second deadline and a 512 MiB worker heap limit. Each page contains at most 100
+requests for the same page share work. Two workers run at once, with a queue of 32
+and a 512 MiB worker heap limit. Reads have no fixed wall-clock deadline: full-source
+verification takes time proportional to source size and storage throughput. Slow
+reads occupy a worker until completion or shutdown; qualify actual storage and
+resource use. Each page contains at most 100
 source records. There is no trace-file byte limit. Import and indexing read JSONL
 incrementally; rendered reads retain the selected page and compact cross-record
 annotations instead of the complete source. Source-line responses stream through
@@ -44,7 +47,7 @@ verified original bytes. Cache eviction and restarting discard only derivatives.
 
 ## Fidelity
 
-Both formats expose **every original record and field**, with permanent source-line
+All supported formats expose **every original record and field**, with permanent source-line
 anchors, recorded timestamps, and JSON API access. Unknown records appear as context
 with expandable source JSON. Markdown is sanitized and raw JSON is escaped.
 
@@ -60,6 +63,13 @@ with expandable source JSON. Markdown is sanitized and raw JSON is escaped.
   record. Older revisions of an entry are retained but collapsed. Compaction tails
   are source context, not replayed dialogue. All branches remain in recorded order;
   this is an archive view, not a reconstructed active-branch chat.
+- **Claude Code:** native records are accepted without a special header, including
+  metadata that precedes the first dialogue record. Camel-case `sessionId` groups
+  snapshots, native `uuid` values identify logical events across growing captures,
+  and `parentUuid` links are shown when their parent is present. User/assistant
+  text, thinking and tool-use/result blocks are classified separately. Queue,
+  summary, system, attachment and unknown records remain source context with every
+  original field available.
 
 Parent-session history is not automatically fetched or stitched. A referenced parent
 is disclosed when present in the supported header fields. Images, audio and other
@@ -92,7 +102,7 @@ snapshot means the most recently imported, not necessarily the most complete cap
 Groups expose `format`, `session_id`, `latest` snapshot metadata, and `snapshot_count`.
 
 `/api/traces/sessions.json` returns `{ sessions, total, nextOffset }`. It accepts
-optional `format=codex|pi`, exact `session_id`, `limit` (1–100, default 20), and
+optional `format=codex|pi|claude`, exact `session_id`, `limit` (1–100, default 20), and
 `offset` (0–10,000). Session IDs are limited to 1,000 characters in filters.
 To inspect a group's captures, use `/api/traces/catalog.json?format=pi&session_id=ID`.
 Catalog requests with query parameters return `{ snapshots, total, nextOffset }`

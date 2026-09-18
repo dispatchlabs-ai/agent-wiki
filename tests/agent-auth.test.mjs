@@ -767,3 +767,60 @@ test("editor agents need explicit trace scope for evidence tools, files, health 
     200,
   );
 });
+
+test("operator scopes keep a trace researcher from acquiring publication tokens", async (t) => {
+  const s = await setup(t, { role: "editor" });
+  const spec = {
+    ...s.spec,
+    key: randomUUID(),
+    scope: [{ space: "default", actions: ["read", "trace"] }],
+  };
+  s.agents.enrollOperator(spec, s.owner, "editor");
+  assert.equal(s.agents.enrollOperator(spec, s.owner, "editor").changed, false);
+  const narrow = new AgentCredential({
+    ...s.config,
+    key: spec.key,
+    scope: "wiki:read wiki:trace",
+  });
+  const escalation = new AgentCredential({ ...s.config, key: spec.key });
+  t.after(async () => {
+    await narrow.close();
+    await escalation.close();
+  });
+  const token = await narrow.token();
+  assert.equal(
+    (await s.request("/api/articles/catalog.json", token)).status,
+    200,
+  );
+  const save = await s.request("/api/articles/edits", token, {
+    method: "POST",
+    headers: { "X-Wiki-Write": "1", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      operation_id: "forbidden-research-write",
+      updates: [update("forbidden-research", "Research draft")],
+    }),
+  });
+  assert.equal(save.status, 404);
+  await assert.rejects(escalation.token());
+  assert.throws(
+    () =>
+      s.agents.enrollOperator(
+        {
+          ...registration(),
+          scope: [{ space: "default", actions: ["read", "trace"] }],
+        },
+        s.owner,
+        "reader",
+      ),
+    /scope exceeds/,
+  );
+  assert.throws(
+    () =>
+      s.agents.enrollOperator(
+        { ...registration(), scope: [{ space: "other", actions: ["read"] }] },
+        s.owner,
+        "editor",
+      ),
+    /scope exceeds/,
+  );
+});

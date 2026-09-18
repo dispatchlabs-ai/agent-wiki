@@ -22,7 +22,7 @@ export function scanMetadata(root) {
       const m = JSON.parse(
         fs.readFileSync(path.join(root, id, "metadata.json"), "utf8"),
       );
-      if (m.id !== id || !["codex", "pi"].includes(m.format))
+      if (m.id !== id || !["codex", "pi", "claude"].includes(m.format))
         throw Error("Invalid trace metadata");
       return { ...m, url: `/traces/${id}/` };
     });

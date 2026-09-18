@@ -95,12 +95,28 @@ export class AgentStore {
     this.human(owner);
     const name = text(spec.name);
     const config = this.definition(spec.definition);
-    const entries = scope([
-      {
-        space: "default",
-        actions: role === "editor" ? ["read", "trace", "write"] : ["read"],
-      },
-    ]);
+    const allowed = role === "editor" ? ["read", "trace", "write"] : ["read"];
+    const entries = scope(
+      spec.scope ?? [
+        {
+          space: "default",
+          actions: allowed,
+        },
+      ],
+    );
+    if (
+      entries.some(
+        (entry) =>
+          entry.space !== "default" ||
+          entry.actions.some((action) => !allowed.includes(action)),
+      ) ||
+      !permits(entries, "default", "read")
+    )
+      throw new WikiError(
+        "INVALID_AGENT",
+        "Registration scope exceeds the selected role or omits read",
+        400,
+      );
     const expires =
       spec.expiresAt === null && mode === "independent"
         ? null

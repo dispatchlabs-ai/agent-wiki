@@ -49,7 +49,7 @@ export function disclose(events, id, options) {
         ...metadata,
         sourceUrl: `/traces/${id}/?page=${Math.floor(index++ / 100) + 1}#line-${event.line}`,
       };
-      if (blocks?.length && ["user", "assistant"].includes(event.kind)) {
+      if (blocks?.length) {
         const texts = blocks
           .filter((b) => b.type === "text")
           .map((b) => b.text || "");
@@ -57,19 +57,26 @@ export function disclose(events, id, options) {
           .filter((b) => b.type !== "text")
           .map((block) => ({
             ...base,
-            kind:
-              block.type === "toolCall"
-                ? "tool"
-                : block.type === "thinking"
-                  ? "reasoning"
-                  : "context",
+            kind: ["toolCall", "tool_use", "tool_result"].includes(block.type)
+              ? "tool"
+              : block.type === "thinking"
+                ? "reasoning"
+                : "context",
             text:
               block.type === "thinking"
                 ? block.thinking || block.text || ""
                 : JSON.stringify(block),
           }));
         yield* [
-          ...(texts.length ? [{ ...base, text: texts.join("\n\n") }] : []),
+          ...(texts.length
+            ? [
+                {
+                  ...base,
+                  kind: event.kind,
+                  text: texts.join("\n\n"),
+                },
+              ]
+            : []),
           ...extra,
         ];
       } else yield base;

@@ -12,7 +12,7 @@ export class McpResourceResult {
 
 /** Track loopback requests for cancellation, deadlines and shutdown. */
 export class McpApiClient {
-  constructor(server, origin, { timeout = 30000 } = {}) {
+  constructor(server, origin, { timeout = 0 } = {}) {
     this.server = server;
     this.origin = origin;
     this.timeout = timeout;
@@ -65,17 +65,20 @@ export class McpApiClient {
         finish(new WikiError("MCP_CLOSED", "MCP bridge is closed.", 503));
       const abort = () => finish(cancelled());
       this.pending.add(cancel);
-      const timer = setTimeout(
-        () =>
-          finish(
-            new WikiError(
-              "MCP_TIMEOUT",
-              "MCP API request timed out; retry saves with identical input and operation_id.",
-              503,
-            ),
-          ),
-        this.timeout,
-      );
+      const timer =
+        this.timeout > 0
+          ? setTimeout(
+              () =>
+                finish(
+                  new WikiError(
+                    "MCP_TIMEOUT",
+                    "MCP API request timed out; retry saves with identical input and operation_id.",
+                    503,
+                  ),
+                ),
+              this.timeout,
+            )
+          : null;
       upstream.on("error", (error) => finish(error));
       upstream.on("response", (response) => {
         const chunks = [];

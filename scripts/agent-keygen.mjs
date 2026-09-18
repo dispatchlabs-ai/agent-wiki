@@ -12,6 +12,7 @@ const { values, positionals } = parseArgs({
     days: { type: "string" },
     "until-revoked": { type: "boolean", default: false },
     role: { type: "string", default: "reader" },
+    scope: { type: "string" },
   },
 });
 if (
@@ -21,9 +22,23 @@ if (
   !["reader", "editor"].includes(values.role)
 )
   throw Error(
-    "Usage: node scripts/agent-keygen.mjs /absolute/researcher.json --origin https://wiki.example.org --name Researcher [--role editor] [--agent EXISTING-ID] [--days 90 | --until-revoked]",
+    "Usage: node scripts/agent-keygen.mjs /absolute/researcher.json --origin https://wiki.example.org --name Researcher [--role editor] [--scope 'wiki:read wiki:trace'] [--agent EXISTING-ID] [--days 90 | --until-revoked]",
   );
 const origin = new URL(values.origin);
+const allowed =
+  values.role === "editor" ? ["read", "trace", "write"] : ["read"];
+const actions =
+  values.scope === undefined
+    ? allowed
+    : values.scope.split(/\s+/).map((value) => value.replace(/^wiki:/, ""));
+if (
+  !actions.includes("read") ||
+  new Set(actions).size !== actions.length ||
+  actions.some((action) => !allowed.includes(action))
+)
+  throw Error(
+    "Scope must include wiki:read and contain only actions allowed by the role",
+  );
 if (
   origin.origin !== values.origin ||
   (origin.protocol !== "https:" &&
@@ -56,25 +71,24 @@ const config = {
   agent,
   key,
   privateKeyFile: keyFile,
-  scope:
-    values.role === "editor" ? "wiki:read wiki:trace wiki:write" : "wiki:read",
+  scope: actions.map((action) => "wiki:" + action).join(" "),
 };
 const tools = [
   "wiki.search",
   "wiki.read",
   "wiki.history",
-  "wiki.traceSearch",
-  "wiki.traces",
-  "wiki.trace",
-  "wiki.file",
+  ...(actions.includes("trace")
+    ? ["wiki.traceSearch", "wiki.traces", "wiki.trace", "wiki.file"]
+    : []),
   "wiki.preview",
-  ...(values.role === "editor" ? ["wiki.save"] : []),
+  ...(actions.includes("write") ? ["wiki.save"] : []),
 ];
 const registration = {
   version: 1,
   agent,
   key,
   name: values.name,
+  scope: [{ space: "default", actions }],
   publicKey: { ...publicKey.export({ format: "jwk" }), alg: "RS256" },
   expiresAt: values["until-revoked"]
     ? null

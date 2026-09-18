@@ -172,3 +172,11 @@ test(
     assert.equal(client.pending.size, 0);
   },
 );
+
+test("default bridge has no deadline while explicit deadlines remain optional", async (t) => {
+  const client = await bridge(t, (req, res) => {
+    setTimeout(() => res.end('{"ok":true}'), 25);
+  });
+  assert.equal(client.timeout, 0);
+  assert.deepEqual(await client.request("/api/slow"), { ok: true });
+});
