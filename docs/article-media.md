@@ -26,7 +26,9 @@ The engine's `/assets/` namespace remains reserved for bundled application files
 Publication is direct-storage operator administration, separate from normal
 article editing. The command copies one reviewed file into the configured store,
 checks its extension and file signature, computes its SHA-256 identity, and writes
-an immutable provenance manifest. It does not modify an article or retrieve a
+an immutable provenance manifest. Complete staged files are installed atomically
+without replacing an existing publication, so an interrupted attempt can be
+retried with the same input. It does not modify an article or retrieve a
 restricted source.
 
 ```sh

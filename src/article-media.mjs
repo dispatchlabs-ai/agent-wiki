@@ -44,6 +44,24 @@ const sha256File = async (filename) => {
   await pipeline(fs.createReadStream(filename), hash);
   return hash.digest("hex");
 };
+const syncFile = async (filename) => {
+  const handle = await fs.promises.open(filename, "r");
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+};
+const installExclusive = async (staged, target, verifyExisting) => {
+  try {
+    // The staged and final paths share the configured filesystem. The link makes
+    // the complete inode visible atomically and cannot replace an existing peer.
+    await fs.promises.link(staged, target);
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    await verifyExisting(target);
+  }
+};
 const formatFor = (asset) => formats[path.extname(asset).slice(1)];
 const safeText = (value, name, maximum = 1000) => {
   if (
@@ -126,6 +144,7 @@ export async function publishArticleMedia({
   const target = path.join(assets, asset);
   const manifest = path.join(manifests, asset + ".json");
   const temporary = path.join(root, `.publish-${randomUUID()}`);
+  const manifestTemporary = path.join(root, `.manifest-${randomUUID()}`);
   try {
     await fs.promises.copyFile(
       sourceFile,
@@ -135,28 +154,32 @@ export async function publishArticleMedia({
     await fs.promises.chmod(temporary, 0o400);
     if ((await sha256File(temporary)) !== hash)
       throw Error("Source changed during publication");
-    try {
-      await fs.promises.copyFile(temporary, target, fs.constants.COPYFILE_EXCL);
-      await fs.promises.chmod(target, 0o400);
-    } catch (error) {
-      if (error.code !== "EEXIST" || (await sha256File(target)) !== hash)
-        throw error;
-    }
+    await syncFile(temporary);
+    await installExclusive(temporary, target, async (existing) => {
+      if ((await sha256File(existing)) !== hash)
+        throw Error("Published asset does not match its content address");
+    });
     const serialized = JSON.stringify(metadata, null, 2) + "\n";
-    try {
-      await fs.promises.writeFile(manifest, serialized, {
-        flag: "wx",
-        mode: 0o400,
-      });
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-      const existing = JSON.parse(await fs.promises.readFile(manifest, "utf8"));
-      const comparable = { ...existing, published_at: metadata.published_at };
-      if (JSON.stringify(comparable) !== JSON.stringify(metadata))
-        throw Error("Asset already has different publication provenance");
-    }
+    await fs.promises.writeFile(manifestTemporary, serialized, {
+      flag: "wx",
+      mode: 0o400,
+    });
+    await syncFile(manifestTemporary);
+    await installExclusive(
+      manifestTemporary,
+      manifest,
+      async (existingFile) => {
+        const existing = JSON.parse(
+          await fs.promises.readFile(existingFile, "utf8"),
+        );
+        const comparable = { ...existing, published_at: metadata.published_at };
+        if (JSON.stringify(comparable) !== JSON.stringify(metadata))
+          throw Error("Asset already has different publication provenance");
+      },
+    );
   } finally {
     await fs.promises.rm(temporary, { force: true });
+    await fs.promises.rm(manifestTemporary, { force: true });
   }
   return { asset, url: `/article-media/${asset}`, manifest: metadata };
 }

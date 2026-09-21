@@ -7,7 +7,8 @@ import { createWiki } from "../../src/server.mjs";
 import { fixture, commit } from "../helpers.mjs";
 import { markdown } from "../../src/git-wiki.mjs";
 import { importTrace } from "../../src/traces.mjs";
-let app, cleanup, base, repo, trace;
+import { publishArticleMedia } from "../../src/article-media.mjs";
+let app, cleanup, base, repo, trace, publishedImage, publishedPdf;
 const source = fs.readFileSync(
   new URL("../fixtures/rich-markdown.md", import.meta.url),
   "utf8",
@@ -21,7 +22,32 @@ const data = {
 const review = path.resolve(".runtime/rich-review");
 test.beforeAll(async () => {
   repo = fixture({ after: (fn) => (cleanup = fn) });
-  fs.writeFileSync(path.join(repo, "wiki/guide.md"), markdown(data, source));
+  const articleMedia = path.join(repo, ".git/article-media");
+  const imageSource = path.join(repo, ".git/approved-image.png");
+  const pdfSource = path.join(repo, ".git/approved-report.pdf");
+  fs.writeFileSync(
+    imageSource,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  );
+  fs.writeFileSync(pdfSource, "%PDF-1.4\nsynthetic browser report\n%%EOF\n");
+  publishedImage = await publishArticleMedia({
+    root: articleMedia,
+    sourceFile: imageSource,
+    source: "synthetic:browser-image",
+  });
+  publishedPdf = await publishArticleMedia({
+    root: articleMedia,
+    sourceFile: pdfSource,
+    source: "synthetic:browser-pdf",
+  });
+  const articleSource = `${source}\n![Approved image](${publishedImage.url})\n\n[Approved report](${publishedPdf.url})\n`;
+  fs.writeFileSync(
+    path.join(repo, "wiki/guide.md"),
+    markdown(data, articleSource),
+  );
   commit(repo, "Add synthetic rich Markdown");
   const capture = path.join(repo, ".git/synthetic.jsonl");
   fs.writeFileSync(
@@ -58,10 +84,13 @@ test.beforeAll(async () => {
   const port = reservation.address().port;
   await new Promise((resolve) => reservation.close(resolve));
   base = `http://127.0.0.1:${port}`;
-  app = createWiki({ repo, traces, origin: base, write: true }).listen(
-    port,
-    "127.0.0.1",
-  );
+  app = createWiki({
+    repo,
+    traces,
+    origin: base,
+    write: true,
+    articleMediaRoot: articleMedia,
+  }).listen(port, "127.0.0.1");
   await once(app, "listening");
   fs.mkdirSync(review, { recursive: true });
 });
@@ -180,6 +209,22 @@ test("Mermaid is isolated, retains source and renders with no external requests"
   );
   await expect(page.locator(".diagram pre")).toContainText("flowchart LR");
   expect(external).toEqual([]);
+});
+test("published article images render and PDFs remain directly viewable", async ({
+  page,
+}) => {
+  await page.goto(base + "/wiki/guide/");
+  const image = page.getByRole("img", { name: "Approved image" });
+  await expect(image).toBeVisible();
+  await expect
+    .poll(() => image.evaluate((node) => node.naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(
+    page.getByRole("link", { name: "Approved report" }),
+  ).toHaveAttribute("href", publishedPdf.url);
+  const pdf = await page.request.get(base + publishedPdf.url);
+  expect(pdf.status()).toBe(200);
+  expect(pdf.headers()["content-type"]).toBe("application/pdf");
 });
 test("live preview and later content commits use the shared renderer without rebuilding", async ({
   page,

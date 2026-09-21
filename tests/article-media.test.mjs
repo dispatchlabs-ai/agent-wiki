@@ -39,6 +39,8 @@ test("operator publication creates immutable hashed media and provenance", async
     fs.statSync(path.join(root, "assets", published.asset)).mode & 0o777,
     0o400,
   );
+  const manifestFile = path.join(root, "manifests", published.asset + ".json");
+  const originalManifest = fs.readFileSync(manifestFile, "utf8");
 
   const repeated = await publishArticleMedia({
     root,
@@ -49,6 +51,7 @@ test("operator publication creates immutable hashed media and provenance", async
     now: new Date("2026-09-22T12:00:00Z"),
   });
   assert.equal(repeated.asset, published.asset);
+  assert.equal(fs.readFileSync(manifestFile, "utf8"), originalManifest);
   await assert.rejects(
     publishArticleMedia({
       root,
@@ -69,6 +72,51 @@ test("operator publication creates immutable hashed media and provenance", async
     null,
   );
   assert.equal(ArticleMediaStore.asset(`/media/${published.asset}`), null);
+});
+
+test("an interruption between atomic asset and manifest installs is retryable", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "article-media-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const sourceFile = path.join(directory, "logo.png");
+  const root = path.join(directory, "published");
+  fs.writeFileSync(sourceFile, png);
+  const realLink = fs.promises.link;
+  let links = 0;
+  fs.promises.link = async (...arguments_) => {
+    links += 1;
+    if (links === 2) {
+      const error = Error("interrupted before manifest install");
+      error.code = "EIO";
+      throw error;
+    }
+    return realLink(...arguments_);
+  };
+  try {
+    await assert.rejects(
+      publishArticleMedia({
+        root,
+        sourceFile,
+        source: "brand-guide:logo",
+        now: new Date("2026-09-21T12:00:00Z"),
+      }),
+      /interrupted/,
+    );
+  } finally {
+    fs.promises.link = realLink;
+  }
+  assert.equal(
+    fs.readdirSync(root).filter((name) => name.startsWith(".")).length,
+    0,
+  );
+  const recovered = await publishArticleMedia({
+    root,
+    sourceFile,
+    source: "brand-guide:logo",
+    now: new Date("2026-09-21T12:00:00Z"),
+  });
+  const opened = await new ArticleMediaStore(root).open(recovered.asset);
+  assert.deepEqual(await read(opened.stream), png);
+  await opened.close();
 });
 
 test("publication rejects disguised files and serving rejects changed bytes", async (t) => {
