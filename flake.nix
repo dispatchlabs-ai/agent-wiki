@@ -53,6 +53,10 @@
           package = packageFor system;
         in
         {
+          lifecycle = {
+            type = "app";
+            program = "${package}/bin/agent-wiki";
+          };
           server-direct = {
             type = "app";
             program = "${package}/bin/agent-wiki-server-direct";

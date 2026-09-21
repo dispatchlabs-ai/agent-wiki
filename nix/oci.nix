@@ -30,11 +30,17 @@ dockerTools.buildLayeredImage {
   config = {
     User = "65532:65532";
     WorkingDir = "/data";
-    Entrypoint = [ "${agent-wiki}/bin/agent-wiki-server-direct" ];
+    Entrypoint = [ "${agent-wiki}/bin/agent-wiki" ];
+    Cmd = [
+      "serve"
+      "--root"
+      "/data"
+    ];
     Env = [
       "HOME=/tmp"
       "NODE_ENV=production"
       "PORT=4317"
+      "WIKI_LISTEN_HOST=0.0.0.0"
     ];
     ExposedPorts = {
       "4317/tcp" = { };

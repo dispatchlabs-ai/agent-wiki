@@ -13,9 +13,9 @@ complete runtime closure and does not require Nix in the running container.
 
 `flake.lock` pins the August 21, 2026 NixOS 26.05 channel revision. That revision
 supplies Node 24.19.0, matching the repository's tested runtime baseline and using
-the channel's published binary-cache artifacts where available. `package-lock.json` supplies
-the exact JavaScript dependency graph through Nixpkgs' `importNpmLock`; there is
-no placeholder dependency hash and the build performs no unlocked npm resolution.
+the channel's published binary-cache artifacts where available. `package-lock.json`
+supplies the exact JavaScript dependency graph through Nixpkgs' `importNpmLock`;
+there is no placeholder dependency hash and the build performs no unlocked npm resolution.
 The package builds the browser assets, prunes development dependencies, and keeps:
 
 - Node, Git, production JavaScript dependencies, and built browser assets;
@@ -45,6 +45,18 @@ nix --extra-experimental-features 'nix-command flakes' flake check
 nix --extra-experimental-features 'nix-command flakes' build .#agent-wiki
 ./result/bin/agent-wiki-package-info | jq .
 ./result/bin/agent-wiki-cli --help
+./result/bin/agent-wiki --help
+```
+
+`agent-wiki` and `agent-wiki-lifecycle` are equivalent managed entry points. Use
+them for bootstrap, serve, maintenance, backup, restore, and recovery operations:
+
+```sh
+agent-wiki bootstrap --root /srv/agent-wiki \
+  --origin https://wiki.example.test \
+  --manager-email manager@example.test \
+  --manager-name 'Wiki Manager'
+agent-wiki serve --root /srv/agent-wiki
 ```
 
 Build the container archive on the native `x86_64-linux` builder:
@@ -55,9 +67,20 @@ docker load < result
 docker image inspect agent-wiki:VERSION-SOURCE
 ```
 
-The container entry point is `agent-wiki-server-direct`. Supply all runtime
-configuration explicitly, mount independent writable data paths, bind to the
-configured origin, and retain the one-writer lifecycle rules. An example layout is:
+The container entry point is the managed `agent-wiki` lifecycle. Its default command
+is `serve --root /data`, and the image explicitly binds the server to `0.0.0.0`.
+Bootstrap an empty named volume once before starting the long-running container:
+
+```sh
+docker volume create agent-wiki-data
+docker run --rm -v agent-wiki-data:/data agent-wiki:VERSION-SOURCE \
+  bootstrap --root /data --origin https://wiki.example.test \
+  --manager-email manager@example.test --manager-name 'Wiki Manager'
+docker run -d --name agent-wiki -p 4317:4317 \
+  -v agent-wiki-data:/data agent-wiki:VERSION-SOURCE
+```
+
+The lifecycle creates and exports this mutable layout:
 
 ```text
 /data/content                 WIKI_REPO
@@ -67,12 +90,11 @@ configured origin, and retain the one-writer lifecycle rules. An example layout 
 /data/article-media           WIKI_ARTICLE_MEDIA (optional)
 ```
 
-The direct entry points expose existing application operations; they do not add a
-service supervisor or writer fence. Managed activation, bootstrap, maintenance,
-backup, and recovery must go through the repository's lifecycle command when that
-adapter is present. Direct commands remain useful for development and an already
-fenced operator session, and their `-direct` suffix makes that authority boundary
-visible.
+The direct entry points expose existing application operations and bypass the
+managed writer fence. Managed activation, bootstrap, maintenance, backup, and
+recovery must go through `agent-wiki`. Direct commands remain useful for development
+and an already fenced operator session, and their `-direct` suffix makes that
+authority boundary visible.
 
 ## Signed host closure candidate
 

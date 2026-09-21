@@ -20,9 +20,15 @@ runCommand "agent-wiki-package-smoke-${agent-wiki.version}"
     test "$(printf '%s' "$identity" | jq -r '.packageLockSha256 | length')" = 64
 
     HOME="$TMPDIR" agent-wiki-cli --help >/dev/null
+    HOME="$TMPDIR" agent-wiki --help >/dev/null
+    mkdir "$TMPDIR/uninitialized"
+    agent-wiki status --root "$TMPDIR/uninitialized" \
+      | jq -e '.state == "uninitialized" and .active_owner == false' >/dev/null
 
     for executable in \
       agent-wiki-server-direct \
+      agent-wiki \
+      agent-wiki-lifecycle \
       agent-wiki-cli \
       agent-wiki-bootstrap-direct \
       agent-wiki-bootstrap-oidc-direct \

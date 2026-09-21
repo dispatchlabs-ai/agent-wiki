@@ -7,6 +7,7 @@
   coreutils,
   git,
   nodejs_24,
+  python3,
   src,
   sourceRevision,
 }:
@@ -22,8 +23,11 @@ let
   nodeVersion = nodejs_24.version;
   packageLockSha256 = builtins.hashFile "sha256" (src + "/package-lock.json");
   applicationRoot = "$out/libexec/agent-wiki";
-  runtimePath = lib.makeBinPath [ git ];
-  entrypoints = {
+  runtimePath = lib.makeBinPath [
+    git
+    nodejs_24
+  ];
+  directEntrypoints = {
     agent-wiki-server-direct = "src/server.mjs";
     agent-wiki-cli = "bin/wiki.mjs";
     agent-wiki-bootstrap-direct = "scripts/provision-local.mjs";
@@ -36,6 +40,11 @@ let
     agent-wiki-index-traces-direct = "scripts/index-traces.mjs";
     agent-wiki-publish-media-direct = "scripts/publish-article-media.mjs";
   };
+  managedEntrypoints = {
+    agent-wiki = "scripts/lifecycle.py";
+    agent-wiki-lifecycle = "scripts/lifecycle.py";
+  };
+  entrypoints = directEntrypoints // managedEntrypoints;
   identity = builtins.toJSON {
     schemaVersion = 1;
     name = manifest.name;
@@ -93,7 +102,17 @@ buildNpmPackage {
             --set NODE_ENV production \
             --prefix PATH : ${runtimePath}
         ''
-      ) entrypoints
+      ) directEntrypoints
+    )}
+
+    ${lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (
+        name: script: ''
+          makeWrapper ${python3}/bin/python3 "$out/bin/${name}" \
+            --add-flags "$app/${script}" \
+            --prefix PATH : ${runtimePath}
+        ''
+      ) managedEntrypoints
     )}
 
     makeWrapper ${coreutils}/bin/cat "$out/bin/agent-wiki-package-info" \
@@ -108,7 +127,7 @@ buildNpmPackage {
     description = manifest.description;
     homepage = "https://github.com/dispatchlabs-ai/agent-wiki";
     license = lib.licenses.mit;
-    mainProgram = "agent-wiki-server-direct";
+    mainProgram = "agent-wiki";
     platforms = [
       "aarch64-darwin"
       "x86_64-linux"
