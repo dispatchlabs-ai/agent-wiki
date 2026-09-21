@@ -231,10 +231,12 @@ test("verification hashes a private copy and imports those same bytes", (t) => {
   fs.writeFileSync(signers, `fixture ${fs.readFileSync(`${key}.pub`, "utf8")}`);
   fs.writeFileSync(
     path.join(tools, "nix"),
-    `#!/bin/sh
-for argument do filename=$argument; done
-printf '%s\\n' "$filename" > "$HASHED_PATH"
-shasum -a 256 "$filename" | cut -d ' ' -f 1
+    `#!${process.execPath}
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const filename = process.argv.at(-1);
+fs.writeFileSync(process.env.HASHED_PATH, filename + '\\n');
+process.stdout.write(crypto.createHash('sha256').update(fs.readFileSync(filename)).digest('hex') + '\\n');
 `,
     { mode: 0o755 },
   );
