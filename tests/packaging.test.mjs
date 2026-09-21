@@ -190,3 +190,87 @@ touch '${importMarker}'
   assert.match(result.stderr, /does not contain one exact Nix store root/);
   assert.equal(fs.existsSync(importMarker), false);
 });
+
+test("verification hashes a private copy and imports those same bytes", (t) => {
+  const temporary = fs.mkdtempSync(
+    path.join(os.tmpdir(), "wiki-staging-test-"),
+  );
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const tools = path.join(temporary, "bin");
+  const archive = path.join(temporary, "closure.gz");
+  const manifest = path.join(temporary, "manifest.json");
+  const key = path.join(temporary, "key");
+  const signers = path.join(temporary, "signers");
+  const hashed = path.join(temporary, "hashed-path");
+  const imported = path.join(temporary, "imported-bytes");
+  const contents = "benign synthetic export fixture";
+  fs.mkdirSync(tools);
+  fs.writeFileSync(archive, zlib.gzipSync(contents));
+  const digest = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(archive))
+    .digest("hex");
+  fs.writeFileSync(
+    manifest,
+    JSON.stringify({
+      schemaVersion: 1,
+      format: "nix-store-export+gzip",
+      archive: path.basename(archive),
+      archiveSha256: digest,
+      storePath: `/nix/store/${"0".repeat(32)}-agent-wiki`,
+      packageIdentity: {},
+    }),
+  );
+  for (const args of [
+    ["-q", "-t", "ed25519", "-N", "", "-f", key],
+    ["-Y", "sign", "-f", key, "-n", "agent-wiki-release", manifest],
+  ]) {
+    const result = spawnSync("ssh-keygen", args, { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  fs.writeFileSync(signers, `fixture ${fs.readFileSync(`${key}.pub`, "utf8")}`);
+  fs.writeFileSync(
+    path.join(tools, "nix"),
+    `#!/bin/sh
+for argument do filename=$argument; done
+printf '%s\\n' "$filename" > "$HASHED_PATH"
+shasum -a 256 "$filename" | cut -d ' ' -f 1
+`,
+    { mode: 0o755 },
+  );
+  // No Nix store mutation: capture the decompressed fixture and stop before
+  // application identity execution.
+  fs.writeFileSync(
+    path.join(tools, "nix-store"),
+    `#!/bin/sh
+cat > "$IMPORTED_BYTES"
+exit 42
+`,
+    { mode: 0o755 },
+  );
+  const result = spawnSync(
+    "sh",
+    [
+      path.join(root, "scripts", "verify-package-closure"),
+      manifest,
+      archive,
+      signers,
+      "fixture",
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${tools}:${process.env.PATH}`,
+        HASHED_PATH: hashed,
+        IMPORTED_BYTES: imported,
+      },
+    },
+  );
+  assert.equal(result.status, 42, result.stderr);
+  const hashedPath = fs.readFileSync(hashed, "utf8").trim();
+  assert.notEqual(hashedPath, archive);
+  assert.match(hashedPath, /agent-wiki-nix-verify\.[^/]+\/closure\.gz$/);
+  assert.equal(fs.readFileSync(imported, "utf8"), contents);
+  assert.equal(fs.existsSync(path.dirname(hashedPath)), false);
+});

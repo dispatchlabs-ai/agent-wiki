@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.8 — 2026-09-21
 
 - Add one locked Nix definition for complete Apple Silicon macOS and x86-64 Linux
   host packages plus a Linux container image built from the same package. Embed
@@ -8,6 +8,12 @@
   secrets outside the immutable closure.
 - Add signed Nix-closure export/import validation for clean consumers. Host
   packages explicitly require Nix; container consumers do not.
+- Add managed bootstrap, writer fencing, offline consistent backup, fresh-root
+  restore and explicit interrupted-writer recovery. Existing direct-storage
+  commands remain separate; adoption of the managed root is explicit. No
+  application schema migration or existing service activation is performed.
+- Add opt-in installed-package browser/MCP, identity, media, evidence and
+  recovery acceptance with explicit process-restart and same-filesystem scope.
 
 ## 0.8.7 — 2026-09-21
 

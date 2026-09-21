@@ -100,9 +100,11 @@ store_path=$(
 }
 
 expected_sha256=$(jq -er .archiveSha256 "$verified_manifest")
+verified_archive=$verification_staging/closure.gz
+install -m 0444 "$archive" "$verified_archive"
 actual_sha256=$(
   "$nix_command" --extra-experimental-features "nix-command flakes" hash file \
-    --type sha256 --base16 "$archive"
+    --type sha256 --base16 "$verified_archive"
 )
 [ "$actual_sha256" = "$expected_sha256" ] || {
   echo "Closure archive SHA-256 does not match the signed manifest" >&2
@@ -114,9 +116,9 @@ if [ "$sudo_import" -eq 1 ]; then
     echo "--sudo-import requires sudo" >&2
     exit 1
   }
-  sudo "$0" --root-import "$archive" "$expected_sha256"
+  sudo "$0" --root-import "$verified_archive" "$expected_sha256"
 else
-  gzip -dc "$archive" > "$verification_staging/closure.nar"
+  gzip -dc "$verified_archive" > "$verification_staging/closure.nar"
   "$nix_store_command" --import < "$verification_staging/closure.nar" >/dev/null
 fi
 

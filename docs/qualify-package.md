@@ -15,6 +15,14 @@ node scripts/qualify-package.mjs \
   --receipt /absolute/private/path/package-qualification.json
 ```
 
+To qualify a Wiki-only binary upgrade, add `--upgrade-from /nix/store/OLD-PACKAGE`.
+Both roots must be immutable, have matching target systems and distinct source
+revisions. The old executable performs bootstrap and the initial browser/MCP
+journey. The runner then stops that owner and activates the new executable on the
+same root, verifies session/content continuity, and completes restore/recovery and
+authenticated writes with the new package. The receipt identifies both artifacts
+and measures stop-to-health time. No House or Dispatch runtime is involved.
+
 The host needs Node 24.19 or newer, OpenSSL, and a Playwright Chromium
 installation. Install Chromium separately with `npx playwright install chromium`
 when the browser cache has not already been prepared. The Agent Wiki package
@@ -62,7 +70,10 @@ that it performs from service-manager restart, WSL, and host-reboot claims. The
 latter three remain `tested: false` until separately exercised in their actual
 environments. A passing portable run therefore does not establish service
 activation, WSL compatibility, reboot persistence, OCI behavior, or any external
-storage claim.
+storage claim. The backup archive and both managed roots are siblings on the
+same temporary filesystem. `fresh_root_backup_restore` proves application
+continuity after restore; it does not qualify independent backup retention or
+recovery after loss of that filesystem.
 
 Use `--headed` only for local troubleshooting. It changes browser visibility,
 not the acceptance operations. Use `--keep-evidence` when a reviewer needs the

@@ -2,8 +2,8 @@
 
 Agent Wiki has one locked Nix definition for an `aarch64-darwin` host package,
 an `x86_64-linux` host package, and an `x86_64-linux` container image. These are
-packaging candidates until their platform rows below have been built and accepted;
-the source release policy and existing deployments are unchanged.
+independent release surfaces. Only exact-revision receipts establish acceptance;
+existing deployments change only through their separately authorized upgrade.
 
 The host package is a Nix store package and **requires Nix on the destination**.
 It is not a relocatable native archive. The Linux container archive contains its
@@ -37,7 +37,7 @@ secrets and runs as numeric user/group `65532:65532` with `/tmp` as its home.
 ## Build and inspect
 
 Nix flakes and the `nix-command` interface are currently experimental upstream.
-Use Nix 2.35 or the version selected by the managed build host and enable both
+The qualified build and consumer prerequisite is Nix 2.35.2; enable both
 features for these commands:
 
 ```sh
@@ -129,17 +129,27 @@ signature; do not configure consumers as trusted Nix substituters for it.
 A clean Nix-enabled consumer downloads all four candidate files (`.nix-closure.gz`,
 `.manifest.json`, `.manifest.json.sig`, and the repository public signing key),
 creates an allowed-signers file with the independently verified release key, and
-runs:
+runs the verifier from the reviewed release checkout. The verifier needs `jq`,
+`gzip` and an OpenSSH `ssh-keygen` that supports SSH signatures, in addition to
+Nix. The locked packaging shell supplies these verification tools without
+building the application or changing the consumer's profile:
 
 ```sh
-./scripts/verify-package-closure \
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --no-update-lock-file .#packaging --command \
+  ./scripts/verify-package-closure \
   agent-wiki-VERSION-SYSTEM-SOURCE.manifest.json \
   agent-wiki-VERSION-SYSTEM-SOURCE.nix-closure.gz \
   ./allowed-signers maintainer@example.invalid --sudo-import --install
 ```
 
+Use a private `TMPDIR` on a filesystem with room for the uncompressed closure;
+the archive and expanded import staging coexist. A minimal Nix installation does
+not imply `jq` is already available. The verifier refuses missing prerequisites
+before importing; do not substitute partial manual checks for this command.
+
 Verification checks the SSH signature, manifest schema, archive name and SHA-256,
-then asks `sudo` to copy the already verified archive into a root-owned staging
+using one private archive copy, then asks `sudo` to copy it into a root-owned staging
 directory, verify its digest again, and import it without rebuilding the application.
 The privileged process never runs the imported Wiki executable; identity comparison
 and the CLI smoke check run afterward as the ordinary caller. A single-user Nix
@@ -152,14 +162,44 @@ these scripts do not publish anything.
 
 ## Qualification matrix
 
-| Surface                  | Intended artifact                           | Consumer prerequisite                                        | Evidence in this change                                                                    |
-| ------------------------ | ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| macOS Apple Silicon      | `aarch64-darwin` Nix closure                | Nix and operator-owned mutable data paths                    | The ca4 pilot built natively and passed package identity, CLI and derivation smoke checks. |
-| Linux x86-64             | `x86_64-linux` Nix closure                  | Nix and operator-owned mutable data paths                    | The ca4 pilot built natively and passed package identity, CLI and derivation smoke checks. |
-| Linux x86-64 container   | layered image archive from the same package | OCI-compatible runtime; no Nix in container                  | The ca4 pilot passed clean-volume bootstrap, managed health, writer exclusion and cleanup. |
-| Ubuntu x86-64 under WSL2 | matching Linux Nix closure                  | Nix in WSL2; Linux filesystem data; documented WSL lifecycle | Not executed. Existing source-install evidence does not qualify this package.              |
+The initial pilot artifact identifies source `ca4df1c9a11e77d692a7d37f7c8e535e8ba4e6fa`.
+It is evidence for the packaging approach, not a substitute for checking each new
+release's exact revision and signature.
 
-No row above is considered qualified until the exact committed definition builds
-on its native platform and the clean-consumer, application, lifecycle, recovery,
-and security checks are recorded. A successful source test or evaluation alone is
-not a package pass.
+| Surface                        | Pilot evidence                                                                                                                                                    | Boundary                                                                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS Apple Silicon            | Native build; installed browser/MCP reads and writes, identities, media, traces, restart, fresh-root restore and interrupted-writer recovery                      | Nix required; process mode only                                                                                                                               |
+| Linux x86-64                   | Same full installed-package journey; native host and container builds                                                                                             | Nix required for host; process mode only                                                                                                                      |
+| Linux x86-64 container         | Clean-volume bootstrap, health, non-root execution, writer exclusion and cleanup                                                                                  | No Nix at runtime; ECS/S3 Files qualification is separate                                                                                                     |
+| Ubuntu 24.04 x86-64 under WSL2 | Retrieved matching closure into previously empty application store; verified manifest; bootstrap, health, fencing and process restart with persisted content HEAD | Initial missing jq fixed by locked verifier shell; formal verification was repeated on warm store. Browser/full recovery and unattended restart not qualified |
+
+The WSL test VM unexpectedly stopped during qualification. The cause was not
+established; restarting the same preserved VM and completing process checks does
+not prove service startup, WSL restart or Windows reboot behavior. Do not advertise
+unattended WSL operation from this evidence.
+
+The full package runner's backup and fresh roots share one temporary filesystem.
+It proves application continuity, not independently retained disaster recovery.
+Operators must retain authenticated backup bytes in a separate failure domain,
+protect control identities and evidence, and test their actual recovery destination.
+
+## Upgrade and retention
+
+Stop the sole managed server before changing its package. Run managed status and
+retain an offline consistent backup outside the service's failure domain. Activate
+the new immutable executable against the same managed root, verify health and an
+authorized write, then record its exact identity and the backup digest. The writer
+fence refuses overlapping managed owners. Existing unmanaged installations need
+an explicit adoption procedure; installing a package does not move their data.
+
+Version 0.8.8 adds lifecycle operations without an application schema migration.
+Switching an executable back is binary rollback only. When data has changed in a
+way an older binary cannot read, restore the selected trusted backup into a fresh
+root and verify it before activation. The backup's internal manifest detects
+inconsistency; it does not establish the archive's external authenticity.
+
+Retain signed release manifests, signatures, host closures and image digests while
+any installation or recovery plan references them. Customer-owned environments
+may mirror the same immutable assets and public verification key; downloading a
+mirror must not replace signature/digest verification. Package signing and promotion
+are separate from credential-free CI, and neither activates a running service.

@@ -17,6 +17,7 @@ const startedAt = new Date();
 const { values } = parseArgs({
   options: {
     "package-root": { type: "string" },
+    "upgrade-from": { type: "string" },
     receipt: { type: "string" },
     "keep-evidence": { type: "boolean", default: false },
     headed: { type: "boolean", default: false },
@@ -41,9 +42,10 @@ fs.mkdirSync(path.dirname(receiptPath), { recursive: true, mode: 0o700 });
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const fileSha256 = (filename) => sha256(fs.readFileSync(filename));
-const executable = (name) => path.join(packageRoot, "bin", name);
-const lifecycle = executable("agent-wiki");
-const lifecycleAlias = executable("agent-wiki-lifecycle");
+let activePackageRoot = packageRoot;
+const executable = (name) => path.join(activePackageRoot, "bin", name);
+const lifecycleCommand = () => executable("agent-wiki");
+const lifecycleAliasCommand = () => executable("agent-wiki-lifecycle");
 const timings = {};
 const checks = {};
 const secrets = new Set();
@@ -139,7 +141,7 @@ function rejected(result, code, name) {
 }
 
 const managed = (name, args, options) =>
-  command(name, lifecycle, args, options);
+  command(name, lifecycleCommand(), args, options);
 
 async function reservePort() {
   const server = net.createServer().listen(0, "127.0.0.1");
@@ -224,7 +226,7 @@ async function startWiki(root, origin, backendPort, label) {
   const stdout = fs.openSync(stdoutFile, "w", 0o600);
   const stderr = fs.openSync(stderrFile, "w", 0o600);
   const child = spawn(
-    lifecycle,
+    lifecycleCommand(),
     [
       "serve",
       "--root",
@@ -378,6 +380,7 @@ async function closeRuntime() {
 }
 
 let packageEvidence;
+let upgradeEvidence = { tested: false };
 let resultEvidence = {};
 try {
   packageEvidence = await step("package_identity", async () => {
@@ -422,10 +425,59 @@ try {
     };
   });
 
+  if (values["upgrade-from"]) {
+    activePackageRoot = fs.realpathSync(path.resolve(values["upgrade-from"]));
+    assert(
+      activePackageRoot !== packageRoot,
+      "Upgrade requires distinct package roots",
+    );
+    assert(
+      (fs.statSync(activePackageRoot).mode & 0o222) === 0,
+      "Previous package root is writable",
+    );
+    const identityFile = path.join(
+      activePackageRoot,
+      "share/agent-wiki/package-identity.json",
+    );
+    const previousIdentity = JSON.parse(fs.readFileSync(identityFile, "utf8"));
+    const actual = accepted(
+      await command(
+        "previous-package-info",
+        executable("agent-wiki-package-info"),
+        [],
+      ),
+      "previous package identity",
+    );
+    assert(
+      JSON.stringify(previousIdentity) === JSON.stringify(actual),
+      "Previous package identity disagrees",
+    );
+    assert(
+      previousIdentity.sourceRevision !==
+        packageEvidence.identity.sourceRevision,
+      "Upgrade requires distinct source revisions",
+    );
+    assert(
+      previousIdentity.system === packageEvidence.identity.system,
+      "Upgrade requires matching target systems",
+    );
+    upgradeEvidence = {
+      tested: true,
+      from: {
+        root: activePackageRoot,
+        identity: previousIdentity,
+        identity_sha256: fileSha256(identityFile),
+      },
+      to: packageEvidence.identity,
+      operation:
+        "stop old managed process, activate new package against the same root",
+    };
+  }
+
   const managedRoot = path.join(evidenceRoot, "managed-root");
   const restoredRoot = path.join(evidenceRoot, "restored-root");
-  const independent = path.join(evidenceRoot, "independent-backup");
-  fs.mkdirSync(independent, { mode: 0o700 });
+  const backupDirectory = path.join(evidenceRoot, "same-filesystem-backup");
+  fs.mkdirSync(backupDirectory, { mode: 0o700 });
   const backendPort = await reservePort();
   proxy = await step("temporary_https_proxy", () => startProxy(backendPort));
   const origin = proxy.origin;
@@ -466,7 +518,7 @@ try {
     ]);
     rejected(repeat, "ALREADY_INITIALIZED", "rebootstrap");
     const aliasStatus = accepted(
-      await command("lifecycle-alias-status", lifecycleAlias, [
+      await command("lifecycle-alias-status", lifecycleAliasCommand(), [
         "status",
         "--root",
         managedRoot,
@@ -651,10 +703,16 @@ try {
     };
   });
 
+  const restartStarted = performance.now();
   await step("process_restart_stop", () => stopWiki());
+  activePackageRoot = packageRoot;
   await step("process_restart_start", () =>
     startWiki(managedRoot, origin, backendPort, "server-restarted"),
   );
+  if (upgradeEvidence.tested)
+    upgradeEvidence.stop_to_health_ms = Math.round(
+      performance.now() - restartStarted,
+    );
   const restarted = await profile(origin);
   assert(
     restarted.id === browserEvidence.principal &&
@@ -669,13 +727,34 @@ try {
     "Process restart changed content revision",
   );
   checks.process_restart_persistence = true;
+  if (upgradeEvidence.tested) {
+    await mcpCall(
+      origin,
+      restarted.csrf,
+      "wiki.save",
+      draft(
+        "upgrade-original-root-write",
+        "upgrade-proof",
+        "The upgraded package writes to the original managed root.",
+      ),
+    );
+    const upgradedWrite = await mcpCall(origin, restarted.csrf, "wiki.read", {
+      id: "upgrade-proof",
+    });
+    assert(
+      upgradedWrite.body.includes("original managed root"),
+      "Upgraded package could not read its original-root write",
+    );
+    checks.upgraded_original_root_write = true;
+    upgradeEvidence.original_root_write = "passed";
+  }
   await stopWiki();
 
   const beforeBackup = accepted(
     await managed("pre-backup-status", ["status", "--root", managedRoot]),
     "pre-backup status",
   );
-  const archive = path.join(independent, "agent-wiki-backup.tar.gz");
+  const archive = path.join(backupDirectory, "agent-wiki-backup.tar.gz");
   const backup = await step("offline_backup", async () =>
     accepted(
       await managed("backup", [
@@ -712,7 +791,7 @@ try {
     restore.content_head === beforeBackup.content_head,
     "Restore changed the content HEAD",
   );
-  checks.independent_backup_restore = true;
+  checks.fresh_root_backup_restore = true;
 
   await step("restored_server_start", () =>
     startWiki(restoredRoot, origin, backendPort, "server-restored"),
@@ -810,7 +889,7 @@ try {
     "INTERRUPTED_WRITE",
     "serve with retained writer evidence",
   );
-  const recoveryManifest = path.join(independent, "recovery-manifest.json");
+  const recoveryManifest = path.join(backupDirectory, "recovery-manifest.json");
   const inspection = accepted(
     await managed("inspect-recovery", [
       "inspect-recovery",
@@ -904,6 +983,12 @@ try {
       recovery_manifest_sha256: recovery.manifest_sha256,
     },
     claims: {
+      package_upgrade: upgradeEvidence,
+      backup_restore: {
+        tested: true,
+        scope: "fresh root on the same temporary filesystem",
+        independent_retention_tested: false,
+      },
       process_restart: { tested: true, result: "passed" },
       service_manager_restart: { tested: false },
       wsl: { tested: false },
