@@ -88,7 +88,8 @@ archive_bytes=$(wc -c < "$staged_archive" | tr -d ' ')
 closure_paths=$(wc -l < "$staged_paths" | tr -d ' ')
 closure_nar_bytes=$(
   "$nix_command" --extra-experimental-features "nix-command flakes" path-info \
-    --json --recursive "$store_path" | jq '[to_entries[].value.narSize] | add'
+    --json --json-format 1 --recursive "$store_path" \
+    | jq '[to_entries[].value.narSize] | add'
 )
 
 jq -n \

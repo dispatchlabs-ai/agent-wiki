@@ -67,6 +67,19 @@ docker load < result
 docker image inspect agent-wiki:VERSION-SOURCE
 ```
 
+Managed Linux CI runs the same public repository check after the ordinary source
+checks:
+
+```sh
+./scripts/check
+./scripts/check-package
+```
+
+`check-package` requires native `x86_64-linux`, Nix and a clean Git checkout. It
+runs the locked flake checks, builds the host and OCI outputs without publishing,
+checks that package identity names the exact Git revision, and prints bounded
+store paths, sizes and identity metadata.
+
 The container entry point is the managed `agent-wiki` lifecycle. Its default command
 is `serve --root /data`, and the image explicitly binds the server to `0.0.0.0`.
 Bootstrap an empty named volume once before starting the long-running container:
@@ -139,12 +152,12 @@ these scripts do not publish anything.
 
 ## Qualification matrix
 
-| Surface                  | Intended artifact                           | Consumer prerequisite                                        | Evidence in this change                                                                          |
-| ------------------------ | ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| macOS Apple Silicon      | `aarch64-darwin` Nix closure                | Nix, Git content/data paths, service adapter                 | Definition and native smoke check added; build not executed because this workstation had no Nix. |
-| Linux x86-64             | `x86_64-linux` Nix closure                  | Nix, mutable data paths, service adapter                     | Definition and native smoke check added; build not executed here.                                |
-| Linux x86-64 container   | layered image archive from the same package | OCI-compatible runtime; no Nix in container                  | Definition and labels added; build/run and non-root mount acceptance not executed here.          |
-| Ubuntu x86-64 under WSL2 | matching Linux Nix closure                  | Nix in WSL2; Linux filesystem data; documented WSL lifecycle | Not executed. Existing source-install evidence does not qualify this package.                    |
+| Surface                  | Intended artifact                           | Consumer prerequisite                                        | Evidence in this change                                                                    |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| macOS Apple Silicon      | `aarch64-darwin` Nix closure                | Nix and operator-owned mutable data paths                    | The ca4 pilot built natively and passed package identity, CLI and derivation smoke checks. |
+| Linux x86-64             | `x86_64-linux` Nix closure                  | Nix and operator-owned mutable data paths                    | The ca4 pilot built natively and passed package identity, CLI and derivation smoke checks. |
+| Linux x86-64 container   | layered image archive from the same package | OCI-compatible runtime; no Nix in container                  | The ca4 pilot passed clean-volume bootstrap, managed health, writer exclusion and cleanup. |
+| Ubuntu x86-64 under WSL2 | matching Linux Nix closure                  | Nix in WSL2; Linux filesystem data; documented WSL lifecycle | Not executed. Existing source-install evidence does not qualify this package.              |
 
 No row above is considered qualified until the exact committed definition builds
 on its native platform and the clean-consumer, application, lifecycle, recovery,

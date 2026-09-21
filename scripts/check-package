@@ -1,0 +1,61 @@
+#!/bin/sh
+# Build and inspect the locked Linux host and OCI package candidates.
+set -eu
+
+repository=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+nix_command=$(command -v nix || true)
+[ -n "$nix_command" ] || nix_command=/nix/var/nix/profiles/default/bin/nix
+[ -x "$nix_command" ] || {
+  echo "Missing required command: nix" >&2
+  exit 1
+}
+command -v git >/dev/null 2>&1 || {
+  echo "Missing required command: git" >&2
+  exit 1
+}
+
+[ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ] || {
+  echo "Package CI requires native x86_64-linux" >&2
+  exit 1
+}
+
+cd "$repository"
+[ -z "$(git status --porcelain=v1 --untracked-files=all)" ] || {
+  echo "Package CI requires an exact clean Git source" >&2
+  exit 1
+}
+source_revision=$(git rev-parse HEAD)
+
+run_nix() {
+  "$nix_command" --extra-experimental-features "nix-command flakes" "$@"
+}
+
+run_nix flake check --no-update-lock-file
+package=$(run_nix build --no-link --print-out-paths --no-update-lock-file .#agent-wiki)
+oci=$(run_nix build --no-link --print-out-paths --no-update-lock-file .#oci)
+identity=$("$package/bin/agent-wiki-package-info")
+
+case "$identity" in
+  *\"sourceRevision\":\"$source_revision\"*) ;;
+  *)
+    echo "Packaged source revision does not match Git HEAD" >&2
+    exit 1
+    ;;
+esac
+case "$identity" in
+  *\"system\":\"x86_64-linux\"*) ;;
+  *)
+    echo "Packaged system is not x86_64-linux" >&2
+    exit 1
+    ;;
+esac
+
+closure_bytes=$(run_nix path-info --closure-size "$package" | awk 'NR == 1 { print $2 }')
+oci_bytes=$(wc -c < "$oci" | tr -d ' ')
+
+printf 'source_revision=%s\n' "$source_revision"
+printf 'package=%s\n' "$package"
+printf 'package_closure_bytes=%s\n' "$closure_bytes"
+printf 'oci=%s\n' "$oci"
+printf 'oci_bytes=%s\n' "$oci_bytes"
+printf 'identity=%s\n' "$identity"

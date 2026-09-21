@@ -38,12 +38,28 @@ test("packaging inputs carry immutable dependency and source identity", () => {
 });
 
 test("closure producer and consumer scripts have valid POSIX shell syntax", () => {
-  for (const script of ["package-closure", "verify-package-closure"]) {
+  for (const script of [
+    "check-package",
+    "package-closure",
+    "verify-package-closure",
+  ]) {
     const result = spawnSync("sh", ["-n", path.join(root, "scripts", script)], {
       encoding: "utf8",
     });
     assert.equal(result.status, 0, result.stderr);
   }
+});
+
+test("package CI checks clean immutable source and both Linux artifacts", () => {
+  const check = fs.readFileSync(
+    path.join(root, "scripts", "check-package"),
+    "utf8",
+  );
+  assert.match(check, /git status --porcelain=v1 --untracked-files=all/);
+  assert.match(check, /flake check --no-update-lock-file/);
+  assert.match(check, /\.\#agent-wiki/);
+  assert.match(check, /\.\#oci/);
+  assert.match(check, /sourceRevision/);
 });
 
 test("a failed Nix export cannot leave a release artifact", (t) => {
