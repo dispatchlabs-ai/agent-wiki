@@ -74,14 +74,32 @@ signature=$manifest.sig
   exit 1
 }
 
+umask 077
+verification_staging=$(mktemp -d "${TMPDIR:-/tmp}/agent-wiki-nix-verify.XXXXXX")
+trap 'rm -rf -- "$verification_staging"' EXIT HUP INT TERM
+verified_manifest=$verification_staging/manifest.json
+verified_signature=$verification_staging/manifest.json.sig
+install -m 0444 "$manifest" "$verified_manifest"
+install -m 0444 "$signature" "$verified_signature"
+
 ssh-keygen -Y verify -f "$allowed_signers" -I "$principal" \
-  -n agent-wiki-release -s "$signature" < "$manifest"
+  -n agent-wiki-release -s "$verified_signature" < "$verified_manifest"
 
-[ "$(jq -er .schemaVersion "$manifest")" = 1 ]
-[ "$(jq -er .format "$manifest")" = "nix-store-export+gzip" ]
-[ "$(jq -er .archive "$manifest")" = "$(basename "$archive")" ]
+[ "$(jq -er .schemaVersion "$verified_manifest")" = 1 ]
+[ "$(jq -er .format "$verified_manifest")" = "nix-store-export+gzip" ]
+[ "$(jq -er .archive "$verified_manifest")" = "$(basename "$archive")" ]
 
-expected_sha256=$(jq -er .archiveSha256 "$manifest")
+store_path=$(
+  jq -er '
+    .storePath
+    | select(test("^/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+$"))
+  ' "$verified_manifest"
+) || {
+  echo "Signed manifest does not contain one exact Nix store root" >&2
+  exit 1
+}
+
+expected_sha256=$(jq -er .archiveSha256 "$verified_manifest")
 actual_sha256=$(
   "$nix_command" --extra-experimental-features "nix-command flakes" hash file \
     --type sha256 --base16 "$archive"
@@ -98,35 +116,24 @@ if [ "$sudo_import" -eq 1 ]; then
   }
   sudo -n "$0" --root-import "$archive" "$expected_sha256"
 else
-  staging=$(mktemp -d "${TMPDIR:-/tmp}/agent-wiki-nix-import.XXXXXX")
-  trap 'rm -rf -- "$staging"' EXIT HUP INT TERM
-  gzip -dc "$archive" > "$staging/closure.nar"
-  "$nix_store_command" --import < "$staging/closure.nar" >/dev/null
-  rm -rf -- "$staging"
-  trap - EXIT HUP INT TERM
+  gzip -dc "$archive" > "$verification_staging/closure.nar"
+  "$nix_store_command" --import < "$verification_staging/closure.nar" >/dev/null
 fi
-
-store_path=$(jq -er .storePath "$manifest")
-case "$store_path" in
-  /nix/store/*) ;;
-  *)
-    echo "Signed manifest contains an invalid Nix store path" >&2
-    exit 1
-    ;;
-esac
 
 [ -x "$store_path/bin/agent-wiki-package-info" ] || {
   echo "Imported closure does not contain Agent Wiki's identity command" >&2
   exit 1
 }
 
-identity=$($store_path/bin/agent-wiki-package-info)
+identity=$("$store_path/bin/agent-wiki-package-info")
 jq -e --argjson identity "$identity" '.packageIdentity == $identity' \
-  "$manifest" >/dev/null
+  "$verified_manifest" >/dev/null
 HOME=${HOME:-/tmp} "$store_path/bin/agent-wiki-cli" --help >/dev/null
 
 if [ "$install_profile" -eq 1 ]; then
   "$nix_command" --extra-experimental-features "nix-command flakes" profile install "$store_path"
 fi
 
+rm -rf -- "$verification_staging"
+trap - EXIT HUP INT TERM
 printf '%s\n' "$store_path"
