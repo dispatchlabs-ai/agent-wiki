@@ -1,0 +1,4 @@
+{"type":"session_meta","timestamp":"2026-09-21T12:00:00Z","payload":{"id":"synthetic-package-qualification","cwd":"/synthetic/package-qualification","originator":"codex"}}
+{"type":"event_msg","timestamp":"2026-09-21T12:00:01Z","payload":{"type":"user_message","message":"Record the synthetic portable package decision."}}
+{"type":"response_item","timestamp":"2026-09-21T12:00:02Z","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The synthetic portable package preserves evidence through backup and restore."}]}}
+{"type":"event_msg","timestamp":"2026-09-21T12:00:03Z","payload":{"type":"task_complete","turn_id":"synthetic-turn"}}

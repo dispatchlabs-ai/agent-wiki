@@ -1,0 +1,70 @@
+# Immutable package qualification
+
+`scripts/qualify-package.mjs` is an opt-in acceptance runner for an existing
+immutable Agent Wiki package. It does not build the application and does not
+import application modules from a source checkout. Every application operation
+uses an executable from the supplied package root. The runner itself uses the
+repository's Playwright development dependency as an external verification
+dependency.
+
+Run it with an absolute immutable package output and a new private receipt path:
+
+```sh
+node scripts/qualify-package.mjs \
+  --package-root /nix/store/...-agent-wiki-0.8.7 \
+  --receipt /absolute/private/path/package-qualification.json
+```
+
+The host needs Node 24.19 or newer, OpenSSL, and a Playwright Chromium
+installation. Install Chromium separately with `npx playwright install chromium`
+when the browser cache has not already been prepared. The Agent Wiki package
+does not bundle Chromium. On WSL2, clear inherited WSLg display variables for a
+headless run:
+
+```sh
+env -u DISPLAY -u WAYLAND_DISPLAY node scripts/qualify-package.mjs \
+  --package-root /nix/store/...-agent-wiki-0.8.7 \
+  --receipt /absolute/private/path/package-qualification.json
+```
+
+The runner creates a mode-0700 temporary directory and synthetic data only. It
+uses a loopback HTTPS proxy with an ephemeral self-signed certificate and sets
+`ignoreHTTPSErrors` only on its Playwright browser context. It does not change
+the host trust store, expose a network listener, import an operator root, or
+write persistent machine configuration. Command output, generated credentials,
+the TLS private key, and a failure screenshot stay in that private directory.
+Successful runs remove it unless `--keep-evidence` is supplied. Failed runs
+retain it and name the directory in the failure receipt.
+
+The acceptance sequence verifies:
+
+- the package identity file and `agent-wiki-package-info` agree, all declared
+  entrypoints exist, both managed lifecycle aliases execute, and the supplied
+  package root is read-only;
+- empty managed bootstrap succeeds and a second bootstrap is refused;
+- trace import and article-media publication run through fenced maintenance;
+- an active managed server excludes offline maintenance;
+- the bootstrap invitation creates a local manager through the browser over
+  HTTPS;
+- that browser and its cookie-authenticated MCP connection both read and write;
+- imported trace evidence and published media bytes are readable;
+- content, session identity, and the manager grant survive a server-process
+  restart;
+- an offline mode-0600 backup restores into a fresh root with the same Git HEAD,
+  principal, grant, content, trace, and media;
+- retained synthetic writer evidence blocks serve, binds to an inspection
+  manifest, recovers explicitly, and permits a new authenticated write.
+
+The JSON receipt records the exact package identity, package root, identity and
+entrypoint digests, qualifier and fixture digests, step timings, continuity
+identifiers, and sanitized check results. It distinguishes the process restart
+that it performs from service-manager restart, WSL, and host-reboot claims. The
+latter three remain `tested: false` until separately exercised in their actual
+environments. A passing portable run therefore does not establish service
+activation, WSL compatibility, reboot persistence, OCI behavior, or any external
+storage claim.
+
+Use `--headed` only for local troubleshooting. It changes browser visibility,
+not the acceptance operations. Use `--keep-evidence` when a reviewer needs the
+private command logs from a passing run. Never publish the retained directory:
+it contains a one-use setup URL and the temporary TLS private key.
