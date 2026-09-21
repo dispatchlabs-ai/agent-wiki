@@ -84,7 +84,7 @@ buildNpmPackage {
 
     app=${applicationRoot}
     mkdir -p "$app" "$out/bin" "$out/share/doc/agent-wiki" "$out/share/agent-wiki"
-    cp -R bin public scripts src "$app/"
+    cp -R bin public scripts src ui "$app/"
     cp package.json package-lock.json LICENSE THIRD_PARTY_NOTICES.md "$app/"
     cp -R node_modules "$app/"
     cp -R docs/. "$out/share/doc/agent-wiki/"

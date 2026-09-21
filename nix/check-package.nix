@@ -21,6 +21,7 @@ runCommand "agent-wiki-package-smoke-${agent-wiki.version}"
 
     HOME="$TMPDIR" agent-wiki-cli --help >/dev/null
     HOME="$TMPDIR" agent-wiki --help >/dev/null
+    test -f "${agent-wiki}/libexec/agent-wiki/ui/components/site.mjs"
     mkdir "$TMPDIR/uninitialized"
     agent-wiki status --root "$TMPDIR/uninitialized" \
       | jq -e '.state == "uninitialized" and .active_owner == false' >/dev/null
