@@ -114,7 +114,7 @@ if [ "$sudo_import" -eq 1 ]; then
     echo "--sudo-import requires sudo" >&2
     exit 1
   }
-  sudo -n "$0" --root-import "$archive" "$expected_sha256"
+  sudo "$0" --root-import "$archive" "$expected_sha256"
 else
   gzip -dc "$archive" > "$verification_staging/closure.nar"
   "$nix_store_command" --import < "$verification_staging/closure.nar" >/dev/null
