@@ -46,6 +46,13 @@ version; never move or replace a published tag. Several related commits may form
 one release. Completed user-visible work must not silently remain unversioned.
 Source releases do not authorize npm publication or deployment of running instances.
 
+Repo-owned Nix host and Linux container candidates are documented in
+[portable packages](packaging.md). Packaging a release is a separate qualification
+and publication step: build the exact signed-tag commit on each native target,
+record the embedded identity and artifact digest, verify installation from a clean
+consumer without rebuilding the application, and retain the previous recovery
+artifact. A source release does not imply that matching package assets exist.
+
 ## Verify a downloaded release
 
 The public signing key is [release-signing-key.pub](release-signing-key.pub).

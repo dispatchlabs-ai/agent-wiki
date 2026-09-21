@@ -1,0 +1,74 @@
+#!/bin/sh
+# Verify, import and inspect a signed Agent Wiki Nix closure.
+set -eu
+
+usage() {
+  echo "Usage: scripts/verify-package-closure MANIFEST ARCHIVE ALLOWED_SIGNERS PRINCIPAL [--install]" >&2
+  exit 2
+}
+
+[ "$#" -ge 4 ] && [ "$#" -le 5 ] || usage
+
+manifest=$1
+archive=$2
+allowed_signers=$3
+principal=$4
+install=${5-}
+[ -z "$install" ] || [ "$install" = "--install" ] || usage
+
+for command in nix nix-store jq gzip ssh-keygen; do
+  command -v "$command" >/dev/null 2>&1 || {
+    echo "Missing required command: $command" >&2
+    exit 1
+  }
+done
+
+signature=$manifest.sig
+[ -f "$signature" ] || {
+  echo "Missing manifest signature: $signature" >&2
+  exit 1
+}
+
+ssh-keygen -Y verify -f "$allowed_signers" -I "$principal" \
+  -n agent-wiki-release -s "$signature" < "$manifest"
+
+[ "$(jq -er .schemaVersion "$manifest")" = 1 ]
+[ "$(jq -er .format "$manifest")" = "nix-store-export+gzip" ]
+[ "$(jq -er .archive "$manifest")" = "$(basename "$archive")" ]
+
+expected_sha256=$(jq -er .archiveSha256 "$manifest")
+actual_sha256=$(
+  nix --extra-experimental-features "nix-command flakes" hash file \
+    --type sha256 --base16 "$archive"
+)
+[ "$actual_sha256" = "$expected_sha256" ] || {
+  echo "Closure archive SHA-256 does not match the signed manifest" >&2
+  exit 1
+}
+
+gzip -dc "$archive" | nix-store --import >/dev/null
+
+store_path=$(jq -er .storePath "$manifest")
+case "$store_path" in
+  /nix/store/*) ;;
+  *)
+    echo "Signed manifest contains an invalid Nix store path" >&2
+    exit 1
+    ;;
+esac
+
+[ -x "$store_path/bin/agent-wiki-package-info" ] || {
+  echo "Imported closure does not contain Agent Wiki's identity command" >&2
+  exit 1
+}
+
+identity=$($store_path/bin/agent-wiki-package-info)
+jq -e --argjson identity "$identity" '.packageIdentity == $identity' \
+  "$manifest" >/dev/null
+HOME=${HOME:-/tmp} "$store_path/bin/agent-wiki-cli" --help >/dev/null
+
+if [ "$install" = "--install" ]; then
+  nix --extra-experimental-features "nix-command flakes" profile install "$store_path"
+fi
+
+printf '%s\n' "$store_path"

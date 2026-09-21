@@ -1,0 +1,122 @@
+# Portable packages
+
+Agent Wiki has one locked Nix definition for an `aarch64-darwin` host package,
+an `x86_64-linux` host package, and an `x86_64-linux` container image. These are
+packaging candidates until their platform rows below have been built and accepted;
+the source release policy and existing deployments are unchanged.
+
+The host package is a Nix store package and **requires Nix on the destination**.
+It is not a relocatable native archive. The Linux container archive contains its
+complete runtime closure and does not require Nix in the running container.
+
+## Locked runtime
+
+`flake.lock` pins one Nixpkgs revision. That revision supplies Node 24.19.0,
+matching the repository's tested runtime baseline. `package-lock.json` supplies
+the exact JavaScript dependency graph through Nixpkgs' `importNpmLock`; there is
+no placeholder dependency hash and the build performs no unlocked npm resolution.
+The package builds the browser assets, prunes development dependencies, and keeps:
+
+- Node, Git, production JavaScript dependencies, and built browser assets;
+- the server, authenticated CLI, bootstrap, account and agent administration,
+  trace import/indexing, article-media publication, and synthetic example commands;
+- operator documentation, the license, and third-party notices.
+
+Run `agent-wiki-package-info` from the result to read its version, source revision,
+Nixpkgs revision, Node version, target system, package-lock SHA-256, and executable
+inventory. Container labels repeat the release version and source revision. A
+release builder must build from the exact clean signed-tag commit so the revision
+is immutable; `uncommitted` or a `-dirty` revision is not releasable.
+
+The package contains no content repository, control database, identities, trace
+archive, article-media store, credentials, or client configuration. Keep those in
+operator-owned mutable paths. The image also contains no default customer data or
+secrets and runs as numeric user/group `65532:65532` with `/tmp` as its home.
+
+## Build and inspect
+
+Nix flakes and the `nix-command` interface are currently experimental upstream.
+Use Nix 2.35 or the version selected by the managed build host and enable both
+features for these commands:
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' flake check
+nix --extra-experimental-features 'nix-command flakes' build .#agent-wiki
+./result/bin/agent-wiki-package-info | jq .
+./result/bin/agent-wiki-cli --help
+```
+
+Build the container archive on the native `x86_64-linux` builder:
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' build .#oci
+docker load < result
+docker image inspect agent-wiki:VERSION-SOURCE
+```
+
+The container entry point is `agent-wiki-server-direct`. Supply all runtime
+configuration explicitly, mount independent writable data paths, bind to the
+configured origin, and retain the one-writer lifecycle rules. An example layout is:
+
+```text
+/data/content                 WIKI_REPO
+/data/control/control.sqlite3 WIKI_CONTROL
+/data/search/wiki.sqlite3     WIKI_DATABASE
+/data/traces                  WIKI_TRACES (optional)
+/data/article-media           WIKI_ARTICLE_MEDIA (optional)
+```
+
+The direct entry points expose existing application operations; they do not add a
+service supervisor or writer fence. Managed activation, bootstrap, maintenance,
+backup, and recovery must go through the repository's lifecycle command when that
+adapter is present. Direct commands remain useful for development and an already
+fenced operator session, and their `-direct` suffix makes that authority boundary
+visible.
+
+## Signed host closure candidate
+
+The pilot uses an ordinary Nix closure export as the complete host artifact. It
+can be attached to a GitHub release beside its JSON manifest and signature without
+introducing a shared binary-cache service:
+
+```sh
+nix develop .#packaging -c ./scripts/package-closure ./dist /path/to/ssh-private-key
+```
+
+The script builds the native package, exports every referenced store path, records
+the package identity, archive SHA-256, store path, closure count and sizes, then
+SSH-signs that manifest in the `agent-wiki-release` namespace. The existing public
+release key can verify the signature when the corresponding private key is used.
+This is an SSH signature over the artifact manifest, not a Nix binary-cache
+signature; do not configure consumers as trusted Nix substituters for it.
+
+A clean Nix-enabled consumer downloads all four candidate files (`.nix-closure.gz`,
+`.manifest.json`, `.manifest.json.sig`, and the repository public signing key),
+creates an allowed-signers file with the independently verified release key, and
+runs:
+
+```sh
+./scripts/verify-package-closure \
+  agent-wiki-VERSION-SYSTEM-SOURCE.manifest.json \
+  agent-wiki-VERSION-SYSTEM-SOURCE.nix-closure.gz \
+  ./allowed-signers maintainer@example.invalid --install
+```
+
+Verification checks the SSH signature, manifest schema, archive name and SHA-256,
+imports without rebuilding the application, compares the installed package's own
+identity with the signed manifest, and exercises the CLI. Publishing and retention
+of these assets remain a release action; these scripts do not publish anything.
+
+## Qualification matrix
+
+| Surface                  | Intended artifact                           | Consumer prerequisite                                        | Evidence in this change                                                                          |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| macOS Apple Silicon      | `aarch64-darwin` Nix closure                | Nix, Git content/data paths, service adapter                 | Definition and native smoke check added; build not executed because this workstation had no Nix. |
+| Linux x86-64             | `x86_64-linux` Nix closure                  | Nix, mutable data paths, service adapter                     | Definition and native smoke check added; build not executed here.                                |
+| Linux x86-64 container   | layered image archive from the same package | OCI-compatible runtime; no Nix in container                  | Definition and labels added; build/run and non-root mount acceptance not executed here.          |
+| Ubuntu x86-64 under WSL2 | matching Linux Nix closure                  | Nix in WSL2; Linux filesystem data; documented WSL lifecycle | Not executed. Existing source-install evidence does not qualify this package.                    |
+
+No row above is considered qualified until the exact committed definition builds
+on its native platform and the clean-consumer, application, lifecycle, recovery,
+and security checks are recorded. A successful source test or evaluation alone is
+not a package pass.

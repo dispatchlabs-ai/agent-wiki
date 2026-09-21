@@ -82,7 +82,8 @@ Agent identity and permissions belong entirely to the wiki, with no external
 agent-management service or private package required.
 
 [Authentication](docs/authentication.md) · [Remote agent connections](docs/remote-agents.md) ·
-[Operator signing keys](docs/agent-setup.md) · [Security boundary](SECURITY.md)
+[Operator signing keys](docs/agent-setup.md) · [Portable packages](docs/packaging.md) ·
+[Security boundary](SECURITY.md)
 
 ## Content format
 

@@ -1,2 +1,9 @@
 public/vendor/
+
+# Nix and POSIX shell packaging sources use their native formatters/checkers.
+flake.nix
+flake.lock
+nix/
+scripts/package-closure
+scripts/verify-package-closure
 public/typeset.css

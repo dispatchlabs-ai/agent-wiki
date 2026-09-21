@@ -1,0 +1,94 @@
+#!/bin/sh
+# Build one native Nix package and export its complete runtime closure.
+set -eu
+
+usage() {
+  echo "Usage: scripts/package-closure OUTPUT_DIRECTORY [SSH_SIGNING_KEY]" >&2
+  exit 2
+}
+
+[ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage
+
+output_directory=$1
+signing_key=${2-}
+repository=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+for command in nix nix-store jq gzip ssh-keygen; do
+  command -v "$command" >/dev/null 2>&1 || {
+    echo "Missing required command: $command" >&2
+    exit 1
+  }
+done
+
+mkdir -p "$output_directory"
+output_directory=$(CDPATH= cd -- "$output_directory" && pwd)
+
+store_path=$(
+  nix --extra-experimental-features "nix-command flakes" build \
+    --no-link --print-out-paths "$repository#agent-wiki"
+)
+identity=$($store_path/bin/agent-wiki-package-info)
+version=$(printf '%s' "$identity" | jq -er .version)
+system=$(printf '%s' "$identity" | jq -er .system)
+revision=$(printf '%s' "$identity" | jq -er .sourceRevision)
+short_revision=$(printf '%.12s' "$revision")
+
+case "$version:$system:$short_revision" in
+  *[!A-Za-z0-9._:+-]*)
+    echo "Package identity contains an unsafe artifact-name character" >&2
+    exit 1
+    ;;
+esac
+
+base="agent-wiki-$version-$system-$short_revision"
+archive="$output_directory/$base.nix-closure.gz"
+manifest="$output_directory/$base.manifest.json"
+paths="$output_directory/$base.store-paths"
+
+nix --extra-experimental-features "nix-command flakes" path-info \
+  --recursive "$store_path" | LC_ALL=C sort > "$paths"
+
+# Nix store paths contain no shell whitespace. shellcheck disable=SC2046
+nix-store --export $(sed -n '/^\/nix\/store\//p' "$paths") | gzip -9 > "$archive"
+
+archive_sha256=$(
+  nix --extra-experimental-features "nix-command flakes" hash file \
+    --type sha256 --base16 "$archive"
+)
+archive_bytes=$(wc -c < "$archive" | tr -d ' ')
+closure_paths=$(wc -l < "$paths" | tr -d ' ')
+closure_nar_bytes=$(
+  nix --extra-experimental-features "nix-command flakes" path-info \
+    --json --recursive "$store_path" | jq '[to_entries[].value.narSize] | add'
+)
+
+jq -n \
+  --arg archive "$(basename "$archive")" \
+  --arg archiveSha256 "$archive_sha256" \
+  --argjson archiveBytes "$archive_bytes" \
+  --argjson closurePaths "$closure_paths" \
+  --argjson closureNarBytes "$closure_nar_bytes" \
+  --arg storePath "$store_path" \
+  --argjson packageIdentity "$identity" \
+  '{
+    schemaVersion: 1,
+    format: "nix-store-export+gzip",
+    archive: $archive,
+    archiveSha256: $archiveSha256,
+    archiveBytes: $archiveBytes,
+    closurePaths: $closurePaths,
+    closureNarBytes: $closureNarBytes,
+    storePath: $storePath,
+    packageIdentity: $packageIdentity
+  }' > "$manifest"
+
+if [ -n "$signing_key" ]; then
+  ssh-keygen -Y sign -f "$signing_key" -n agent-wiki-release "$manifest"
+fi
+
+printf '%s\n' "$archive" "$manifest" "$paths"
+if [ -n "$signing_key" ]; then
+  printf '%s\n' "$manifest.sig"
+else
+  echo "Manifest is unsigned; pass the release SSH private key to create a candidate signature." >&2
+fi

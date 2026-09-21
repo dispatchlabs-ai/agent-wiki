@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add one locked Nix definition for complete Apple Silicon macOS and x86-64 Linux
+  host packages plus a Linux container image built from the same package. Embed
+  version, source, lockfile and runtime identity; keep all customer state and
+  secrets outside the immutable closure.
+- Add signed Nix-closure export/import validation for clean consumers. Host
+  packages explicitly require Nix; container consumers do not.
+
 ## 0.8.7 — 2026-09-21
 
 - Publish complete article-media asset/provenance pairs with atomic directory
