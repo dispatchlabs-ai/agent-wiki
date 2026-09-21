@@ -13,6 +13,12 @@
 
 let
   manifest = builtins.fromJSON (builtins.readFile (src + "/package.json"));
+  # importNpmLock rewrites direct dependencies to file: store URLs. npm 11 treats
+  # an otherwise identical registry-version override as conflicting with that
+  # rewritten direct dependency. The lock already fixes jose at 6.2.8.
+  buildManifest = manifest // {
+    overrides = builtins.removeAttrs manifest.overrides [ "jose" ];
+  };
   nodeVersion = nodejs_24.version;
   packageLockSha256 = builtins.hashFile "sha256" (src + "/package-lock.json");
   applicationRoot = "$out/libexec/agent-wiki";
@@ -53,7 +59,10 @@ buildNpmPackage {
   inherit src;
 
   nodejs = nodejs_24;
-  npmDeps = importNpmLock { npmRoot = src; };
+  npmDeps = importNpmLock {
+    npmRoot = src;
+    package = buildManifest;
+  };
   npmConfigHook = importNpmLock.npmConfigHook;
   npmBuildScript = "build:ui";
 

@@ -25,6 +25,10 @@ test("packaging inputs carry immutable dependency and source identity", () => {
     "utf8",
   );
   assert.match(packageDefinition, /builtins\.hashFile "sha256"/);
+  assert.match(
+    packageDefinition,
+    /removeAttrs manifest\.overrides \[ "jose" \]/,
+  );
   assert.ok(packageDefinition.includes(nixpkgsRevision));
   assert.match(packageDefinition, /versionAtLeast nodeVersion "24\.19\.0"/);
   assert.match(packageDefinition, /hostRequiresNix = true/);
