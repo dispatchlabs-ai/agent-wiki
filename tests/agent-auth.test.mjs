@@ -7,6 +7,7 @@ import { GitWiki, git } from "../src/git-wiki.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
 import { once } from "node:events";
@@ -17,6 +18,7 @@ import { AgentStore } from "../src/agent-store.mjs";
 import { AgentCredential, connectAgent } from "../src/agent-client.mjs";
 import { createWiki } from "../src/server.mjs";
 import { fixture, update } from "./helpers.mjs";
+import { publishArticleMedia } from "../src/article-media.mjs";
 
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const pem = pair.privateKey.export({ type: "pkcs8", format: "pem" });
@@ -256,6 +258,37 @@ test("registered agent connects through SDK OAuth, discovers and reads via MCP",
   assert.equal(run.initiator, s.owner);
   assert.equal(run.mode, "independent");
   assert.equal(run.subject, null);
+});
+
+test("read-scoped agents can fetch published article media but cannot rewrite evidence URLs", async (t) => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "agent-media-"));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const source = path.join(temporary, "image.png");
+  fs.writeFileSync(
+    source,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  );
+  const published = await publishArticleMedia({
+    root: path.join(temporary, "published"),
+    sourceFile: source,
+    source: "synthetic:approved-image",
+  });
+  const s = await setup(t, {
+    options: { articleMediaRoot: path.join(temporary, "published") },
+  });
+  const credential = new AgentCredential(s.config);
+  t.after(() => credential.close());
+  const token = await credential.token();
+  assert.equal((await s.request(published.url, token)).status, 200);
+  assert.equal(
+    (await s.request(`/media/${published.asset}`, token)).status,
+    404,
+  );
+  s.agents.revokeKey(s.spec.agent, s.spec.key);
+  assert.equal((await s.request(published.url, token)).status, 401);
 });
 
 test("token renewal keeps the same run and concurrent renewal happens once", async (t) => {

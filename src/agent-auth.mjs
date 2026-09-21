@@ -171,6 +171,7 @@ export class AgentAuth {
   /** Only supported machine APIs accept agent tokens, never account controls. */
   action(path) {
     if (["/mcp", "/mcp/", "/api/agent/run"].includes(path)) return null;
+    if (path.startsWith("/article-media/")) return "read";
     if (path === "/api/articles/edits") return "write";
     if (path.startsWith("/api/articles/")) return "read";
     if (evidencePath(path)) return "trace";

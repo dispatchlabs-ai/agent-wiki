@@ -1,5 +1,15 @@
 # Upgrading
 
+## Unreleased — published article media
+
+`WIKI_ARTICLE_MEDIA` optionally points to an independent private store for images
+and PDFs deliberately published to article readers. Existing installations need
+no data migration and retain the evidence-only meaning of `/media/` and `/files/`.
+Do not point this setting at the trace archive, evidence provider cache or engine
+assets. Create and back up a dedicated directory, publish reviewed bytes through
+the operator script, then add the returned content-addressed URL to an article.
+See [published article media](article-media.md).
+
 ## 0.8.2 — optional selective article reads
 
 Existing reads return the same complete articles. Clients can opt into section,

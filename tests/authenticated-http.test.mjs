@@ -4,6 +4,7 @@ import { openAPI } from "../src/api-contract.mjs";
 import { importTrace } from "../src/traces.mjs";
 import test from "node:test";
 import http from "node:http";
+import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { saveGitEdits } from "../src/editor.mjs";
@@ -14,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { createWiki } from "../src/server.mjs";
 import { GitWiki, git } from "../src/git-wiki.mjs";
 import { registerTools } from "../public/client.js";
+import { publishArticleMedia } from "../src/article-media.mjs";
 import { fixture, update } from "./helpers.mjs";
 async function server(t, options = {}) {
   const repo = options.repo || fixture(t),
@@ -130,6 +132,114 @@ test("HTTP reads, same-origin writes, idempotent retries and revision conflicts"
     /href="\/wiki\/created\/"/,
   );
   assert.equal(git(repo, ["status", "--porcelain"]), "");
+});
+
+test("published article media follows article-read grants and remains available to old revisions", async (t) => {
+  const repo = fixture(t);
+  const media = path.join(repo, ".git", "article-media");
+  const source = path.join(repo, ".git", "source.pdf");
+  fs.writeFileSync(source, "%PDF-1.4\nsynthetic article media\n%%EOF\n");
+  const published = await publishArticleMedia({
+    root: media,
+    sourceFile: source,
+    source: "synthetic:approved-pdf",
+    sourceUrl: "https://example.org/approved.pdf",
+  });
+  const { request, save, control, actor } = await server(t, {
+    repo,
+    articleMediaRoot: media,
+  });
+  const current = await (
+    await request("/api/articles/guide/current.json")
+  ).json();
+  const withMedia = await save({
+    operation_id: "publish-article-media",
+    updates: [
+      {
+        ...update("guide", `[Approved PDF](${published.url})\n`),
+        expected_revision_id: current.revision_id,
+      },
+    ],
+  });
+  assert.equal(withMedia.status, 200);
+  const oldRevision = (await withMedia.json()).articles[0].number;
+  const revised = await (
+    await request("/api/articles/guide/current.json")
+  ).json();
+  assert.equal(
+    (
+      await save({
+        operation_id: "remove-article-media-link",
+        updates: [
+          {
+            ...update(
+              "guide",
+              "The current revision no longer embeds the PDF.",
+            ),
+            expected_revision_id: revised.revision_id,
+          },
+        ],
+      })
+    ).status,
+    200,
+  );
+
+  const reader = control.enroll({
+    issuer: "https://id.example",
+    subject: "article-reader",
+    name: "Article reader",
+  });
+  control.grant(actor, reader.id, "reader");
+  const readerSession = control.session(reader.id);
+  const readerHeaders = { Cookie: `wiki_session=${readerSession.token}` };
+  const mediaResponse = await request(published.url, {
+    headers: readerHeaders,
+  });
+  assert.equal(mediaResponse.status, 200);
+  assert.equal(mediaResponse.headers.get("content-type"), "application/pdf");
+  const historical = await request(`/wiki/guide/revision/${oldRevision}/`, {
+    headers: readerHeaders,
+  });
+  assert.equal(historical.status, 200);
+  assert.match(await historical.text(), new RegExp(published.url));
+  assert.equal(
+    (await request(`/media/${published.asset}`, { headers: readerHeaders }))
+      .status,
+    404,
+  );
+  assert.equal(
+    (await request(published.url, { headers: { Cookie: "" } })).status,
+    401,
+  );
+  assert.equal(
+    (
+      await request("/article-media/../../private.pdf", {
+        headers: readerHeaders,
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await request(`/article-media/${"a".repeat(64)}.svg`, {
+        headers: readerHeaders,
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await request(`/article-media/${"a".repeat(64)}.pdf`, {
+        headers: readerHeaders,
+      })
+    ).status,
+    404,
+  );
+  control.grant(actor, reader.id, null);
+  assert.equal(
+    (await request(published.url, { headers: readerHeaders })).status,
+    404,
+  );
 });
 test("simultaneous HTTP writers serialize and exactly one stale update succeeds", async (t) => {
   const { request, save, repo } = await server(t);

@@ -74,6 +74,12 @@ The existing captured-media policy applies: only approved local hashed images
 embed; unavailable images are labeled, and original download links are retained.
 Figures also accept ordinary Markdown text, links and tables.
 
+Article-only readers cannot open captured evidence under `/media/`. To deliberately
+publish a reviewed image or PDF to all article readers, an operator first uses the
+[published article media workflow](article-media.md), then the article uses the
+returned `/article-media/<sha256>.<extension>` URL. This separate copy and provenance
+record do not weaken the original evidence boundary.
+
 The `note`, `tip`, `important`, `warning` and `caution` directives accept Markdown
 content and an optional plain-text title, using the same presentation as alerts.
 

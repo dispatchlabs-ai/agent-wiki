@@ -28,6 +28,7 @@ import {
   attachmentView,
 } from "./evidence-views.mjs";
 import { pipeline } from "node:stream/promises";
+import { ArticleMediaStore } from "./article-media.mjs";
 import { WikiError } from "./errors.mjs";
 import http from "node:http";
 import fs from "node:fs";
@@ -59,6 +60,7 @@ export function createWiki({
   origin = "http://127.0.0.1:4317",
   traces = process.env.WIKI_TRACES || null,
   evidenceUrl = process.env.WIKI_EVIDENCE_URL || null,
+  articleMediaRoot = process.env.WIKI_ARTICLE_MEDIA || null,
   write = false,
   push = false,
   control = null,
@@ -93,6 +95,7 @@ export function createWiki({
   const traceStore = new TraceStore(traces);
   const traceSearches = traceSearchPool || new TraceSearchPool();
   const previews = new PreviewRenderer();
+  const articleMedia = new ArticleMediaStore(articleMediaRoot);
   const wiki = new GitWiki(repo),
     index = new WikiSearch(database),
     citations = new ArticleCitations(),
@@ -937,6 +940,33 @@ export function createWiki({
           fs.readFileSync(path.join(assetRoot, asset[0]), "utf8"),
           asset[1],
         );
+      }
+      const articleAsset = ArticleMediaStore.asset(url.pathname);
+      if (articleAsset) {
+        if (req.method !== "GET")
+          return send(405, { error: "Method not allowed" });
+        const opened = await articleMedia.open(articleAsset, req.headers.range);
+        const headers = {
+          ...opened.headers,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "sandbox; default-src 'none'",
+          "Referrer-Policy": "no-referrer",
+        };
+        const download = url.searchParams.get("download");
+        if (download)
+          headers["Content-Disposition"] =
+            "attachment; filename*=UTF-8''" +
+            encodeURIComponent(download.slice(0, 240));
+        try {
+          authorizeResponse();
+          res.writeHead(opened.status, headers);
+          if (opened.stream) await pipeline(opened.stream, res);
+          else res.end();
+        } finally {
+          await opened.close();
+        }
+        return;
       }
       if (evidence && url.pathname.startsWith("/api/evidence/v1/")) {
         const route = url.pathname.slice("/api/evidence/v1/".length);

@@ -180,8 +180,10 @@ bootstrap and server startup so the exported settings are retained:
 
 ```sh
 mkdir -m 700 ../my-wiki-state
+mkdir -m 700 ../my-wiki-article-media
 export WIKI_CONTROL="$(cd ../my-wiki-state && pwd)/control.sqlite3"
 export WIKI_REPO="$(cd ../my-wiki-content && pwd)"
+export WIKI_ARTICLE_MEDIA="$(cd ../my-wiki-article-media && pwd)"
 export WIKI_ORIGIN=https://wiki.example.org
 export PORT=4317
 export WIKI_LOCAL_LOGIN=1
@@ -212,7 +214,9 @@ browser cookie into the client. Verify article reads and that read-only discover
 omits `wiki.save`; reconnect after changing server write settings.
 
 Back up the complete content repository, including `.git`. The index is disposable;
-the Git history and operation receipts are not. See [content format](../README.md#content-format),
+the Git history and operation receipts are not. If `WIKI_ARTICLE_MEDIA` is set,
+back up that complete store with the repository and control database. See
+[content format](../README.md#content-format), [published article media](article-media.md),
 [trace import](traces.md), and [recovery](api.md#git-correctness-and-recovery) when needed.
 
 ## Troubleshooting

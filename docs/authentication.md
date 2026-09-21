@@ -182,7 +182,8 @@ considering Google login operational.
 ## Recovery
 
 Back up the authoritative control database together with the full content Git
-repository and immutable trace archive. Stop the service and writers before
+repository, immutable trace archive, and configured published article-media store.
+Stop the service, writers, trace ingestion and article-media publication before
 copying the SQLite file and any WAL, or use SQLite's consistent backup facilities.
 Protect the backup like credentials and private content. A restore of old sessions
 can restore still-unexpired login rights. Before reopening, invalidate browser
@@ -202,6 +203,11 @@ Loss of control state loses principal mappings and grants. Search databases and
 render caches remain disposable. Recovery of administrative access is explicit
 operator maintenance of the backed-up control store; there is no unauthenticated
 remote recovery endpoint.
+
+Published article media has its own immutable bytes and provenance manifests; it
+cannot be rebuilt from article links or from the restricted evidence provider.
+Restore and verify it with the content repository. See
+[published article media](article-media.md#immutability-revisions-and-recovery).
 
 For a forgotten local password or expired setup link, the trusted operator runs:
 

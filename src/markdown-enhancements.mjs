@@ -1,5 +1,9 @@
+import { articleMediaPattern } from "./article-media.mjs";
+
 export const mediaPattern =
   /^\/media\/([a-f0-9]{64}\.(?:png|jpg|jpeg|gif|webp|pdf|bin))$/;
+const displayMedia = (url) =>
+  mediaPattern.exec(url) || articleMediaPattern.exec(url);
 // Keep raw HTML visible as source text and distinguish the existing [w] task marker.
 export function markdownEnhancements() {
   return (tree, file) => {
@@ -36,7 +40,7 @@ export function capturedMedia() {
         if (child.tagName === "img") {
           const { src, alt = "Image" } = child.properties;
           if (
-            !mediaPattern.test(String(src)) ||
+            !displayMedia(String(src)) ||
             !/\.(png|jpg|jpeg|gif|webp)$/.test(String(src))
           ) {
             return el("span", { className: ["unavailable-image"] }, [
@@ -73,18 +77,23 @@ export function capturedMedia() {
           child.children[0].tagName === "a"
         ) {
           const a = child.children[0];
-          const asset = mediaPattern.exec(String(a.properties.href))?.[1];
+          const href = String(a.properties.href);
+          const evidenceAsset = mediaPattern.exec(href)?.[1];
+          const articleAsset = articleMediaPattern.exec(href)?.[1];
+          const asset = evidenceAsset || articleAsset;
           if (asset && /\.(pdf|bin)$/.test(asset)) {
             return el("section", { className: ["file-card"] }, [
               a,
               el("p", { className: ["file-actions"] }, [
-                el("a", { href: `/files/${asset}/` }, [
-                  text("Preview and file details"),
-                ]),
-                text(" · "),
-                el("a", { href: a.properties.href, download: "" }, [
-                  text("Download"),
-                ]),
+                ...(evidenceAsset
+                  ? [
+                      el("a", { href: `/files/${asset}/` }, [
+                        text("Preview and file details"),
+                      ]),
+                      text(" · "),
+                    ]
+                  : []),
+                el("a", { href, download: "" }, [text("Download")]),
               ]),
             ]);
           }

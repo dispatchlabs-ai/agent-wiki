@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add an optional independent store for content-addressed article images and PDFs.
+  Readers and `wiki:read` agents can view only explicitly published copies while
+  original `/media/`, `/files/` and evidence routes retain trace authorization.
+- Add a direct-storage operator command that validates an approved file, copies
+  immutable bytes, and records source provenance. Normal article editing remains
+  Markdown-only. Existing installations need no migration.
+
 ## 0.8.5 — 2026-09-18
 
 - Keep token renewal and sign-in available while article edits prepare Git history

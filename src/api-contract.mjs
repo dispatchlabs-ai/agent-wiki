@@ -533,6 +533,13 @@ export function openAPI() {
     ],
     [
       "get",
+      "/article-media/{asset}",
+      "article-media.download",
+      "read",
+      "Deliberately published article image or PDF bytes; supports Range and optional download filename. Independent from original evidence.",
+    ],
+    [
+      "get",
       "/api/evidence/v1/{route}",
       "evidence.proxy",
       "trace",
@@ -571,7 +578,7 @@ export function openAPI() {
       };
     if (id === "articles.catalog")
       spec.responses["200"].content = content({ type: "array", items: object });
-    if (id === "evidence.download") {
+    if (["evidence.download", "article-media.download"].includes(id)) {
       spec.parameters.push(
         {
           name: "Range",
@@ -589,7 +596,10 @@ export function openAPI() {
         },
       );
       const media = {
-        description: "Original bytes; never public cacheable",
+        description:
+          id === "evidence.download"
+            ? "Original evidence bytes; never public cacheable"
+            : "Published article media bytes; never public cacheable",
         content: Object.fromEntries(
           [
             "image/png",

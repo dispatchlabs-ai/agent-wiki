@@ -6774,7 +6774,234 @@
         "security": [{ "browserSession": [] }, { "bearerAuth": [] }],
         "responses": {
           "200": {
-            "description": "Original bytes; never public cacheable",
+            "description": "Original evidence bytes; never public cacheable",
+            "content": {
+              "image/png": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/jpeg": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/gif": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/webp": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "application/pdf": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "206": {
+            "description": "Requested partial byte range",
+            "content": {
+              "image/png": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/jpeg": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/gif": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/webp": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "application/pdf": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            },
+            "headers": {
+              "Content-Range": { "schema": { "type": "string" } },
+              "Accept-Ranges": { "schema": { "type": "string" } }
+            }
+          },
+          "400": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or unauthorized; resource existence is not disclosed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, operation identity, or lock conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "416": { "description": "Unsatisfiable byte range" },
+          "429": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain exact write input for reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "code"],
+                  "properties": {
+                    "error": { "type": "string" },
+                    "code": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Byte range, e.g. bytes=0-1023"
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Download filename; at most 240 characters used"
+          }
+        ]
+      }
+    },
+    "/article-media/{asset}": {
+      "get": {
+        "operationId": "article-media.download",
+        "description": "Deliberately published article image or PDF bytes; supports Range and optional download filename. Independent from original evidence.",
+        "x-wiki-permission": "read",
+        "security": [{ "browserSession": [] }, { "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Published article media bytes; never public cacheable",
             "content": {
               "image/png": {
                 "schema": { "type": "string", "format": "binary" }

@@ -109,6 +109,9 @@ An explanation with [[example-person|a linked person]] and ordinary
   Alerts, math, syntax highlighting, Mermaid, tabs, figures and disclosures follow
   the [Markdown profile](docs/markdown-profile.md). Raw HTML and executable frontmatter/MDX are not supported. Code spans and fenced
   code do not create wiki links. Every wiki link must resolve in the committed tree.
+- Operators can publish reviewed, content-addressed images and PDFs from a separate
+  private store. Article readers can view those copies without receiving original
+  evidence access. See [published article media](docs/article-media.md).
 - Commit ordinary file edits to publish them. Dirty files are ignored. To delete,
   update incoming links and remove the file in the same Git commit.
 
@@ -139,7 +142,8 @@ See [API and editing](docs/api.md) for request shapes, retry semantics, and erro
 
 The engine renders committed Markdown and original conversation snapshots on
 demand. SQLite search indexes are disposable; content Git history and the private
-authentication database are authoritative. The server binds to loopback and needs
+authentication database are authoritative. Configured published article media is
+also authoritative and has its own provenance records. The server binds to loopback and needs
 an HTTPS reverse proxy for shared hosting. Each instance has one content space;
 there is no per-article permission model. Tools enforce current grants and do not
 redact sensitive material inside imported traces.
