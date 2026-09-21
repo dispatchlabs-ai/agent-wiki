@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import matter from "gray-matter";
 import { references } from "./wiki.mjs";
+import { lifecycleStdio } from "./lifecycle-lock.mjs";
 
 export const wikiRepo = () =>
   process.env.WIKI_REPO ||
@@ -22,7 +23,7 @@ export function git(repo, args, options = {}) {
   return execFileSync("git", ["-C", repo, ...args], {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
-    stdio: ["pipe", "pipe", "pipe"],
+    stdio: lifecycleStdio(["pipe", "pipe", "pipe"]),
     ...options,
   }).trimEnd();
 }

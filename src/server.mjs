@@ -53,6 +53,7 @@ import {
 import { TraceStore } from "./traces.mjs";
 import { catalogOptions } from "./trace-catalog.mjs";
 import { traceSearchHealth, traceProvenance } from "./trace-search.mjs";
+import { lifecycleLockFd, lifecycleStdio } from "./lifecycle-lock.mjs";
 const assetRoot = fileURLToPath(new URL("../public/", import.meta.url));
 export function createWiki({
   repo = wikiRepo(),
@@ -854,7 +855,7 @@ export function createWiki({
               WIKI_PUSH: push ? "1" : "0",
               WIKI_EVIDENCE_URL: evidenceUrl || "",
             },
-            stdio: ["pipe", "pipe", "pipe"],
+            stdio: lifecycleStdio(["pipe", "pipe", "pipe"]),
           },
         );
         let out = "",
@@ -1531,7 +1532,9 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
+  lifecycleLockFd();
   const port = Number(process.env.PORT || 4317);
+  const host = process.env.WIKI_LISTEN_HOST || "127.0.0.1";
   const origin = process.env.WIKI_ORIGIN || `http://127.0.0.1:${port}`;
   const control = new ControlStore(process.env.WIKI_CONTROL);
   const settings = oidcSettings(process.env);
@@ -1547,7 +1550,5 @@ if (
     origin: process.env.WIKI_ORIGIN || `http://127.0.0.1:${port}`,
     write: process.env.WIKI_WRITE === "1",
     push: process.env.WIKI_PUSH === "1",
-  }).listen(port, "127.0.0.1", () =>
-    console.log(`Wiki: http://127.0.0.1:${port}`),
-  );
+  }).listen(port, host, () => console.log(`Wiki: http://${host}:${port}`));
 }
