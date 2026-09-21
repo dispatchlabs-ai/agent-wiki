@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.8.6 — 2026-09-21
+
 - Add an optional independent store for content-addressed article images and PDFs.
   Readers and `wiki:read` agents can view only explicitly published copies while
   original `/media/`, `/files/` and evidence routes retain trace authorization.

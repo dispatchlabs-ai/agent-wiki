@@ -1,6 +1,6 @@
 # Upgrading
 
-## Unreleased — published article media
+## 0.8.6 — published article media
 
 `WIKI_ARTICLE_MEDIA` optionally points to an independent private store for images
 and PDFs deliberately published to article readers. Existing installations need
