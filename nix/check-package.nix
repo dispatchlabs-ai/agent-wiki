@@ -17,7 +17,7 @@ runCommand "agent-wiki-package-smoke-${agent-wiki.version}"
     test "$(printf '%s' "$identity" | jq -r .version)" = ${agent-wiki.version}
     test "$(printf '%s' "$identity" | jq -r .node)" = 24.19.0
     test "$(printf '%s' "$identity" | jq -r .system)" = ${agent-wiki.packageIdentity.system}
-    test "$(printf '%s' "$identity" | jq -r .packageLockSha256 | length)" = 64
+    test "$(printf '%s' "$identity" | jq -r '.packageLockSha256 | length')" = 64
 
     HOME="$TMPDIR" agent-wiki-cli --help >/dev/null
 
