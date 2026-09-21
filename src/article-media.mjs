@@ -52,15 +52,28 @@ const syncFile = async (filename) => {
     await handle.close();
   }
 };
-const installExclusive = async (staged, target, verifyExisting) => {
+const exists = async (filename) => {
   try {
-    // The staged and final paths share the configured filesystem. The link makes
-    // the complete inode visible atomically and cannot replace an existing peer.
-    await fs.promises.link(staged, target);
+    return await fs.promises.lstat(filename);
   } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    await verifyExisting(target);
+    if (error.code !== "ENOENT") throw error;
+    return null;
   }
+};
+const pairedFiles = (directory) => ({
+  filename: path.join(directory, "asset"),
+  manifest: path.join(directory, "manifest.json"),
+});
+const legacyFiles = (root, asset) => ({
+  filename: path.join(root, "assets", asset),
+  manifest: path.join(root, "manifests", asset + ".json"),
+});
+const publicationFiles = async (root, asset) => {
+  const directory = path.join(root, "publications", asset);
+  const stat = await exists(directory);
+  if (!stat) return legacyFiles(root, asset);
+  if (!stat.isDirectory()) throw Error("Invalid publication directory");
+  return pairedFiles(directory);
 };
 const formatFor = (asset) => formats[path.extname(asset).slice(1)];
 const safeText = (value, name, maximum = 1000) => {
@@ -137,51 +150,82 @@ export async function publishArticleMedia({
     throw Error("Invalid publication date");
   if (metadata.provenance.date === "Invalid Date")
     throw Error("Invalid source date");
-  const assets = path.join(root, "assets");
-  const manifests = path.join(root, "manifests");
-  await fs.promises.mkdir(assets, { recursive: true, mode: 0o700 });
-  await fs.promises.mkdir(manifests, { recursive: true, mode: 0o700 });
-  const target = path.join(assets, asset);
-  const manifest = path.join(manifests, asset + ".json");
+  const verifyExisting = async (files) => {
+    const existing = JSON.parse(
+      await fs.promises.readFile(files.manifest, "utf8"),
+    );
+    const comparable = { ...existing, published_at: metadata.published_at };
+    if (JSON.stringify(comparable) !== JSON.stringify(metadata))
+      throw Error("Asset already has different publication provenance");
+    if ((await sha256File(files.filename)) !== hash)
+      throw Error("Published asset does not match its content address");
+    return existing;
+  };
+  const result = (manifest) => ({
+    asset,
+    url: `/article-media/${asset}`,
+    manifest,
+  });
+  const publications = path.join(root, "publications");
+  await fs.promises.mkdir(publications, { recursive: true, mode: 0o700 });
+  await syncFile(root);
+  const target = path.join(publications, asset);
+  const targetStat = await exists(target);
+  if (targetStat) {
+    if (!targetStat.isDirectory()) throw Error("Invalid publication directory");
+    const existing = await verifyExisting(pairedFiles(target));
+    await syncFile(publications);
+    return result(existing);
+  }
+  // Existing publications keep their paths and original provenance. Old and new
+  // publisher versions must not run concurrently during an upgrade.
+  const legacy = legacyFiles(root, asset);
+  const legacyManifest = await exists(legacy.manifest);
+  const legacyAsset = await exists(legacy.filename);
+  if (legacyManifest || legacyAsset) {
+    if (!legacyManifest || !legacyAsset)
+      throw Error("Incomplete legacy publication requires operator recovery");
+    return result(await verifyExisting(legacy));
+  }
   const temporary = path.join(root, `.publish-${randomUUID()}`);
-  const manifestTemporary = path.join(root, `.manifest-${randomUUID()}`);
+  await fs.promises.mkdir(temporary, { mode: 0o700 });
+  const staged = pairedFiles(temporary);
   try {
     await fs.promises.copyFile(
       sourceFile,
-      temporary,
+      staged.filename,
       fs.constants.COPYFILE_EXCL,
     );
-    await fs.promises.chmod(temporary, 0o400);
-    if ((await sha256File(temporary)) !== hash)
+    await fs.promises.chmod(staged.filename, 0o400);
+    if ((await sha256File(staged.filename)) !== hash)
       throw Error("Source changed during publication");
-    await syncFile(temporary);
-    await installExclusive(temporary, target, async (existing) => {
-      if ((await sha256File(existing)) !== hash)
-        throw Error("Published asset does not match its content address");
-    });
+    await syncFile(staged.filename);
     const serialized = JSON.stringify(metadata, null, 2) + "\n";
-    await fs.promises.writeFile(manifestTemporary, serialized, {
+    await fs.promises.writeFile(staged.manifest, serialized, {
       flag: "wx",
       mode: 0o400,
     });
-    await syncFile(manifestTemporary);
-    await installExclusive(
-      manifestTemporary,
-      manifest,
-      async (existingFile) => {
-        const existing = JSON.parse(
-          await fs.promises.readFile(existingFile, "utf8"),
-        );
-        const comparable = { ...existing, published_at: metadata.published_at };
-        if (JSON.stringify(comparable) !== JSON.stringify(metadata))
-          throw Error("Asset already has different publication provenance");
-      },
-    );
+    await syncFile(staged.manifest);
+    await syncFile(temporary);
+    try {
+      // Complete nonempty directories publish atomically on the mounted
+      // filesystem without hard links. Another protocol writer's nonempty
+      // winner cannot be replaced by rename; verify it instead.
+      await fs.promises.rename(temporary, target);
+    } catch (error) {
+      if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error;
+      const winnerStat = await exists(target);
+      if (!winnerStat?.isDirectory())
+        throw Error("Invalid publication directory");
+      const winner = await verifyExisting(pairedFiles(target));
+      await syncFile(publications);
+      return result(winner);
+    }
+    await syncFile(publications);
   } finally {
-    await fs.promises.rm(temporary, { force: true });
-    await fs.promises.rm(manifestTemporary, { force: true });
+    await fs.promises.rm(temporary, { recursive: true, force: true });
   }
-  return { asset, url: `/article-media/${asset}`, manifest: metadata };
+  return result(metadata);
 }
 
 function rangeFor(header, size) {
@@ -216,11 +260,9 @@ export class ArticleMediaStore {
     const format = formatFor(asset);
     const hash = asset.slice(0, 64);
     try {
+      const files = await publicationFiles(this.root, asset);
       const manifest = JSON.parse(
-        await fs.promises.readFile(
-          path.join(this.root, "manifests", asset + ".json"),
-          "utf8",
-        ),
+        await fs.promises.readFile(files.manifest, "utf8"),
       );
       if (
         manifest?.version !== 1 ||
@@ -232,8 +274,7 @@ export class ArticleMediaStore {
         typeof manifest.provenance?.source !== "string"
       )
         throw notFound();
-      const filename = path.join(this.root, "assets", asset);
-      const handle = await fs.promises.open(filename, "r");
+      const handle = await fs.promises.open(files.filename, "r");
       try {
         const stat = await handle.stat();
         if (!stat.isFile() || stat.size !== manifest.size) throw notFound();

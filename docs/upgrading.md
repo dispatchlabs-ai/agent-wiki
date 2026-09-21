@@ -1,5 +1,13 @@
 # Upgrading
 
+## 0.8.7 — publication without hard links
+
+New article-media publications use complete asset/manifest directories and atomic
+filesystem rename. Existing publications and URLs remain readable and unchanged.
+Stop old publishers before upgrading, and recover any incomplete legacy pair
+before republishing it. Once new-format media is published, a 0.8.7-or-newer
+server is required to read it. See [publication and recovery](article-media.md).
+
 ## 0.8.6 — published article media
 
 `WIKI_ARTICLE_MEDIA` optionally points to an independent private store for images

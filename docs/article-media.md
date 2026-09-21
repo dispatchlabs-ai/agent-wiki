@@ -26,9 +26,11 @@ The engine's `/assets/` namespace remains reserved for bundled application files
 Publication is direct-storage operator administration, separate from normal
 article editing. The command copies one reviewed file into the configured store,
 checks its extension and file signature, computes its SHA-256 identity, and writes
-an immutable provenance manifest. Complete staged files are installed atomically
-without replacing an existing publication, so an interrupted attempt can be
-retried with the same input. It does not modify an article or retrieve a
+an immutable provenance manifest. A complete staged asset/manifest directory is
+published by one filesystem rename. Concurrent publishers retain the first
+complete publication, and an interrupted attempt can be retried with the same
+input. Publication needs atomic directory rename and file/directory sync, but
+does not need hard links. It does not modify an article or retrieve a
 restricted source.
 
 ```sh
@@ -62,10 +64,32 @@ API and no implicit promotion of a trace attachment.
 
 ## Immutability, revisions and recovery
 
-The store contains `assets/<hash>.<extension>` and a corresponding
-`manifests/<hash>.<extension>.json`. The server requires both, checks the manifest,
-size and complete file hash before serving, and supports a single HTTP byte range.
+New publications contain `publications/<hash>.<extension>/asset` and
+`publications/<hash>.<extension>/manifest.json`. Both complete files are synced
+before their nonempty directory is renamed into place. Another publisher cannot
+replace that nonempty directory; it verifies the existing bytes and provenance
+instead. Retries return the original stored publication timestamp.
+
+The server also reads the earlier `assets/<hash>.<extension>` plus
+`manifests/<hash>.<extension>.json` layout. Existing complete pairs stay unchanged.
+The server chooses one layout and requires both of its files; it never combines
+layouts or falls back from a corrupt new publication to an older pair. It checks
+the manifest, size and complete file hash before serving and supports a single HTTP byte range.
 Disguised formats, changed files, unknown hashes and path traversal fail closed.
+
+Stop all publishers before upgrading from a version earlier than 0.8.7. Incomplete
+legacy pairs require operator recovery before republishing; do not run old and
+new publisher versions concurrently. Empty, corrupt or symlink publication
+directories are rejected. All writers must follow this protocol: directory
+rename by itself does not protect against an unrelated operator creating empty
+destinations or modifying the store. After publishing the new layout, keep a
+0.8.7-or-newer server to read it.
+
+Hidden `.publish-*` directories left by a killed process are not publications;
+a retry uses a fresh staging directory. Remove abandoned staging only after
+confirming publishers are stopped. Atomicity here concerns the mounted
+filesystem, not a transaction across backing object-store keys. Back up through
+the mounted filesystem while publication is stopped.
 
 Do not overwrite or delete an asset during an ordinary article edit. Removing a
 link creates a new article revision; readers can still open the older Git revision,

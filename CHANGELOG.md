@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.8.7 — 2026-09-21
+
+- Publish complete article-media asset/provenance pairs with atomic directory
+  rename, supporting filesystems without hard links. Concurrent and interrupted
+  publication preserves immutable bytes, original provenance and safe retries.
+- Keep existing media pairs and URLs readable without migration. Stop old
+  publishers before upgrading; new-format publications require a 0.8.7-or-newer
+  server. Incomplete legacy pairs remain fenced for operator recovery.
+
 ## 0.8.6 — 2026-09-21
 
 - Add an optional independent store for content-addressed article images and PDFs.
