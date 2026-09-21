@@ -3,20 +3,65 @@
 set -eu
 
 usage() {
-  echo "Usage: scripts/verify-package-closure MANIFEST ARCHIVE ALLOWED_SIGNERS PRINCIPAL [--install]" >&2
+  echo "Usage: scripts/verify-package-closure MANIFEST ARCHIVE ALLOWED_SIGNERS PRINCIPAL [--sudo-import] [--install]" >&2
   exit 2
 }
 
-[ "$#" -ge 4 ] && [ "$#" -le 5 ] || usage
+nix_command=$(command -v nix || true)
+nix_store_command=$(command -v nix-store || true)
+[ -n "$nix_command" ] || nix_command=/nix/var/nix/profiles/default/bin/nix
+[ -n "$nix_store_command" ] || nix_store_command=/nix/var/nix/profiles/default/bin/nix-store
+[ -x "$nix_command" ] || {
+  echo "Missing required command: nix" >&2
+  exit 1
+}
+[ -x "$nix_store_command" ] || {
+  echo "Missing required command: nix-store" >&2
+  exit 1
+}
+
+if [ "${1-}" = "--root-import" ]; then
+  [ "$#" -eq 3 ] || usage
+  [ "$(id -u)" -eq 0 ] || {
+    echo "Root import mode requires root" >&2
+    exit 1
+  }
+  archive=$2
+  expected_sha256=$3
+  staging=$(mktemp -d /var/tmp/agent-wiki-nix-import.XXXXXX)
+  trap 'rm -rf -- "$staging"' EXIT HUP INT TERM
+  install -m 0444 "$archive" "$staging/closure.gz"
+  staged_sha256=$(
+    "$nix_command" --extra-experimental-features "nix-command flakes" hash file \
+      --type sha256 --base16 "$staging/closure.gz"
+  )
+  [ "$staged_sha256" = "$expected_sha256" ] || {
+    echo "Root-staged closure SHA-256 does not match the verified manifest" >&2
+    exit 1
+  }
+  gzip -dc "$staging/closure.gz" > "$staging/closure.nar"
+  "$nix_store_command" --import < "$staging/closure.nar" >/dev/null
+  exit 0
+fi
+
+[ "$#" -ge 4 ] && [ "$#" -le 6 ] || usage
 
 manifest=$1
 archive=$2
 allowed_signers=$3
 principal=$4
-install=${5-}
-[ -z "$install" ] || [ "$install" = "--install" ] || usage
+shift 4
+sudo_import=0
+install_profile=0
+for option in "$@"; do
+  case "$option" in
+    --sudo-import) sudo_import=1 ;;
+    --install) install_profile=1 ;;
+    *) usage ;;
+  esac
+done
 
-for command in nix nix-store jq gzip ssh-keygen; do
+for command in jq gzip ssh-keygen; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "Missing required command: $command" >&2
     exit 1
@@ -38,7 +83,7 @@ ssh-keygen -Y verify -f "$allowed_signers" -I "$principal" \
 
 expected_sha256=$(jq -er .archiveSha256 "$manifest")
 actual_sha256=$(
-  nix --extra-experimental-features "nix-command flakes" hash file \
+  "$nix_command" --extra-experimental-features "nix-command flakes" hash file \
     --type sha256 --base16 "$archive"
 )
 [ "$actual_sha256" = "$expected_sha256" ] || {
@@ -46,7 +91,20 @@ actual_sha256=$(
   exit 1
 }
 
-gzip -dc "$archive" | nix-store --import >/dev/null
+if [ "$sudo_import" -eq 1 ]; then
+  command -v sudo >/dev/null 2>&1 || {
+    echo "--sudo-import requires sudo" >&2
+    exit 1
+  }
+  sudo -n "$0" --root-import "$archive" "$expected_sha256"
+else
+  staging=$(mktemp -d "${TMPDIR:-/tmp}/agent-wiki-nix-import.XXXXXX")
+  trap 'rm -rf -- "$staging"' EXIT HUP INT TERM
+  gzip -dc "$archive" > "$staging/closure.nar"
+  "$nix_store_command" --import < "$staging/closure.nar" >/dev/null
+  rm -rf -- "$staging"
+  trap - EXIT HUP INT TERM
+fi
 
 store_path=$(jq -er .storePath "$manifest")
 case "$store_path" in
@@ -67,8 +125,8 @@ jq -e --argjson identity "$identity" '.packageIdentity == $identity' \
   "$manifest" >/dev/null
 HOME=${HOME:-/tmp} "$store_path/bin/agent-wiki-cli" --help >/dev/null
 
-if [ "$install" = "--install" ]; then
-  nix --extra-experimental-features "nix-command flakes" profile install "$store_path"
+if [ "$install_profile" -eq 1 ]; then
+  "$nix_command" --extra-experimental-features "nix-command flakes" profile install "$store_path"
 fi
 
 printf '%s\n' "$store_path"

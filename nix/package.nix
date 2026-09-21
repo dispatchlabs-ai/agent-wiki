@@ -29,14 +29,13 @@ let
     agent-wiki-import-trace-direct = "scripts/import-trace.mjs";
     agent-wiki-index-traces-direct = "scripts/index-traces.mjs";
     agent-wiki-publish-media-direct = "scripts/publish-article-media.mjs";
-    agent-wiki-example = "scripts/example.mjs";
   };
   identity = builtins.toJSON {
     schemaVersion = 1;
     name = manifest.name;
     version = manifest.version;
     inherit sourceRevision packageLockSha256;
-    nixpkgsRevision = "d14174cf76b08f145215940c72af608cd8a956e3";
+    nixpkgsRevision = "5880666fd9eb563038431edb35c2d0aa595884e6";
     system = stdenv.hostPlatform.system;
     node = nodeVersion;
     hostRequiresNix = true;

@@ -12,8 +12,20 @@ usage() {
 output_directory=$1
 signing_key=${2-}
 repository=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+nix_command=$(command -v nix || true)
+nix_store_command=$(command -v nix-store || true)
+[ -n "$nix_command" ] || nix_command=/nix/var/nix/profiles/default/bin/nix
+[ -n "$nix_store_command" ] || nix_store_command=/nix/var/nix/profiles/default/bin/nix-store
+[ -x "$nix_command" ] || {
+  echo "Missing required command: nix" >&2
+  exit 1
+}
+[ -x "$nix_store_command" ] || {
+  echo "Missing required command: nix-store" >&2
+  exit 1
+}
 
-for command in nix nix-store jq gzip ssh-keygen; do
+for command in jq gzip ssh-keygen; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "Missing required command: $command" >&2
     exit 1
@@ -24,7 +36,7 @@ mkdir -p "$output_directory"
 output_directory=$(CDPATH= cd -- "$output_directory" && pwd)
 
 store_path=$(
-  nix --extra-experimental-features "nix-command flakes" build \
+  "$nix_command" --extra-experimental-features "nix-command flakes" build \
     --no-link --print-out-paths "$repository#agent-wiki"
 )
 identity=$($store_path/bin/agent-wiki-package-info)
@@ -44,21 +56,38 @@ base="agent-wiki-$version-$system-$short_revision"
 archive="$output_directory/$base.nix-closure.gz"
 manifest="$output_directory/$base.manifest.json"
 paths="$output_directory/$base.store-paths"
+signature="$manifest.sig"
 
-nix --extra-experimental-features "nix-command flakes" path-info \
-  --recursive "$store_path" | LC_ALL=C sort > "$paths"
+for candidate in "$archive" "$manifest" "$paths" "$signature"; do
+  [ ! -e "$candidate" ] || {
+    echo "Refusing to overwrite existing artifact: $candidate" >&2
+    exit 1
+  }
+done
+
+staging=$(mktemp -d "$output_directory/.agent-wiki-package.XXXXXX")
+trap 'rm -rf -- "$staging"' EXIT HUP INT TERM
+staged_archive="$staging/$(basename "$archive")"
+staged_manifest="$staging/$(basename "$manifest")"
+staged_paths="$staging/$(basename "$paths")"
+raw_export="$staging/$base.nix-closure"
+
+"$nix_command" --extra-experimental-features "nix-command flakes" path-info \
+  --recursive "$store_path" | LC_ALL=C sort > "$staged_paths"
 
 # Nix store paths contain no shell whitespace. shellcheck disable=SC2046
-nix-store --export $(sed -n '/^\/nix\/store\//p' "$paths") | gzip -9 > "$archive"
+"$nix_store_command" --export $(sed -n '/^\/nix\/store\//p' "$staged_paths") > "$raw_export"
+gzip -9c "$raw_export" > "$staged_archive"
+rm -- "$raw_export"
 
 archive_sha256=$(
-  nix --extra-experimental-features "nix-command flakes" hash file \
-    --type sha256 --base16 "$archive"
+  "$nix_command" --extra-experimental-features "nix-command flakes" hash file \
+    --type sha256 --base16 "$staged_archive"
 )
-archive_bytes=$(wc -c < "$archive" | tr -d ' ')
-closure_paths=$(wc -l < "$paths" | tr -d ' ')
+archive_bytes=$(wc -c < "$staged_archive" | tr -d ' ')
+closure_paths=$(wc -l < "$staged_paths" | tr -d ' ')
 closure_nar_bytes=$(
-  nix --extra-experimental-features "nix-command flakes" path-info \
+  "$nix_command" --extra-experimental-features "nix-command flakes" path-info \
     --json --recursive "$store_path" | jq '[to_entries[].value.narSize] | add'
 )
 
@@ -80,15 +109,24 @@ jq -n \
     closureNarBytes: $closureNarBytes,
     storePath: $storePath,
     packageIdentity: $packageIdentity
-  }' > "$manifest"
+  }' > "$staged_manifest"
 
 if [ -n "$signing_key" ]; then
-  ssh-keygen -Y sign -f "$signing_key" -n agent-wiki-release "$manifest"
+  ssh-keygen -Y sign -f "$signing_key" -n agent-wiki-release "$staged_manifest"
 fi
+
+mv "$staged_archive" "$archive"
+mv "$staged_manifest" "$manifest"
+mv "$staged_paths" "$paths"
+if [ -n "$signing_key" ]; then
+  mv "$staged_manifest.sig" "$signature"
+fi
+rmdir "$staging"
+trap - EXIT HUP INT TERM
 
 printf '%s\n' "$archive" "$manifest" "$paths"
 if [ -n "$signing_key" ]; then
-  printf '%s\n' "$manifest.sig"
+  printf '%s\n' "$signature"
 else
   echo "Manifest is unsigned; pass the release SSH private key to create a candidate signature." >&2
 fi

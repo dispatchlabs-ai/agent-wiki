@@ -11,15 +11,16 @@ complete runtime closure and does not require Nix in the running container.
 
 ## Locked runtime
 
-`flake.lock` pins one Nixpkgs revision. That revision supplies Node 24.19.0,
-matching the repository's tested runtime baseline. `package-lock.json` supplies
+`flake.lock` pins the August 21, 2026 NixOS 26.05 channel revision. That revision
+supplies Node 24.19.0, matching the repository's tested runtime baseline and using
+the channel's published binary-cache artifacts where available. `package-lock.json` supplies
 the exact JavaScript dependency graph through Nixpkgs' `importNpmLock`; there is
 no placeholder dependency hash and the build performs no unlocked npm resolution.
 The package builds the browser assets, prunes development dependencies, and keeps:
 
 - Node, Git, production JavaScript dependencies, and built browser assets;
 - the server, authenticated CLI, bootstrap, account and agent administration,
-  trace import/indexing, article-media publication, and synthetic example commands;
+  trace import/indexing, and article-media publication commands;
 - operator documentation, the license, and third-party notices.
 
 Run `agent-wiki-package-info` from the result to read its version, source revision,
@@ -99,13 +100,20 @@ runs:
 ./scripts/verify-package-closure \
   agent-wiki-VERSION-SYSTEM-SOURCE.manifest.json \
   agent-wiki-VERSION-SYSTEM-SOURCE.nix-closure.gz \
-  ./allowed-signers maintainer@example.invalid --install
+  ./allowed-signers maintainer@example.invalid --sudo-import --install
 ```
 
 Verification checks the SSH signature, manifest schema, archive name and SHA-256,
-imports without rebuilding the application, compares the installed package's own
-identity with the signed manifest, and exercises the CLI. Publishing and retention
-of these assets remain a release action; these scripts do not publish anything.
+then asks `sudo` to copy the already verified archive into a root-owned staging
+directory, verify its digest again, and import it without rebuilding the application.
+The privileged process never runs the imported Wiki executable; identity comparison
+and the CLI smoke check run afterward as the ordinary caller. A single-user Nix
+installation can omit `--sudo-import`. Multi-user Nix rejects this legacy closure
+export for an untrusted caller because the Nix export format does not preserve an
+SSH manifest signature as a native Nix store signature. Do not grant the Wiki
+service user Nix `trusted-users` authority or disable signature checks to bypass
+that boundary. Publishing and retention of these assets remain a release action;
+these scripts do not publish anything.
 
 ## Qualification matrix
 
