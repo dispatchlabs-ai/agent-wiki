@@ -11,6 +11,8 @@
   archive from application backup/restore while retaining that recovery boundary.
 - Include OpenSSH in packaged runtimes and accept conservatively parsed SCP-style
   SSH aliases without allowing Git remote helpers or unsafe configuration.
+- Restore through the writable state mount when its parent is a read-only image,
+  preserving the fresh-target fence and publishing the ready marker last.
 
 ## 0.8.9 — 2026-09-22
 

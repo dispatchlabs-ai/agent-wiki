@@ -108,6 +108,11 @@ managed root, adopts them with an ephemeral host evidence service, and verifies:
 - fresh-root restore preserves authentication, content, writes and external
   evidence access.
 
+The Linux fixture uses host networking with both HTTP listeners bound to loopback,
+matching an existing loopback evidence provider without changing host firewall
+rules. Restore stages beneath the fresh writable state mount; the image filesystem
+and the state mount's parent remain read-only.
+
 It uses a safe synthetic SCP-style remote with push disabled, proving adoption
 compatibility but not SSH transport or remote publication. The receipt records
 that limit; qualify the deployment's mounted passwd identity, key, `known_hosts`,

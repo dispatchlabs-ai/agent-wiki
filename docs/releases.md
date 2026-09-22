@@ -25,6 +25,8 @@ and additions. It does not imply production readiness.
 
 1. Work from public `main`; never merge private engineering history into it.
    Maintainer changes can push directly to `main`; outside contributors use PRs.
+   Main requires linear history. Rebase unpublished task commits onto its current
+   tip before validation and publication; do not publish merge commits.
 2. Describe changes since the previous release in `CHANGELOG.md`, including
    compatibility and migration notes. Update `package.json`, both root version
    fields in `package-lock.json`, and the README status together.

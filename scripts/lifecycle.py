@@ -1008,6 +1008,8 @@ def restore(args) -> None:
             raise LifecycleError("PARTIAL_STATE", "Restore target must be fresh and empty", 3)
         with tarfile.open(archive_path, "r:*") as archive:
             members, manifest = archive_inventory(archive)
+            # Keep same-filesystem staging inside the writable state mount;
+            # its parent can be the immutable container image.
             with tempfile.TemporaryDirectory(
                 prefix=".restore-staging-", dir=root / ".lifecycle"
             ) as temporary:
@@ -1023,6 +1025,7 @@ def restore(args) -> None:
                 recovery = staging / ".lifecycle" / "recovery"
                 if recovery.exists():
                     os.replace(recovery, root / ".lifecycle" / "recovery")
+                sync_directory(root)
                 marker_bytes = (staging / ".lifecycle" / "initialized.json").read_bytes()
             atomic_write(root / ".lifecycle" / "initialized.json", marker_bytes)
         ready = validate_ready(root)

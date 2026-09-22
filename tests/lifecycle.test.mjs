@@ -582,8 +582,17 @@ test("backup and fresh-root restore preserve authoritative state and remain writ
     "DESTINATION_EXISTS",
   );
   assert.equal(sha256(archive), backupReceipt.sha256);
-  const restored = path.join(directory, "fresh-root");
-  const restore = call(["restore", "--root", restored, "--archive", archive]);
+  const readonlyParent = path.join(directory, "readonly-image-root");
+  fs.mkdirSync(readonlyParent);
+  const restored = path.join(readonlyParent, "fresh-root");
+  fs.mkdirSync(restored);
+  fs.chmodSync(readonlyParent, 0o555);
+  let restore;
+  try {
+    restore = call(["restore", "--root", restored, "--archive", archive]);
+  } finally {
+    fs.chmodSync(readonlyParent, 0o700);
+  }
   assert.equal(restore.status, 0, restore.stderr);
   assert.equal(JSON.parse(restore.stdout).content_head, originalHead);
   assert.equal(

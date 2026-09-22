@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import socket
 import subprocess
 import tarfile
 import tempfile
@@ -167,12 +168,12 @@ def main() -> None:
         "fixture_retained": True,
     }
     started = time.monotonic()
-    evidence = ThreadingHTTPServer(("0.0.0.0", 0), EvidenceHandler)
+    evidence = ThreadingHTTPServer(("127.0.0.1", 0), EvidenceHandler)
     EvidenceHandler.requests = []
     evidence_thread = threading.Thread(target=evidence.serve_forever, daemon=True)
     evidence_thread.start()
     evidence_url = (
-        f"http://host.docker.internal:{evidence.server_address[1]}"
+        f"http://127.0.0.1:{evidence.server_address[1]}"
         "/api/evidence/v1/"
     )
 
@@ -305,6 +306,12 @@ def main() -> None:
     search.mkdir(mode=0o700)
     os.chown(search, args.uid, args.gid)
 
+    # Exercise the Linux host-network contract used for an existing loopback
+    # evidence provider without exposing a fixture server to the LAN or changing
+    # firewall policy to permit Docker bridge traffic into the host.
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0))
+        backend_port = reservation.getsockname()[1]
     services = {
         "wiki": {
             "image": candidate["id"],
@@ -317,7 +324,8 @@ def main() -> None:
             "tmpfs": ["/tmp:rw,nosuid,nodev,mode=1777"],
             "stop_grace_period": "120s",
             "logging": {"driver": "none"},
-            "extra_hosts": ["host.docker.internal:host-gateway"],
+            "network_mode": "host",
+            "command": ["serve", "--root", "/data", "--bind", "127.0.0.1", "--port", str(backend_port)],
             "environment": {
                 "WIKI_LOCAL_LOGIN": "1",
                 "WIKI_WRITE": "1",
@@ -328,7 +336,6 @@ def main() -> None:
                 "GIT_COMMITTER_NAME": "Synthetic Wiki",
                 "GIT_COMMITTER_EMAIL": "wiki@example.invalid",
             },
-            "ports": ["127.0.0.1::4317"],
             "volumes": [],
         }
     }
@@ -363,8 +370,6 @@ def main() -> None:
         container = compose("ps", "-a", "-q", "wiki").stdout.strip()
         return json.loads(docker("inspect", container).stdout)[0]
 
-    backend_port = None
-
     def request(path: str, *, payload=None, cookie=None, csrf=None):
         headers = {
             "Host": "wiki-adoption.qualification.invalid",
@@ -398,9 +403,6 @@ def main() -> None:
         return result
 
     def wait_ready() -> None:
-        nonlocal backend_port
-        live = inspection()
-        backend_port = live["NetworkSettings"]["Ports"]["4317/tcp"][0]["HostPort"]
         deadline = time.monotonic() + 40
         while time.monotonic() < deadline:
             try:
