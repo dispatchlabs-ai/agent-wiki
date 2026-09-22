@@ -212,6 +212,7 @@ try {
   await page.goto(origin + `/wiki/${id}/edit/`, {
     waitUntil: "domcontentloaded",
   });
+  await page.getByRole("status").filter({ hasText: "Ready to edit." }).waitFor();
   const markdown = marker + "\n\nBrowser edit on the deployed service.\n";
   await page.getByLabel("Markdown", { exact: true }).fill(markdown);
   await page.getByLabel("Change summary").fill("Verify deployed browser write");
