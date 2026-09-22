@@ -428,6 +428,42 @@ test("backup and fresh-root restore preserve authoritative state and remain writ
   assert.equal(JSON.parse(after.stdout).state, "saved");
 });
 
+test("restore stages inside a writable managed root when its parent is read-only", (t) => {
+  if (process.getuid?.() === 0)
+    t.skip("root can bypass the parent permission boundary");
+  const directory = temporary(t);
+  const sourceRoot = path.join(directory, "source-root");
+  assert.equal(bootstrap(sourceRoot).status, 0);
+  const archive = path.join(directory, "wiki-backup.tar.gz");
+  assert.equal(
+    call(["backup", "--root", sourceRoot, "--destination", archive]).status,
+    0,
+  );
+  const restored = path.join(directory, "fresh-root");
+  fs.mkdirSync(restored, { mode: 0o700 });
+  fs.chmodSync(directory, 0o555);
+  let result;
+  try {
+    assert.throws(
+      () =>
+        fs.writeFileSync(path.join(directory, "parent-write-must-fail"), "x"),
+      /EACCES|EPERM/,
+    );
+    result = call(["restore", "--root", restored, "--archive", archive]);
+  } finally {
+    fs.chmodSync(directory, 0o700);
+  }
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).state, "restored");
+  assert.equal(
+    fs
+      .readdirSync(path.join(restored, ".lifecycle"))
+      .some((name) => name.startsWith(".restore-staging-")),
+    false,
+  );
+  assert.equal(fs.existsSync(path.join(restored, "content/.git")), true);
+});
+
 test("restore rejects traversal and hard-link archives before writing state", (t) => {
   const directory = temporary(t);
   for (const kind of ["traversal", "hardlink"]) {
@@ -514,6 +550,16 @@ with tempfile.TemporaryDirectory() as temporary:
     fs.readdirSync(restored).filter((name) => name !== ".lifecycle"),
     [],
   );
+  assert.equal(
+    fs
+      .readdirSync(path.join(restored, ".lifecycle"))
+      .some((name) => name.startsWith(".restore-staging-")),
+    false,
+  );
+  assert.equal(
+    fs.existsSync(path.join(restored, ".lifecycle/initialized.json")),
+    false,
+  );
 });
 
 test("restore rejects Git object redirects before invoking the restored repository", (t) => {
@@ -563,6 +609,16 @@ with tempfile.TemporaryDirectory() as temporary:
   assert.deepEqual(
     fs.readdirSync(restored).filter((name) => name !== ".lifecycle"),
     [],
+  );
+  assert.equal(
+    fs
+      .readdirSync(path.join(restored, ".lifecycle"))
+      .some((name) => name.startsWith(".restore-staging-")),
+    false,
+  );
+  assert.equal(
+    fs.existsSync(path.join(restored, ".lifecycle/initialized.json")),
+    false,
   );
 });
 

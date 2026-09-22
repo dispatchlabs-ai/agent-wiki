@@ -752,7 +752,9 @@ def restore(args) -> None:
             raise LifecycleError("PARTIAL_STATE", "Restore target must be fresh and empty", 3)
         with tarfile.open(archive_path, "r:*") as archive:
             members, manifest = archive_inventory(archive)
-            with tempfile.TemporaryDirectory(prefix=".agent-wiki-restore-", dir=root.parent) as temporary:
+            with tempfile.TemporaryDirectory(
+                prefix=".restore-staging-", dir=root / ".lifecycle"
+            ) as temporary:
                 staging = Path(temporary) / "payload"
                 staging.mkdir(mode=0o700)
                 extract_validated(archive, members, staging)
@@ -763,7 +765,7 @@ def restore(args) -> None:
                 if recovery.exists():
                     os.replace(recovery, root / ".lifecycle" / "recovery")
                 marker_bytes = (staging / ".lifecycle" / "initialized.json").read_bytes()
-                atomic_write(root / ".lifecycle" / "initialized.json", marker_bytes)
+            atomic_write(root / ".lifecycle" / "initialized.json", marker_bytes)
         ready = validate_ready(root)
         print(json.dumps({
             "state": "restored", "root": str(root), "backup_id": manifest["backup_id"],

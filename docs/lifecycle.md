@@ -126,9 +126,12 @@ Restore rejects absolute paths, traversal, duplicate members, links, special
 files, unexpected paths, special mode bits, missing files, and metadata or digest
 mismatches. It validates the complete archive before extracting, rejects unsafe
 Git configuration before running Git in the restored repository, then verifies
-Git, SQLite, identities and manager grants in staging. It moves the validated
-stores into the fresh root and writes the initialized marker last. Verify the
-actual browser/API/MCP read and write flows before accepting the recovery copy.
+Git, SQLite, identities and manager grants in private staging below the fresh
+root's `.lifecycle` directory. Staging therefore needs write access only to the
+mounted managed root, not its parent, and stays on the same filesystem as the
+atomic store moves. It removes staging, moves the validated stores into the fresh
+root and writes the initialized marker last. Verify the actual browser/API/MCP
+read and write flows before accepting the recovery copy.
 Backups contain password hashes, sessions, credentials, evidence, and private
 media; protect and retain them as private application data.
 
