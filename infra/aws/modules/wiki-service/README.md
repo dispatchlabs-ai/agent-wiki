@@ -100,16 +100,20 @@ one-off operation while the service and every other writer are stopped:
    run `agent-wiki bootstrap --root /data ...` against this access point. The
    temporary task must use the same image digest and UID/GID, and its role may
    read only its temporary bootstrap secret.
-3. Capture the bootstrap receipt through a protected channel, consume its
-   one-time setup URL through the canonical HTTPS origin, verify the initialized
-   marker and content HEAD, then retire the temporary task definition, role,
-   secret, and unused setup session. Never put the setup URL or secret value in
+3. Capture the bootstrap receipt and one-time setup URL through a protected
+   channel. Verify the initialized marker and content HEAD, then retire the
+   temporary task definition, role and secret while preserving the setup session
+   for first sign-in. The service is still stopped, so the URL cannot yet be
+   consumed. Never put the setup URL or secret value in
    HCL, OpenTofu state, the activation receipt, or the service log group.
 4. Store a sanitized receipt containing the operation ID, task ARN, exact image
    digest, access-point ARN, initialized-marker identity, content HEAD, observed
    zero-writer checks, completion time, and operator. Hash its canonical bytes.
 5. Set `activation_receipt_sha256` to that digest and `desired_count = 1`.
    OpenTofu refuses an active service without the receipt digest.
+6. Once the service responds through its canonical HTTPS origin, consume the
+   setup URL, verify the manager identity and browser/MCP read/write access, and
+   retire any unused setup sessions. Only then mark the installation accepted.
 
 Do not use the serving task definition directly for bootstrap unless the
 operator provides a secure receipt-capture adapter. Its normal `awslogs`

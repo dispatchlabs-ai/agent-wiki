@@ -14,3 +14,11 @@ test-results/
 playwright-report/
 
 public/vendor/
+
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+backend.s3.hcl
+*.auto.tfvars
+*.auto.tfvars.json

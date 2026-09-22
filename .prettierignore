@@ -7,3 +7,5 @@ nix/
 scripts/package-closure
 scripts/verify-package-closure
 public/typeset.css
+**/.terraform/
+**/.terraform.lock.hcl
