@@ -11,6 +11,7 @@ lifecycle_path, root = sys.argv[1:]
 spec = importlib.util.spec_from_file_location("agent_wiki_lifecycle", lifecycle_path)
 lifecycle = importlib.util.module_from_spec(spec)
 assert spec.loader
+sys.dont_write_bytecode = True
 spec.loader.exec_module(lifecycle)
 
 original_replace = lifecycle.os.replace
