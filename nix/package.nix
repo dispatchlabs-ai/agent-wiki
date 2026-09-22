@@ -7,6 +7,7 @@
   coreutils,
   git,
   nodejs_24,
+  openssh,
   python3,
   src,
   sourceRevision,
@@ -26,6 +27,7 @@ let
   runtimePath = lib.makeBinPath [
     git
     nodejs_24
+    openssh
   ];
   directEntrypoints = {
     agent-wiki-server-direct = "src/server.mjs";

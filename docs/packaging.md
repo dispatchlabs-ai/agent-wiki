@@ -18,7 +18,7 @@ supplies the exact JavaScript dependency graph through Nixpkgs' `importNpmLock`;
 there is no placeholder dependency hash and the build performs no unlocked npm resolution.
 The package builds the browser assets, prunes development dependencies, and keeps:
 
-- Node, Git, production JavaScript dependencies, and built browser assets;
+- Node, Git, OpenSSH, production JavaScript dependencies, and built browser assets;
 - the server, authenticated CLI, bootstrap, account and agent administration,
   trace import/indexing, and article-media publication commands;
 - operator documentation, the license, and third-party notices.
@@ -102,6 +102,25 @@ The lifecycle creates and exports this mutable layout:
 /data/traces                  WIKI_TRACES (optional)
 /data/article-media           WIKI_ARTICLE_MEDIA (optional)
 ```
+
+An existing installation can mount its complete content repository at
+`/data/content` and the directory containing `control.sqlite3` at `/data/control`,
+then run the offline [`adopt` procedure](lifecycle.md#adopt-existing-content-and-identities-offline).
+The root itself must also use durable writable storage for its lifecycle marker,
+derived search index, media and any local evidence. Nested bind mounts are
+supported; symbolic links are not. For external evidence, adoption records the
+provider URL and managed serving does not configure `/data/traces`.
+
+The image includes an SSH client so an existing safe SCP-style Git remote such as
+`wiki-host:/srv/wiki-content.git` remains usable. Supply `WIKI_PUSH=1` explicitly
+and mount the selected SSH key, `known_hosts`, and minimal SSH configuration as
+read-only files for the container identity. `WIKI_PUSH=0` keeps commits local.
+Set explicit `GIT_AUTHOR_*` and `GIT_COMMITTER_*` values when the repository does
+not have a local author identity; managed commands intentionally ignore a host's
+global Git configuration. Do not put Git credentials in the image or managed backup. See the
+[generic Compose guide](container-deployment.md) for an application-owned example;
+host-specific service, routing, identity and secret configuration belongs in the
+deployment owner's infrastructure repository.
 
 The direct entry points expose existing application operations and bypass the
 managed writer fence. Managed activation, bootstrap, maintenance, backup, and

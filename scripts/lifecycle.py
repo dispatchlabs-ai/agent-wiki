@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import shutil
 import sqlite3
 import stat
@@ -19,6 +20,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+from urllib.parse import urlsplit, urlunsplit
 import uuid
 
 
@@ -31,6 +33,7 @@ LAYOUT = {
     "article_media": "article-media",
 }
 ACTIVE_LOCK_FD: int | None = None
+LOCAL_EVIDENCE = {"mode": "local"}
 
 
 class LifecycleError(Exception):
@@ -218,7 +221,54 @@ def paths(root: Path) -> dict[str, Path]:
     return {name: root / value for name, value in LAYOUT.items()}
 
 
-def managed_env(root: Path, descriptor: int | None = None) -> dict[str, str]:
+def external_evidence(value: str) -> dict[str, str]:
+    candidate = value if value.endswith("/") else value + "/"
+    try:
+        parsed = urlsplit(candidate)
+    except ValueError as error:
+        raise LifecycleError(
+            "INVALID_EVIDENCE",
+            "External evidence URL must be an HTTP(S) service base",
+            2,
+        ) from error
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise LifecycleError("INVALID_EVIDENCE", "External evidence URL must be an HTTP(S) service base", 2)
+    return {"mode": "external", "url": urlunsplit(parsed)}
+
+
+def requested_evidence(args) -> dict:
+    return external_evidence(args.external_evidence_url) if args.external_evidence_url else LOCAL_EVIDENCE
+
+
+def evidence_config(value: dict) -> dict:
+    evidence = value.get("evidence", LOCAL_EVIDENCE)
+    if evidence == LOCAL_EVIDENCE:
+        return LOCAL_EVIDENCE
+    if (
+        not isinstance(evidence, dict)
+        or evidence.get("mode") != "external"
+        or set(evidence) != {"mode", "url"}
+        or not isinstance(evidence.get("url"), str)
+    ):
+        raise LifecycleError("INVALID_LAYOUT", "Managed evidence ownership is invalid")
+    normalized = external_evidence(evidence["url"])
+    if normalized != evidence:
+        raise LifecycleError("INVALID_LAYOUT", "Managed external evidence URL is not canonical")
+    return evidence
+
+
+def managed_env(
+    root: Path,
+    descriptor: int | None = None,
+    initialized: dict | None = None,
+) -> dict[str, str]:
     locations = paths(root)
     env = dict(os.environ)
     env.update(
@@ -227,10 +277,16 @@ def managed_env(root: Path, descriptor: int | None = None) -> dict[str, str]:
             "WIKI_LIFECYCLE_LOCK": str(lock_path(root)),
             "WIKI_REPO": str(locations["content"]),
             "WIKI_CONTROL": str(locations["control"]),
-            "WIKI_TRACES": str(locations["traces"]),
             "WIKI_ARTICLE_MEDIA": str(locations["article_media"]),
         }
     )
+    evidence = evidence_config(initialized) if initialized else LOCAL_EVIDENCE
+    if evidence["mode"] == "external":
+        env.pop("WIKI_TRACES", None)
+        env["WIKI_EVIDENCE_URL"] = evidence["url"]
+    else:
+        env["WIKI_TRACES"] = str(locations["traces"])
+        env.pop("WIKI_EVIDENCE_URL", None)
     # A managed installation accepts only its validated local repository config.
     # Ignore ambient Git config and make hooks/fsmonitor inert in descendants.
     for name in [name for name in env if name.startswith("GIT_CONFIG_")]:
@@ -266,6 +322,7 @@ def marker(root: Path) -> dict:
     value = read_json(filename)
     if not value or value.get("version") != FORMAT or value.get("layout") != LAYOUT:
         raise LifecycleError("NOT_INITIALIZED", "Managed root has no valid initialized marker")
+    evidence_config(value)
     return value
 
 
@@ -328,11 +385,39 @@ def validate_git_config(content: Path) -> None:
         if family == "remote":
             for key in ("url", "pushurl"):
                 for value in parser[section].get(key, "").split("\n"):
-                    if value and not (
-                        value.startswith(("https://", "ssh://", "git@"))
-                        or value.startswith("file://")
-                    ):
+                    if value and not valid_git_remote(value):
                         raise LifecycleError("UNSAFE_GIT_CONFIG", f"Unsafe managed Git remote URL in {section}")
+
+
+def valid_git_remote(value: str) -> bool:
+    if value.startswith(("https://", "file://")):
+        return not any(character in value for character in ("\r", "\n", "\0"))
+    if value.startswith("ssh://"):
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+        except ValueError:
+            return False
+        return bool(
+            parsed.scheme == "ssh"
+            and parsed.hostname
+            and re.fullmatch(r"[A-Za-z0-9._:-]+", parsed.hostname)
+            and (not parsed.username or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", parsed.username))
+            and not parsed.password
+            and not parsed.query
+            and not parsed.fragment
+            and (port is None or 0 < port < 65536)
+            and re.fullmatch(r"/[A-Za-z0-9._~+/=@%:,/-]*", parsed.path)
+        )
+    # Git's SCP-style SSH form permits a configured host alias. Keep the remote
+    # command path to a conservative, shell-inert character set and reject remote
+    # helpers (`ext::`), option-like hosts, whitespace, and shell substitutions.
+    return bool(re.fullmatch(
+        r"(?:[A-Za-z0-9][A-Za-z0-9._-]*@)?"
+        r"[A-Za-z0-9][A-Za-z0-9._-]*:"
+        r"[A-Za-z0-9._~/][A-Za-z0-9._~+/=@%:,/-]*",
+        value,
+    ))
 
 
 def validate_git_structure(content: Path) -> None:
@@ -371,10 +456,16 @@ def validate_git_structure(content: Path) -> None:
 
 def validate_ready(root: Path, *, allow_writer_lock=False) -> dict:
     initialized = marker(root)
+    evidence = evidence_config(initialized)
     locations = paths(root)
-    for name in ("content", "traces", "article_media"):
+    required_directories = ["content", "article_media"]
+    if evidence["mode"] == "local":
+        required_directories.append("traces")
+    for name in required_directories:
         if not locations[name].is_dir() or locations[name].is_symlink():
             raise LifecycleError("INVALID_LAYOUT", f"Invalid managed {name} path")
+    if locations["traces"].exists() and locations["traces"].is_symlink():
+        raise LifecycleError("INVALID_LAYOUT", "Invalid managed traces path")
     if not locations["control"].is_file() or locations["control"].is_symlink():
         raise LifecycleError("INVALID_LAYOUT", "Invalid managed control database")
     validate_git_structure(locations["content"])
@@ -387,7 +478,7 @@ def validate_ready(root: Path, *, allow_writer_lock=False) -> dict:
     head = git(locations["content"], ["rev-parse", "HEAD"])
     git(locations["content"], ["fsck", "--no-dangling"])
     control = validate_sqlite(locations["control"])
-    return {"marker": initialized, "head": head, "control": control}
+    return {"marker": initialized, "head": head, "control": control, "evidence": evidence}
 
 
 def root_entries(root: Path) -> list[str]:
@@ -412,15 +503,17 @@ def bootstrap(args) -> None:
                 3,
             )
         locations = paths(root)
+        evidence = requested_evidence(args)
         locations["content"].mkdir(mode=0o700)
         locations["control"].parent.mkdir(mode=0o700)
-        locations["traces"].mkdir(mode=0o700)
+        if evidence["mode"] == "local":
+            locations["traces"].mkdir(mode=0o700)
         locations["article_media"].mkdir(mode=0o700)
         git(locations["content"], ["init", "-b", "main"], validate=False)
         git(locations["content"], ["config", "user.name", args.git_name])
         git(locations["content"], ["config", "user.email", args.git_email])
         git(locations["content"], ["commit", "--allow-empty", "-m", "Initialize Agent Wiki"])
-        env = managed_env(root)
+        env = managed_env(root, initialized={"evidence": evidence})
         env["WIKI_ORIGIN"] = args.origin
         account = run(
             [
@@ -438,6 +531,7 @@ def bootstrap(args) -> None:
             "initialized_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "origin": args.origin,
             "content_head": git(locations["content"], ["rev-parse", "HEAD"]),
+            "evidence": evidence,
         }
         validate_sqlite(locations["control"])
         git(locations["content"], ["fsck", "--no-dangling"])
@@ -449,11 +543,130 @@ def bootstrap(args) -> None:
         print(json.dumps(result, sort_keys=True))
 
 
+def lifecycle_extras(root: Path) -> list[Path]:
+    return sorted(
+        (
+            entry
+            for entry in (root / ".lifecycle").iterdir()
+            if entry.name not in {"owner.lock", "owner.json"}
+        ),
+        key=lambda entry: entry.name,
+    )
+
+
+def adoption_marker_temporary(entry: Path) -> bool:
+    try:
+        details = entry.lstat()
+    except FileNotFoundError:
+        return False
+    return bool(
+        re.fullmatch(r"\.initialized\.json\.[a-f0-9]{32}\.tmp", entry.name)
+        and stat.S_ISREG(details.st_mode)
+        and not entry.is_symlink()
+    )
+
+
+def adopt(args) -> None:
+    root = root_path(args.root)
+    evidence = requested_evidence(args)
+    with ownership(root, "adopt"):
+        initialized_file = root / ".lifecycle" / "initialized.json"
+        if initialized_file.exists() or initialized_file.is_symlink():
+            initialized = marker(root)
+            if initialized.get("origin") != args.origin or evidence_config(initialized) != evidence:
+                raise LifecycleError(
+                    "ALREADY_INITIALIZED",
+                    "Managed root is initialized with different origin or evidence settings",
+                    3,
+                )
+            ready = validate_ready(root)
+            print(json.dumps({
+                "state": "already-adopted", "root": str(root),
+                "content_head": ready["head"], "control": ready["control"],
+                "evidence": ready["evidence"],
+            }, sort_keys=True))
+            return
+
+        extras = lifecycle_extras(root)
+        unexpected = [entry.name for entry in extras if not adoption_marker_temporary(entry)]
+        if unexpected:
+            raise LifecycleError(
+                "PARTIAL_STATE",
+                f"Refusing adoption with unexpected lifecycle state: {', '.join(unexpected)}",
+                3,
+            )
+        allowed = {"content", "control", "traces", "article-media", "search"}
+        unexpected_root = sorted(set(root_entries(root)) - allowed)
+        if unexpected_root:
+            raise LifecycleError(
+                "INVALID_LAYOUT",
+                f"Managed root contains unexpected paths: {', '.join(unexpected_root)}",
+                3,
+            )
+        locations = paths(root)
+        control_parent = locations["control"].parent
+        if not control_parent.is_dir() or control_parent.is_symlink():
+            raise LifecycleError("INVALID_LAYOUT", "Existing control parent must be an ordinary directory")
+        if not locations["control"].is_file() or locations["control"].is_symlink():
+            raise LifecycleError("INVALID_LAYOUT", "Existing control database must be one regular file")
+        validate_git_structure(locations["content"])
+        lock = writer_lock(root)
+        if lock.exists() or lock.is_symlink():
+            raise LifecycleError(
+                "INTERRUPTED_WRITE",
+                "Retained wiki-write.lock.d requires reconciliation before adoption",
+                3,
+            )
+        head = git(locations["content"], ["rev-parse", "HEAD"])
+        git(locations["content"], ["fsck", "--no-dangling"])
+        if git(locations["content"], ["status", "--porcelain=v1", "-z", "--untracked-files=all"]):
+            raise LifecycleError("WORKTREE_CONFLICT", "Content worktree must be clean for adoption", 3)
+        control = validate_sqlite(locations["control"])
+        if locations["article_media"].exists():
+            if not locations["article_media"].is_dir() or locations["article_media"].is_symlink():
+                raise LifecycleError("INVALID_LAYOUT", "Existing article-media path must be an ordinary directory")
+        if evidence["mode"] == "local":
+            if locations["traces"].exists():
+                if not locations["traces"].is_dir() or locations["traces"].is_symlink():
+                    raise LifecycleError("INVALID_LAYOUT", "Existing traces path must be an ordinary directory")
+        elif locations["traces"].exists():
+            if not locations["traces"].is_dir() or locations["traces"].is_symlink():
+                raise LifecycleError("INVALID_LAYOUT", "Existing traces path must be an ordinary directory")
+            if any(locations["traces"].iterdir()):
+                raise LifecycleError(
+                    "EVIDENCE_CONFLICT",
+                    "External evidence adoption refuses a nonempty local traces directory",
+                    3,
+                )
+        if not locations["article_media"].exists():
+            locations["article_media"].mkdir(mode=0o700)
+        if evidence["mode"] == "local" and not locations["traces"].exists():
+            locations["traces"].mkdir(mode=0o700)
+        sync_directory(root)
+        state = {
+            "version": FORMAT,
+            "layout": LAYOUT,
+            "adopted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "origin": args.origin,
+            "content_head": head,
+            "evidence": evidence,
+        }
+        atomic_write(initialized_file, canonical_json(state))
+        for entry in extras:
+            entry.unlink(missing_ok=True)
+        sync_directory(root / ".lifecycle")
+        ready = validate_ready(root)
+        print(json.dumps({
+            "state": "adopted", "root": str(root), "content_head": ready["head"],
+            "control": control, "evidence": evidence,
+        }, sort_keys=True))
+
+
 def serve(args) -> None:
     root = root_path(args.root)
     with ownership(root, "serve") as descriptor:
         ready = validate_ready(root)
-        env = managed_env(root, descriptor)
+        env = managed_env(root, descriptor, ready["marker"])
         env["WIKI_ORIGIN"] = args.origin or env.get("WIKI_ORIGIN") or ready["marker"]["origin"]
         env["WIKI_LISTEN_HOST"] = args.bind or env.get("WIKI_LISTEN_HOST", "127.0.0.1")
         if args.port is not None:
@@ -467,8 +680,8 @@ def maintenance(args) -> None:
         raise LifecycleError("INVALID_COMMAND", "maintenance requires a command after --", 2)
     root = root_path(args.root)
     with ownership(root, "maintenance") as descriptor:
-        validate_ready(root)
-        os.execvpe(command[0], command, managed_env(root, descriptor))
+        ready = validate_ready(root)
+        os.execvpe(command[0], command, managed_env(root, descriptor, ready["marker"]))
 
 
 def copy_tree(source: Path, target: Path) -> None:
@@ -557,7 +770,8 @@ def backup(args) -> None:
             copy_tree(paths(root)["content"], staging / "content")
             (staging / "control").mkdir(mode=0o700)
             sqlite_backup(paths(root)["control"], staging / "control" / "control.sqlite3")
-            copy_tree(paths(root)["traces"], staging / "traces")
+            if ready["evidence"]["mode"] == "local":
+                copy_tree(paths(root)["traces"], staging / "traces")
             copy_tree(paths(root)["article_media"], staging / "article-media")
             (staging / ".lifecycle").mkdir(mode=0o700)
             shutil.copy2(root / ".lifecycle" / "initialized.json", staging / ".lifecycle" / "initialized.json")
@@ -572,6 +786,7 @@ def backup(args) -> None:
                 "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
                 "content_head": ready["head"],
                 "control": ready["control"],
+                "evidence": ready["evidence"],
                 "files": files,
             }
             atomic_write(staging / "backup-manifest.json", canonical_json(manifest))
@@ -620,7 +835,7 @@ def backup(args) -> None:
         print(json.dumps({
             "state": "backed-up", "backup_id": backup_id, "archive": str(destination),
             "sha256": archive_digest, "bytes": size, "content_head": ready["head"],
-            "control": ready["control"],
+            "control": ready["control"], "evidence": ready["evidence"],
         }, sort_keys=True))
 
 
@@ -671,6 +886,12 @@ def archive_inventory(archive: tarfile.TarFile) -> tuple[dict[str, tarfile.TarIn
         or any(character not in "0123456789abcdef" for character in manifest["content_head"])
     ):
         raise LifecycleError("INVALID_BACKUP", "Backup identity or Git HEAD is invalid")
+    evidence = manifest.get("evidence", LOCAL_EVIDENCE)
+    try:
+        evidence = evidence_config({"evidence": evidence})
+    except LifecycleError as error:
+        raise LifecycleError("INVALID_BACKUP", "Backup evidence ownership is invalid") from error
+    manifest["evidence"] = evidence
     regular = {name for name, item in members.items() if item.isreg() and name != "backup-manifest.json"}
     if regular != set(manifest["files"]):
         raise LifecycleError("INVALID_BACKUP", "Backup members do not match the manifest")
@@ -734,6 +955,19 @@ def validate_staging(staging: Path, manifest: dict) -> None:
     value = read_json(staging / ".lifecycle" / "initialized.json")
     if not value or value.get("version") != FORMAT or value.get("layout") != LAYOUT:
         raise LifecycleError("INVALID_BACKUP", "Backup initialized marker is invalid")
+    try:
+        evidence = evidence_config(value)
+    except LifecycleError as error:
+        raise LifecycleError("INVALID_BACKUP", "Backup initialized evidence ownership is invalid") from error
+    if evidence != manifest["evidence"]:
+        raise LifecycleError("INVALID_BACKUP", "Backup evidence ownership does not match its marker")
+    if not (staging / "article-media").is_dir():
+        raise LifecycleError("INVALID_BACKUP", "Backup article-media directory is missing")
+    traces = staging / "traces"
+    if evidence["mode"] == "local" and not traces.is_dir():
+        raise LifecycleError("INVALID_BACKUP", "Local-evidence backup omits traces")
+    if evidence["mode"] == "external" and traces.exists():
+        raise LifecycleError("INVALID_BACKUP", "External-evidence backup must not archive traces")
 
 
 def restore(args) -> None:
@@ -759,7 +993,10 @@ def restore(args) -> None:
                 staging.mkdir(mode=0o700)
                 extract_validated(archive, members, staging)
                 validate_staging(staging, manifest)
-                for name in ("content", "control", "traces", "article-media"):
+                stores = ["content", "control", "article-media"]
+                if manifest["evidence"]["mode"] == "local":
+                    stores.append("traces")
+                for name in stores:
                     os.replace(staging / name, root / name)
                 recovery = staging / ".lifecycle" / "recovery"
                 if recovery.exists():
@@ -770,7 +1007,7 @@ def restore(args) -> None:
         print(json.dumps({
             "state": "restored", "root": str(root), "backup_id": manifest["backup_id"],
             "archive_sha256": digest_file(archive_path), "content_head": ready["head"],
-            "control": ready["control"],
+            "control": ready["control"], "evidence": ready["evidence"],
         }, sort_keys=True))
 
 
@@ -897,8 +1134,9 @@ def status(args) -> None:
     }
     if initialized:
         try:
-            validate_git_structure(paths(root)["content"])
-            result["content_head"] = git(paths(root)["content"], ["rev-parse", "HEAD"])
+            ready = validate_ready(root, allow_writer_lock=True)
+            result["content_head"] = ready["head"]
+            result["evidence"] = ready["evidence"]
             result["writer_recovery_required"] = writer_lock(root).exists()
         except Exception as error:
             result["state"] = "invalid"
@@ -916,8 +1154,14 @@ def parser() -> argparse.ArgumentParser:
     boot.add_argument("--manager-name", required=True)
     boot.add_argument("--git-name", default="Agent Wiki")
     boot.add_argument("--git-email", default="agent-wiki@example.invalid")
+    boot.add_argument("--external-evidence-url")
     boot.add_argument("--node", default="node")
     boot.set_defaults(function=bootstrap)
+    import_existing = subcommands.add_parser("adopt", help="adopt validated existing content and control state")
+    import_existing.add_argument("--root", required=True)
+    import_existing.add_argument("--origin", required=True)
+    import_existing.add_argument("--external-evidence-url")
+    import_existing.set_defaults(function=adopt)
     start = subcommands.add_parser("serve", help="run the single managed server owner")
     start.add_argument("--root", required=True)
     start.add_argument("--origin")

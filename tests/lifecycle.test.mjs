@@ -46,6 +46,19 @@ function bootstrap(root, overrides = {}) {
   ]);
 }
 
+function adopt(root, overrides = {}) {
+  const args = [
+    "adopt",
+    "--root",
+    root,
+    "--origin",
+    overrides.origin || "https://wiki.example.test",
+  ];
+  if (overrides.evidence)
+    args.push("--external-evidence-url", overrides.evidence);
+  return call(args, { env: overrides.env });
+}
+
 function savedDraft(operation, id) {
   return JSON.stringify({
     operation_id: operation,
@@ -112,6 +125,173 @@ test("bootstrap commits marker last and refuses rebootstrap or partial state", (
   const retry = bootstrap(partial);
   assert.equal(retry.status, 3);
   assert.equal(JSON.parse(retry.stderr).code, "PARTIAL_STATE");
+});
+
+test("adopt preserves existing state, accepts safe SSH aliases, and records external evidence", (t) => {
+  const directory = temporary(t);
+  const root = path.join(directory, "root");
+  assert.equal(bootstrap(root).status, 0);
+  fs.rmSync(path.join(root, ".lifecycle/initialized.json"));
+  fs.rmSync(path.join(root, "traces"), { recursive: true });
+  fs.rmSync(path.join(root, "article-media"), { recursive: true });
+  execFileSync("git", [
+    "-C",
+    path.join(root, "content"),
+    "remote",
+    "add",
+    "origin",
+    "wiki-host:/srv/private/agent-wiki-content.git",
+  ]);
+  const control = path.join(root, "control/control.sqlite3");
+  const beforeControl = sha256(control);
+  const beforeHead = execFileSync(
+    "git",
+    ["-C", path.join(root, "content"), "rev-parse", "HEAD"],
+    { encoding: "utf8" },
+  ).trim();
+  const contentInode = fs.statSync(path.join(root, "content")).ino;
+  const interruptedMarker = path.join(
+    root,
+    ".lifecycle/.initialized.json.0123456789abcdef0123456789abcdef.tmp",
+  );
+  fs.writeFileSync(interruptedMarker, "incomplete");
+
+  const result = adopt(root, {
+    evidence: "http://127.0.0.1:8769/api/evidence/v1",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const receipt = JSON.parse(result.stdout);
+  assert.equal(receipt.state, "adopted");
+  assert.equal(receipt.content_head, beforeHead);
+  assert.deepEqual(receipt.evidence, {
+    mode: "external",
+    url: "http://127.0.0.1:8769/api/evidence/v1/",
+  });
+  assert.equal(fs.statSync(path.join(root, "content")).ino, contentInode);
+  assert.equal(sha256(control), beforeControl);
+  assert.equal(fs.existsSync(interruptedMarker), false);
+  assert.equal(fs.existsSync(path.join(root, "traces")), false);
+  assert.equal(
+    fs.statSync(path.join(root, "article-media")).isDirectory(),
+    true,
+  );
+
+  const environment = call(
+    [
+      "maintenance",
+      "--root",
+      root,
+      "--",
+      process.execPath,
+      "-e",
+      "console.log(JSON.stringify({traces:process.env.WIKI_TRACES||null,evidence:process.env.WIKI_EVIDENCE_URL,push:process.env.WIKI_PUSH,askpass:process.env.GIT_ASKPASS,author:process.env.GIT_AUTHOR_EMAIL,committer:process.env.GIT_COMMITTER_EMAIL}))",
+    ],
+    {
+      env: {
+        WIKI_TRACES: "/wrong/local/traces",
+        WIKI_EVIDENCE_URL: "https://wrong.example/",
+        WIKI_PUSH: "1",
+        GIT_ASKPASS: "/explicit/askpass",
+        GIT_AUTHOR_EMAIL: "wiki-author@example.test",
+        GIT_COMMITTER_EMAIL: "wiki-committer@example.test",
+      },
+    },
+  );
+  assert.equal(environment.status, 0, environment.stderr);
+  assert.deepEqual(JSON.parse(environment.stdout), {
+    traces: null,
+    evidence: "http://127.0.0.1:8769/api/evidence/v1/",
+    push: "1",
+    askpass: "/explicit/askpass",
+    author: "wiki-author@example.test",
+    committer: "wiki-committer@example.test",
+  });
+
+  const repeated = adopt(root, {
+    evidence: "http://127.0.0.1:8769/api/evidence/v1/",
+  });
+  assert.equal(repeated.status, 0, repeated.stderr);
+  assert.equal(JSON.parse(repeated.stdout).state, "already-adopted");
+  const mismatch = adopt(root);
+  assert.equal(mismatch.status, 3);
+  assert.equal(JSON.parse(mismatch.stderr).code, "ALREADY_INITIALIZED");
+
+  const archive = path.join(directory, "external-backup.tar.gz");
+  const backedUp = call(["backup", "--root", root, "--destination", archive]);
+  assert.equal(backedUp.status, 0, backedUp.stderr);
+  assert.equal(JSON.parse(backedUp.stdout).evidence.mode, "external");
+  const listing = execFileSync("tar", ["-tzf", archive], {
+    encoding: "utf8",
+  }).split("\n");
+  assert.equal(
+    listing.some((name) => name === "traces" || name.startsWith("traces/")),
+    false,
+  );
+
+  const restored = path.join(directory, "restored");
+  const restore = call(["restore", "--root", restored, "--archive", archive]);
+  assert.equal(restore.status, 0, restore.stderr);
+  assert.deepEqual(JSON.parse(restore.stdout).evidence, receipt.evidence);
+  assert.equal(fs.existsSync(path.join(restored, "traces")), false);
+  assert.equal(
+    JSON.parse(call(["status", "--root", restored]).stdout).evidence.mode,
+    "external",
+  );
+});
+
+test("adopt rejects unsafe Git helpers and ambiguous local evidence", (t) => {
+  const directory = temporary(t);
+  const root = path.join(directory, "root");
+  assert.equal(bootstrap(root).status, 0);
+  fs.rmSync(path.join(root, ".lifecycle/initialized.json"));
+  execFileSync("git", [
+    "-C",
+    path.join(root, "content"),
+    "remote",
+    "add",
+    "origin",
+    "ext::sh -c unsafe",
+  ]);
+  let result = adopt(root);
+  assert.notEqual(result.status, 0);
+  assert.equal(JSON.parse(result.stderr).code, "UNSAFE_GIT_CONFIG");
+
+  execFileSync("git", [
+    "-C",
+    path.join(root, "content"),
+    "remote",
+    "set-url",
+    "origin",
+    "wiki-host:/srv/wiki.git;touch-unsafe",
+  ]);
+  result = adopt(root);
+  assert.notEqual(result.status, 0);
+  assert.equal(JSON.parse(result.stderr).code, "UNSAFE_GIT_CONFIG");
+
+  execFileSync("git", [
+    "-C",
+    path.join(root, "content"),
+    "remote",
+    "set-url",
+    "origin",
+    "ssh://wiki-host/srv/wiki.git;touch-unsafe",
+  ]);
+  result = adopt(root);
+  assert.notEqual(result.status, 0);
+  assert.equal(JSON.parse(result.stderr).code, "UNSAFE_GIT_CONFIG");
+
+  execFileSync("git", [
+    "-C",
+    path.join(root, "content"),
+    "remote",
+    "set-url",
+    "origin",
+    "wiki-host:repositories/wiki.git",
+  ]);
+  fs.writeFileSync(path.join(root, "traces/evidence.jsonl"), "synthetic\n");
+  result = adopt(root, { evidence: "http://127.0.0.1:8769/api/evidence/v1" });
+  assert.equal(result.status, 3);
+  assert.equal(JSON.parse(result.stderr).code, "EVIDENCE_CONFLICT");
 });
 
 test("managed serve excludes maintenance and an explicit container bind is reachable", async (t) => {

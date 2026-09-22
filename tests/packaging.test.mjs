@@ -33,6 +33,7 @@ test("packaging inputs carry immutable dependency and source identity", () => {
   );
   assert.ok(packageDefinition.includes(nixpkgsRevision));
   assert.match(packageDefinition, /versionAtLeast nodeVersion "24\.19\.0"/);
+  assert.match(packageDefinition, /runtimePath[\s\S]*openssh/);
   assert.match(packageDefinition, /hostRequiresNix = true/);
   assert.match(packageDefinition, /ociRequiresNix = false/);
 });

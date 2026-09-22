@@ -37,7 +37,8 @@ agent-wiki bootstrap \
 ```
 
 Bootstrap accepts only an absent or empty root. It creates an empty `main` Git
-history, the control store and the independent trace/media stores, then validates
+history, the control store and the independent media store, plus a local trace
+store unless `--external-evidence-url` selects external ownership. It then validates
 Git and SQLite before atomically writing `initialized.json` last. Its JSON receipt
 contains the content HEAD and a one-time setup URL. Treat that URL as a credential
 and consume it through the configured HTTPS origin. A repeated bootstrap returns
@@ -45,10 +46,46 @@ and consume it through the configured HTTPS origin. A repeated bootstrap returns
 the files for diagnosis and restore or deliberately clean the exact failed root
 offline. Bootstrap never guesses that partial data is disposable.
 
-The managed layout is a new installation format. It does not pretend to migrate
-an existing direct-storage installation. Move an existing installation only by
-taking its service offline, producing a reviewed complete recovery copy, and
-restoring or importing it through a procedure written for that source layout.
+## Adopt existing content and identities offline
+
+`adopt` brings an existing direct-storage installation under the managed fence
+without copying, initializing, or replacing its content repository or control
+database. Stop the direct server and every writer first, retain a reviewed recovery
+copy, arrange the existing stores at `ROOT/content` and
+`ROOT/control/control.sqlite3`, and run:
+
+```sh
+agent-wiki adopt \
+  --root /absolute/private/wiki-data \
+  --origin https://wiki.example.org
+```
+
+For an installation whose evidence is owned by a separate read-only service, make
+that ownership explicit during adoption:
+
+```sh
+agent-wiki adopt \
+  --root /absolute/private/wiki-data \
+  --origin https://wiki.example.org \
+  --external-evidence-url http://evidence.internal:8769/api/evidence/v1/
+```
+
+Adoption holds the same owner fence as serve and maintenance. It requires an
+ordinary, clean, self-contained Git worktree with safe configuration and no
+retained writer lock, verifies Git objects and the control database's principals
+and manager grant, and writes `initialized.json` last. Existing content, Git
+configuration, identities, grants, credentials and sessions are read but never
+rewritten. Missing empty application-owned trace or article-media directories are
+created as needed. An external-evidence adoption refuses a nonempty local trace
+directory so evidence cannot silently fall outside recovery.
+
+An interrupted attempt before the marker can be repeated after verifying that the
+service stayed offline. A repeat with the same origin and evidence configuration
+returns `already-adopted`; a different configuration is rejected. Existing
+`content` and `control` directories may be bind-mounted subdirectories as long as
+the managed root and mount layout are stable across every lifecycle command.
+Filesystem validation still rejects symbolic links. Mount points do not prove that
+an unmanaged writer is stopped, so the offline step remains an operator boundary.
 
 ## Serve and maintain one owner
 
@@ -58,7 +95,7 @@ Start the packaged server through the lifecycle command:
 agent-wiki serve --root /absolute/private/wiki-data
 ```
 
-The server uses the bootstrap origin unless `--origin` or `WIKI_ORIGIN` explicitly
+The server uses the bootstrap/adoption origin unless `--origin` or `WIKI_ORIGIN` explicitly
 overrides it. It binds `127.0.0.1` by default for a same-host HTTPS proxy. A
 container can explicitly use `--bind 0.0.0.0`; the canonical origin and Host
 checks still apply, and the application port should remain behind the selected
@@ -72,7 +109,9 @@ agent-wiki maintenance --root /absolute/private/wiki-data -- \
 ```
 
 Stop the managed server first. The maintenance command exports `WIKI_REPO`,
-`WIKI_CONTROL`, `WIKI_TRACES`, and `WIKI_ARTICLE_MEDIA` from the fixed root.
+`WIKI_CONTROL`, and `WIKI_ARTICLE_MEDIA` from the fixed root. A local-evidence
+marker also exports `WIKI_TRACES`; an external-evidence marker instead exports its
+normalized `WIKI_EVIDENCE_URL`. Ambient values cannot select both providers.
 Account and agent administration, trace import/indexing, and media publication
 belong behind this command in a managed installation.
 
@@ -132,8 +171,12 @@ mounted managed root, not its parent, and stays on the same filesystem as the
 atomic store moves. It moves the validated stores into the fresh root, removes
 staging and writes the initialized marker last. Verify the actual browser/API/MCP
 read and write flows before accepting the recovery copy.
-Backups contain password hashes, sessions, credentials, evidence, and private
-media; protect and retain them as private application data.
+For local evidence, the archive contains traces together with password hashes,
+sessions, credentials and private media. For external evidence, the manifest and
+initialized marker record the provider URL and the archive deliberately omits
+traces. Restore preserves that mode and URL; recover and verify the externally
+owned evidence service through its own procedure before reopening the wiki. In
+either mode, protect and retain the archive as private application data.
 
 ## Recover an interrupted article write
 

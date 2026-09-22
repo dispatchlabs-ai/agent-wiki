@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.10 — 2026-09-22
+
+- Add a fenced offline adoption command that validates an existing content Git
+  repository and control database in place, then writes the managed marker last.
+  Exact retries are safe; adoption preserves identities, history, Git remotes and
+  mounted content/control directories.
+- Record local or external evidence ownership in managed state. External mode
+  selects only the configured evidence provider and excludes its externally owned
+  archive from application backup/restore while retaining that recovery boundary.
+- Include OpenSSH in packaged runtimes and accept conservatively parsed SCP-style
+  SSH aliases without allowing Git remote helpers or unsafe configuration.
+
 ## 0.8.9 — 2026-09-22
 
 - Restore managed backups when the data root is a writable mount under a
