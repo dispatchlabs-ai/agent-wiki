@@ -45,6 +45,11 @@ dockerTools.buildLayeredImage {
     ExposedPorts = {
       "4317/tcp" = { };
     };
+    # ECS initializes a task bind volume from the matching image volume path.
+    # Keep the image's 1777 mode when /tmp is replaced under a read-only root.
+    Volumes = {
+      "/tmp" = { };
+    };
     Labels = {
       "org.opencontainers.image.title" = "Agent Wiki";
       "org.opencontainers.image.description" = "Git-backed wiki with browser and agent interfaces";
