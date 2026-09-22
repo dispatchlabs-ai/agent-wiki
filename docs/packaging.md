@@ -160,28 +160,50 @@ service user Nix `trusted-users` authority or disable signature checks to bypass
 that boundary. Publishing and retention of these assets remain a release action;
 these scripts do not publish anything.
 
-## Qualification matrix
+## Qualified 0.8.8 release
 
-The initial pilot artifact identifies source `ca4df1c9a11e77d692a7d37f7c8e535e8ba4e6fa`.
-It is evidence for the packaging approach, not a substitute for checking each new
-release's exact revision and signature.
+The [0.8.8 release](https://github.com/dispatchlabs-ai/agent-wiki/releases/tag/v0.8.8)
+contains exact-source host closures and a Linux controller image at
+`03d96203b5860d6a207af26fb7be5bd4f3cf0535`. Download the signed `SHA256SUMS`,
+per-archive manifests, verification script, and `qualification.json` together.
+The independently versioned module is `wiki-service-v0.1.0` at the same source
+commit; its version is not the application version.
 
-| Surface                        | Pilot evidence                                                                                                                                                    | Boundary                                                                                                                                                      |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS Apple Silicon            | Native build; installed browser/MCP reads and writes, identities, media, traces, restart, fresh-root restore and interrupted-writer recovery                      | Nix required; process mode only                                                                                                                               |
-| Linux x86-64                   | Same full installed-package journey; native host and container builds                                                                                             | Nix required for host; process mode only                                                                                                                      |
-| Linux x86-64 container         | Clean-volume bootstrap, health, non-root execution, writer exclusion and cleanup                                                                                  | No Nix at runtime; ECS/S3 Files qualification is separate                                                                                                     |
-| Ubuntu 24.04 x86-64 under WSL2 | Retrieved matching closure into previously empty application store; verified manifest; bootstrap, health, fencing and process restart with persisted content HEAD | Initial missing jq fixed by locked verifier shell; formal verification was repeated on warm store. Browser/full recovery and unattended restart not qualified |
+| Surface                 | Executed release qualification                                                                                                          | Boundary                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Apple Silicon macOS     | Native package; browser/MCP read/write; identity, media and evidence; upgrade; restart; fresh restore and interrupted-writer recovery   | Nix required; process mode                                                                                       |
+| x86-64 Linux            | Same installed-package journey; own-equipment source and host/OCI package CI                                                            | Nix required for host; process mode                                                                              |
+| x86-64 Linux container  | Fresh volumes, numeric non-root user, read-only root, dropped capabilities, writable `/tmp`, bootstrap, health and writer exclusion     | No Nix at runtime; Docker evidence does not qualify ECS/S3 Files                                                 |
+| Ubuntu 24.04 under WSL2 | Previously absent application store, official signed import, private-profile installation and full browser/MCP upgrade/recovery journey | Unset `DISPLAY` and `WAYLAND_DISPLAY` for the headless qualification browser; unattended startup/reboot untested |
 
-The WSL test VM unexpectedly stopped during qualification. The cause was not
-established; restarting the same preserved VM and completing process checks does
-not prove service startup, WSL restart or Windows reboot behavior. Do not advertise
-unattended WSL operation from this evidence.
+The macOS closure download is 506,802,049 bytes; Linux is 255,994,253 bytes;
+the Linux image archive is 262,420,607 bytes. The full installed journey took
+12.097 seconds on macOS and 8.904 seconds on Linux. The WSL signed import took
+34.444 seconds, profile installation 1.437 seconds, and full journey 23.801
+seconds. These are measured pilot-host timings, not performance guarantees.
 
-The full package runner's backup and fresh roots share one temporary filesystem.
-It proves application continuity, not independently retained disaster recovery.
-Operators must retain authenticated backup bytes in a separate failure domain,
-protect control identities and evidence, and test their actual recovery destination.
+The upgrade used the previously qualified candidate
+`ca4df1c9a11e77d692a7d37f7c8e535e8ba4e6fa`, whose embedded application version
+was 0.8.7; it is distinct from the published `v0.8.7` source tag. The exact new
+package served the same managed root and accepted an authenticated write before
+backup. Stop-to-health was 977 ms on macOS and 606 ms on Linux. Prior candidate
+closures remain retained for the pilot's recovery evidence.
+
+An OCI archive's image configuration digest is not its registry manifest digest.
+After verifying and loading the archive, push it to an authorized installation
+registry and record the returned manifest digest for ECS's `image@sha256:...`
+input. No registry push or customer activation follows merely from this release.
+
+Earlier WSL qualification first lacked `jq`, then hit a WSLg headless animation
+stall. The locked verifier shell supplied `jq`; unsetting the display variables
+let the unchanged complete qualifier pass. An earlier unexpected test-VM stop
+has no established cause. These completed process tests do not establish service
+manager startup, whole-WSL restart or Windows reboot recovery.
+
+The backup and fresh roots share a temporary filesystem. They prove application
+continuity, not independently retained disaster recovery. Retain authenticated
+backup bytes in a separate failure domain, protect control identities and
+evidence, and test the actual recovery destination.
 
 ## Upgrade and retention
 
