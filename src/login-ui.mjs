@@ -1,13 +1,20 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SignIn, Setup, Account } from "../ui/components/auth.mjs";
+import { SignIn, AutoSignIn, Setup, Account } from "../ui/components/auth.mjs";
 import { shell } from "./render.mjs";
-export function signInPage(auth, local, csrf, destination = "/") {
+export function signInPage(auth, local, csrf, destination = "/", notice = "") {
   return shell(
     "Sign in",
     renderToStaticMarkup(
-      createElement(SignIn, { auth, local, csrf, destination }),
+      createElement(SignIn, { auth, local, csrf, destination, notice }),
     ),
+    { signedOut: true },
+  );
+}
+export function autoSignInPage(destination, local) {
+  return shell(
+    "Signing in",
+    renderToStaticMarkup(createElement(AutoSignIn, { destination, local })),
     { signedOut: true },
   );
 }

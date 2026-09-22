@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { once } from "node:events";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { createOIDC } from "../src/authn.mjs";
+import { cookie, createOIDC } from "../src/authn.mjs";
+
+test("browser cookies retain the required session protections", () => {
+  assert.equal(
+    cookie("wiki_oidc_auto", "paused", "https://wiki.example", 31536000),
+    "wiki_oidc_auto=paused; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000; Secure",
+  );
+});
 
 test("OIDC rejects wrong issuer, audience, expiry, nonce, and callback state", async (t) => {
   // A synthetic token endpoint isolates malformed claims. Browser tests separately
@@ -98,6 +105,42 @@ test("OIDC rejects wrong issuer, audience, expiry, nonce, and callback state", a
       login,
     ),
   );
+
+  const workspace = await createOIDC({
+    issuer: origin,
+    clientId: "wiki",
+    clientSecret: "synthetic-secret",
+    hd: "example.com",
+    origin,
+    development: true,
+  });
+  assert.equal(
+    new URL(await workspace.begin(login)).searchParams.get("hd"),
+    "example.com",
+  );
+  override = {
+    email: "owner@example.com",
+    email_verified: true,
+    hd: "example.com",
+  };
+  assert.equal((await workspace.finish(callback, login)).subject, "owner");
+  for (const claims of [
+    {
+      email: "owner@example.com",
+      email_verified: false,
+      hd: "example.com",
+    },
+    {
+      email: "owner@example.com",
+      email_verified: true,
+      hd: "other.example",
+    },
+    { email: "owner@example.com", email_verified: true },
+    { email_verified: true, hd: "example.com" },
+  ]) {
+    override = claims;
+    await assert.rejects(() => workspace.finish(callback, login));
+  }
 });
 
 test("login destinations preserve local deep links and reject open redirects", async () => {

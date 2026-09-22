@@ -5,7 +5,12 @@ import { agentsPage } from "./agents-ui.mjs";
 import { AgentStore } from "./agent-store.mjs";
 import { AgentAuth } from "./agent-auth.mjs";
 import { hashPassword, verifyPassword } from "./passwords.mjs";
-import { signInPage, setupPage, accountPage } from "./login-ui.mjs";
+import {
+  signInPage,
+  autoSignInPage,
+  setupPage,
+  accountPage,
+} from "./login-ui.mjs";
 import { ControlStore, secret, localEmail } from "./control-store.mjs";
 import {
   configuredOIDC,
@@ -66,12 +71,15 @@ export function createWiki({
   push = false,
   control = null,
   auth = null,
+  autoLogin = false,
   localLogin = false,
   development = false,
   traceSearchPool = null,
 } = {}) {
   if (control && control.filename === ":memory:")
     throw Error("Durable control store required");
+  if (autoLogin && !auth)
+    throw Error("Automatic OIDC login requires Google/OIDC configuration");
   if (
     localLogin &&
     new URL(origin).protocol !== "https:" &&
@@ -368,6 +376,8 @@ export function createWiki({
             cookie("wiki_form", "", origin, 0),
           ]);
         };
+        const pauseAutoLogin = () =>
+          cookie("wiki_oidc_auto", "paused", origin, 31536000);
         if (
           localLogin &&
           req.method === "GET" &&
@@ -424,22 +434,61 @@ export function createWiki({
           res.setHeader("Location", location);
           send(303, "");
         };
+        if (req.method === "GET" && url.pathname === "/auth/sign-in") {
+          const destination = returnPath(url.searchParams.get("return_to"));
+          const localOnly = url.searchParams.get("mode") === "local";
+          return send(
+            200,
+            signInPage(
+              localOnly ? null : auth,
+              localLogin,
+              localLogin ? formToken() : "",
+              destination,
+            ),
+            "text/html",
+          );
+        }
         if (req.method === "GET" && url.pathname === "/auth/login") {
           if (!auth) return send(503, { error: "Sign-in unavailable" });
-          const login = control.login(
-            returnPath(url.searchParams.get("return_to")),
+          control.consumeLogin(cookieValue(req, "wiki_login"));
+          const loginDestination = returnPath(
+            url.searchParams.get("return_to"),
           );
-          const destination = await auth.begin(login);
-          res.setHeader(
-            "Set-Cookie",
-            cookie("wiki_login", login.token, origin, 300),
-          );
-          return redirect(destination);
+          const login = control.login(loginDestination);
+          try {
+            const providerDestination = await auth.begin(login);
+            res.setHeader("Set-Cookie", [
+              cookie("wiki_login", login.token, origin, 300),
+              cookie("wiki_oidc_auto", "", origin, 0),
+            ]);
+            return redirect(providerDestination);
+          } catch {
+            control.consumeLogin(login.token);
+            const csrf = localLogin ? secret() : "";
+            res.setHeader("Set-Cookie", [
+              pauseAutoLogin(),
+              ...(localLogin ? [cookie("wiki_form", csrf, origin, 900)] : []),
+            ]);
+            return send(
+              503,
+              signInPage(
+                auth,
+                localLogin,
+                csrf,
+                loginDestination,
+                localLogin
+                  ? "The identity provider is unavailable. Try again or use a wiki account."
+                  : "The identity provider is unavailable. Try again.",
+              ),
+              "text/html",
+            );
+          }
         }
         if (req.method === "GET" && url.pathname === "/auth/callback") {
           res.setHeader("Set-Cookie", cookie("wiki_login", "", origin, 0));
+          let login;
           try {
-            const login = control.consumeLogin(cookieValue(req, "wiki_login"));
+            login = control.consumeLogin(cookieValue(req, "wiki_login"));
             if (!login || !auth) throw Error("Invalid login");
             const identity = await auth.finish(url, login);
             const principal = control.enroll(identity);
@@ -447,10 +496,31 @@ export function createWiki({
             res.setHeader("Set-Cookie", [
               cookie("wiki_login", "", origin, 0),
               cookie("wiki_session", session.token, origin),
+              cookie("wiki_oidc_auto", "", origin, 0),
             ]);
-            return redirect(returnPath(login.destination));
+            return redirect(
+              control.role(principal.id) ? returnPath(login.destination) : "/",
+            );
           } catch {
-            return send(400, { error: "Sign-in failed. Start again." });
+            const csrf = localLogin ? secret() : "";
+            res.setHeader("Set-Cookie", [
+              cookie("wiki_login", "", origin, 0),
+              pauseAutoLogin(),
+              ...(localLogin ? [cookie("wiki_form", csrf, origin, 900)] : []),
+            ]);
+            return send(
+              400,
+              signInPage(
+                auth,
+                localLogin,
+                csrf,
+                login?.destination || "/",
+                localLogin
+                  ? "Sign-in failed or was cancelled. Try again or use a wiki account."
+                  : "Sign-in failed or was cancelled. Try again.",
+              ),
+              "text/html",
+            );
           }
         }
         const publicAsset = {
@@ -469,20 +539,44 @@ export function createWiki({
         token = cookieValue(req, "wiki_session");
         actor = control.authenticate(token);
         if (!actor) res.setHeader("WWW-Authenticate", agentAuth.challenge());
-        if (!actor)
-          return req.method === "GET" &&
+        if (!actor) {
+          if (
+            req.method === "GET" &&
             (url.pathname === "/" || req.headers.accept?.includes("text/html"))
-            ? send(
+          ) {
+            const destination = returnPath(url.pathname + url.search);
+            const machinePath =
+              url.pathname === "/mcp" ||
+              url.pathname === "/mcp/" ||
+              url.pathname.startsWith("/api/") ||
+              url.pathname.startsWith("/.well-known/") ||
+              ["/oauth/register", "/oauth/token", "/oauth/revoke"].includes(
+                url.pathname,
+              );
+            if (
+              autoLogin &&
+              !machinePath &&
+              !cookieValue(req, "wiki_login") &&
+              cookieValue(req, "wiki_oidc_auto") !== "paused"
+            )
+              return send(
                 200,
-                signInPage(
-                  auth,
-                  localLogin,
-                  localLogin ? formToken() : "",
-                  returnPath(url.pathname + url.search),
-                ),
+                autoSignInPage(destination, localLogin),
                 "text/html",
-              )
-            : send(401, { error: "Sign in required" });
+              );
+            return send(
+              200,
+              signInPage(
+                auth,
+                localLogin,
+                localLogin ? formToken() : "",
+                destination,
+              ),
+              "text/html",
+            );
+          }
+          return send(401, { error: "Sign in required" });
+        }
         const csrf = () =>
           req.headers.origin === origin &&
           req.headers["x-wiki-csrf"] === actor.csrf &&
@@ -556,7 +650,10 @@ export function createWiki({
         if (req.method === "POST" && url.pathname === "/auth/logout") {
           if (!csrf()) return send(403, { error: "Invalid request" });
           control.logout(token);
-          res.setHeader("Set-Cookie", cookie("wiki_session", "", origin, 0));
+          res.setHeader("Set-Cookie", [
+            cookie("wiki_session", "", origin, 0),
+            pauseAutoLogin(),
+          ]);
           return send(200, { signedOut: true });
         }
         if (req.method === "GET" && url.pathname === "/api/me")
@@ -1537,12 +1634,14 @@ if (
   const control = new ControlStore(process.env.WIKI_CONTROL);
   const settings = oidcSettings(process.env);
   const localLogin = process.env.WIKI_LOCAL_LOGIN !== "0";
+  const autoLogin = process.env.WIKI_OIDC_AUTO_LOGIN === "1";
   if (!settings && !localLogin)
     throw Error("Enable Google/OIDC or local login");
   const auth = settings ? configuredOIDC(settings, origin) : null;
   createWiki({
     control,
     auth,
+    autoLogin,
     localLogin,
     database: process.env.WIKI_DATABASE || ":memory:",
     origin: process.env.WIKI_ORIGIN || `http://127.0.0.1:${port}`,

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.12 — 2026-09-22
+
+- Add optional `WIKI_OIDC_AUTO_LOGIN=1` browser sign-in. A signed-out protected
+  navigation can reuse an existing provider session while preserving its path,
+  query, fragment and pending remote-MCP consent request. Logout, provider errors
+  and abandoned attempts remain signed out until the person explicitly resumes;
+  local accounts retain a direct recovery route. API, MCP, health, metadata and
+  token behavior is unchanged.
+- Add optional `WIKI_GOOGLE_WORKSPACE_DOMAIN` to hint Google account selection and
+  require a verified email plus the exact hosted-domain claim from the authenticated
+  ID-token response before enrollment. Email never links identities or grants a
+  role. Both settings are off by default, and existing installations require no
+  data migration.
+
 ## 0.8.11 — 2026-09-22
 
 - Allow only `GET /healthz` to answer before canonical Host validation so load

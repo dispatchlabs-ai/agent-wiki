@@ -62,11 +62,37 @@ WIKI_GOOGLE_CLIENT_ID=YOUR_WEB_CLIENT_ID
 WIKI_GOOGLE_CLIENT_SECRET=RETRIEVE_FROM_SECRET_STORE
 ```
 
+An installation intended for exactly one Google Workspace domain may also set:
+
+```sh
+WIKI_GOOGLE_WORKSPACE_DOMAIN=example.org
+```
+
+This is available only with the Google preset. It sends Google's `hd` request hint
+to improve account selection, then requires a verified email and that exact `hd`
+claim from the authenticated ID-token response. The hint alone is never trusted.
+This does not link by email, infer a role or replace explicit wiki grants. Leave it
+unset to continue admitting personal Google accounts and any Workspace domain
+allowed by the OAuth client's audience.
+
 Discovery uses `https://accounts.google.com`. Omit the generic OIDC variables when
 using the Google preset. Discovery is lazy so a provider outage does not prevent
 local accounts from signing in. For another provider, omit both Google variables
 and set `WIKI_OIDC_ISSUER`, `WIKI_OIDC_CLIENT_ID`, and `WIKI_OIDC_CLIENT_SECRET`.
 Generic providers must support Authorization Code, PKCE S256 and UserInfo.
+
+Set `WIKI_OIDC_AUTO_LOGIN=1` to send a signed-out browser navigation directly into
+the configured OIDC flow. It is off by default and requires Google/OIDC to be
+configured. The authorization request deliberately omits `prompt`, so Google can
+reuse an existing Google session after any consent, account-selection or security
+checks Google requires. The wiki cannot promise that Google will never show a
+provider page.
+
+Automatic login never applies to API, MCP, health, metadata or token requests.
+`/auth/sign-in?mode=local&return_to=%2F` is the explicit local-account recovery
+route when local login is enabled. A provider failure or cancelled callback pauses
+automatic attempts in that browser and leaves the ordinary provider and local
+choices available. Choosing the provider link resumes automatic login.
 
 ### Initial manager and local accounts
 
@@ -129,7 +155,10 @@ require `X-Wiki-Write: 1` and JSON. Development identity headers are never accep
 
 **Sign out** deletes the local session and expires its cookie. It does not log the
 person out of the upstream identity provider or their other applications. A later
-login may reuse the provider's existing SSO session. Upstream suspension does not
+login may reuse the provider's existing SSO session. With automatic OIDC enabled,
+sign out also pauses automatic attempts in that browser until the person explicitly
+chooses the provider link again. Opening another protected page does not sign the
+person back in by itself. Upstream suspension does not
 invalidate an already established local session immediately: revoke the local
 grant/session for immediate local removal. Back-channel logout and provider session
 synchronization are not implemented.
@@ -238,10 +267,15 @@ callbacks remain on the same host.
 ## Opening protected links
 
 A signed-out browser opening an article, conversation, or file receives a sign-in
-page. Google/OIDC and local login return to that same path, query, and citation
-anchor. Return destinations are restricted to this wiki. API clients and embedded
-image requests still receive 401 without credentials; a browser session is not
-automatically shared with another browser profile or an external image renderer.
+page, or, when automatic OIDC is enabled and has not been paused, a same-origin
+handoff page that starts OIDC. That handoff preserves the path, query, and citation
+anchor, including a remote MCP authorization request awaiting human consent.
+Google/OIDC and local login return to that destination. Return destinations are
+restricted to this wiki. A newly enrolled OIDC identity without a space grant goes
+to the existing access-requested page; sign-in still grants no role. API clients
+and embedded image requests still receive 401 without credentials; a browser
+session is not automatically shared with another browser profile or an external
+image renderer.
 
 For interactive MCP clients, prefer [remote agent connections](remote-agents.md).
 Account-directory selection in the Agents page requires current wiki membership

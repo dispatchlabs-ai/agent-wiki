@@ -14,6 +14,7 @@ export async function createOIDC({
   issuer,
   clientId,
   clientSecret,
+  hd,
   origin,
   development = false,
   label = issuer === GOOGLE_ISSUER
@@ -45,6 +46,7 @@ export async function createOIDC({
         nonce: login.nonce,
         code_challenge: await oidc.calculatePKCECodeChallenge(login.verifier),
         code_challenge_method: "S256",
+        ...(hd ? { hd } : {}),
       }).href;
     },
     async finish(url, login) {
@@ -57,6 +59,14 @@ export async function createOIDC({
       const claims = tokens.claims();
       if (!claims?.sub || claims.iss !== issuer)
         throw Error("Invalid identity");
+      if (
+        hd &&
+        (typeof claims.email !== "string" ||
+          !claims.email ||
+          claims.email_verified !== true ||
+          claims.hd !== hd)
+      )
+        throw Error("Invalid workspace identity");
       const profile = await oidc.fetchUserInfo(
         config,
         tokens.access_token,
@@ -75,10 +85,14 @@ export async function createOIDC({
   };
 }
 
-// The Google preset is direct OIDC. No hosted-domain or group requirement is
-// inferred: personal Google accounts and Workspace accounts use the same path.
+// The Google preset is direct OIDC. A hosted-domain boundary is optional and
+// explicit; no group or role is ever inferred from Google claims.
 export function oidcSettings(env) {
-  if (env.WIKI_GOOGLE_CLIENT_ID || env.WIKI_GOOGLE_CLIENT_SECRET) {
+  if (
+    env.WIKI_GOOGLE_CLIENT_ID ||
+    env.WIKI_GOOGLE_CLIENT_SECRET ||
+    env.WIKI_GOOGLE_WORKSPACE_DOMAIN
+  ) {
     if (
       !env.WIKI_GOOGLE_CLIENT_ID ||
       !env.WIKI_GOOGLE_CLIENT_SECRET ||
@@ -87,10 +101,20 @@ export function oidcSettings(env) {
       env.WIKI_OIDC_CLIENT_SECRET
     )
       throw Error("Set both Google client values and omit generic OIDC values");
+    if (
+      env.WIKI_GOOGLE_WORKSPACE_DOMAIN &&
+      !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(
+        env.WIKI_GOOGLE_WORKSPACE_DOMAIN,
+      )
+    )
+      throw Error("Google Workspace domain must be a lowercase DNS name");
     return {
       issuer: GOOGLE_ISSUER,
       clientId: env.WIKI_GOOGLE_CLIENT_ID,
       clientSecret: env.WIKI_GOOGLE_CLIENT_SECRET,
+      ...(env.WIKI_GOOGLE_WORKSPACE_DOMAIN
+        ? { hd: env.WIKI_GOOGLE_WORKSPACE_DOMAIN }
+        : {}),
     };
   }
   if (

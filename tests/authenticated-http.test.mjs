@@ -1046,3 +1046,88 @@ test("protected browser deep links offer sign in while machine requests retain 4
     );
   }
 });
+test("optional automatic OIDC is limited to browser navigation and has local and outage recovery", async (t) => {
+  const provider = "https://id.example/authorize";
+  const { request, control } = await server(t, {
+    autoLogin: true,
+    auth: {
+      label: "Continue with identity",
+      begin: async () => provider,
+      finish: async () => ({}),
+    },
+  });
+  const destination = "/wiki/guide/?source=trace";
+  const automatic = await request(destination, {
+    headers: { Cookie: "", Accept: "text/html" },
+  });
+  assert.equal(automatic.status, 200);
+  assert.match(await automatic.text(), /data-auto-login-destination/);
+
+  const paused = await request(destination, {
+    headers: {
+      Cookie: "wiki_oidc_auto=paused",
+      Accept: "text/html",
+    },
+  });
+  assert.equal(paused.status, 200);
+  assert.match(await paused.text(), /Continue with identity/);
+
+  const abandoned = await request(destination, {
+    headers: {
+      Cookie: "wiki_login=abandoned",
+      Accept: "text/html",
+    },
+  });
+  assert.equal(abandoned.status, 200);
+  const abandonedPage = await abandoned.text();
+  assert.match(abandonedPage, /Continue with identity/);
+  assert.doesNotMatch(abandonedPage, /data-auto-login-destination/);
+
+  for (const route of ["/api/articles/catalog.json", "/mcp"]) {
+    const machine = await request(route, {
+      headers: { Cookie: "", Accept: "application/json" },
+    });
+    assert.equal(machine.status, 401);
+    assert.match(machine.headers.get("content-type"), /application\/json/);
+    const html = await request(route, {
+      headers: { Cookie: "", Accept: "text/html" },
+    });
+    assert.equal(html.status, 200);
+    assert.doesNotMatch(await html.text(), /data-auto-login-destination/);
+  }
+  const health = await request("/healthz", {
+    headers: { Cookie: "", Accept: "text/html" },
+  });
+  assert.equal(health.status, 200);
+
+  const failing = await server(t, {
+    autoLogin: true,
+    auth: {
+      label: "Continue with identity",
+      begin: async () => {
+        throw Error("synthetic provider outage");
+      },
+      finish: async () => ({}),
+    },
+  });
+  const unavailable = await failing.request(
+    "/auth/login?return_to=" + encodeURIComponent(destination),
+    { headers: { Cookie: "", Accept: "text/html" } },
+  );
+  assert.equal(unavailable.status, 503);
+  const unavailablePage = await unavailable.text();
+  assert.match(unavailablePage, /identity provider is unavailable/);
+  assert.match(
+    unavailablePage,
+    /data-login-destination="\/wiki\/guide\/\?source=trace"/,
+  );
+  assert.match(
+    unavailable.headers.get("set-cookie"),
+    /wiki_oidc_auto=paused; Path=\/; HttpOnly; SameSite=Lax; Max-Age=31536000/,
+  );
+  assert.equal(
+    failing.control.db.prepare("SELECT count(*) n FROM logins").get().n,
+    0,
+  );
+  assert.equal(control.db.prepare("SELECT count(*) n FROM logins").get().n, 0);
+});

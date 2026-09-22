@@ -12,11 +12,29 @@ test("Google config uses direct identity and can coexist with independent local 
   assert.equal(config.issuer, GOOGLE_ISSUER);
   assert.equal(config.hd, undefined);
   assert.equal(
+    oidcSettings({
+      WIKI_GOOGLE_CLIENT_ID: "synthetic",
+      WIKI_GOOGLE_CLIENT_SECRET: "synthetic-secret",
+      WIKI_GOOGLE_WORKSPACE_DOMAIN: "example.com",
+    }).hd,
+    "example.com",
+  );
+  assert.equal(
     configuredOIDC(config, "https://wiki.example").label,
     "Continue with Google",
   );
   assert.equal(oidcSettings({}), null);
   assert.throws(() => oidcSettings({ WIKI_GOOGLE_CLIENT_ID: "incomplete" }));
+  assert.throws(() =>
+    oidcSettings({ WIKI_GOOGLE_WORKSPACE_DOMAIN: "example.com" }),
+  );
+  assert.throws(() =>
+    oidcSettings({
+      WIKI_GOOGLE_CLIENT_ID: "synthetic",
+      WIKI_GOOGLE_CLIENT_SECRET: "synthetic-secret",
+      WIKI_GOOGLE_WORKSPACE_DOMAIN: "Example.COM",
+    }),
+  );
   assert.throws(() =>
     oidcSettings({
       ...{ WIKI_GOOGLE_CLIENT_ID: "id", WIKI_GOOGLE_CLIENT_SECRET: "secret" },

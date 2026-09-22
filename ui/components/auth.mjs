@@ -35,7 +35,7 @@ function Frame({ title, description, children, ...props }) {
 const submit = (label) =>
   h(Button, { type: "submit", variant: "primary" }, label);
 const script = () => h("script", { type: "module", src: "/assets/auth.js" });
-export function SignIn({ auth, local, csrf, destination }) {
+export function SignIn({ auth, local, csrf, destination, notice = "" }) {
   return h(
     Frame,
     {
@@ -43,6 +43,7 @@ export function SignIn({ auth, local, csrf, destination }) {
       description: "Sign in to the spaces shared with you.",
       "data-login-destination": destination,
     },
+    notice && h("p", { role: "alert", className: "auth-status" }, notice),
     auth &&
       h(
         "a",
@@ -85,6 +86,28 @@ export function SignIn({ auth, local, csrf, destination }) {
     !auth &&
       !local &&
       h(EmptyState, { title: "Sign-in has not been configured." }),
+    script(),
+  );
+}
+export function AutoSignIn({ destination, local }) {
+  return h(
+    Frame,
+    {
+      title: "Signing you in…",
+      description: "Continuing to your identity provider.",
+      "data-auto-login-destination": destination,
+    },
+    local &&
+      h(
+        "a",
+        {
+          className: "local-recovery",
+          href:
+            "/auth/sign-in?mode=local&return_to=" +
+            encodeURIComponent(destination),
+        },
+        "Use a wiki account instead",
+      ),
     script(),
   );
 }

@@ -1,4 +1,17 @@
 import { request } from "./client.js";
+const automatic = document.querySelector("[data-auto-login-destination]");
+if (automatic) {
+  const automaticDestination =
+    automatic.dataset.autoLoginDestination + location.hash;
+  const recovery = document.querySelector(".local-recovery");
+  if (recovery)
+    recovery.href =
+      "/auth/sign-in?mode=local&return_to=" +
+      encodeURIComponent(automaticDestination);
+  location.replace(
+    "/auth/login?return_to=" + encodeURIComponent(automaticDestination),
+  );
+}
 const login = document.querySelector("[data-login-destination]");
 const destination = login
   ? login.dataset.loginDestination + location.hash
@@ -53,8 +66,15 @@ for (const id of ["local-login", "local-setup", "password-change"]) {
         form.reset();
         // The sign-in form is served at the requested URL. Assigning that same
         // URL with a fragment does not reload it, so fetch the page anew.
-        if (login) location.reload();
-        else location.href = destination;
+        if (login) {
+          if (location.pathname.startsWith("/auth/")) {
+            location.href = destination;
+          } else {
+            location.reload();
+          }
+        } else {
+          location.href = destination;
+        }
       }
     } catch (error) {
       status.textContent = error.message;
