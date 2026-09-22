@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Agent Wiki HTTP API",
-    "version": "0.8.9",
+    "version": "0.8.10",
     "description": "Single-space Git-backed wiki. Reader permits published articles, history and citations; editor/manager permits original evidence independently of WIKI_WRITE. Bearer callers additionally need matching read/write/trace run scope. All clients use the same server and writer. Human-only account/agent administration is intentionally excluded from machine credentials. HTML navigation and MCP JSON-RPC have their own documented contracts. See docs/api.md and docs/interfaces.md."
   },
   "servers": [{ "url": "/" }],

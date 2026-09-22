@@ -90,7 +90,7 @@ assign to disposable fixture paths, and a new private receipt:
 ```sh
 python3 scripts/qualify-container-adoption.py \
   --legacy-image agent-wiki:0.8.8-LEGACY_SOURCE \
-  --candidate-image agent-wiki:0.8.9-CANDIDATE_SOURCE \
+  --candidate-image agent-wiki:0.8.10-CANDIDATE_SOURCE \
   --uid 1000 --gid 1000 \
   --receipt /absolute/private/adoption-qualification.json
 ```

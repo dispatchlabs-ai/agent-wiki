@@ -137,7 +137,7 @@ def main() -> None:
     parser.add_argument("--legacy-image", required=True)
     parser.add_argument("--candidate-image", required=True)
     parser.add_argument("--legacy-version", default="0.8.8")
-    parser.add_argument("--candidate-version", default="0.8.9")
+    parser.add_argument("--candidate-version", default="0.8.10")
     parser.add_argument("--uid", type=int, default=os.getuid())
     parser.add_argument("--gid", type=int, default=os.getgid())
     parser.add_argument("--receipt", required=True)
