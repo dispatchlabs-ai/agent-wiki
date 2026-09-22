@@ -63,6 +63,52 @@ test("package CI checks clean immutable source and both Linux artifacts", () => 
   assert.match(check, /sourceRevision/);
 });
 
+test("container adoption qualifier is synthetic and serves its external evidence fixture", () => {
+  const qualifier = path.join(root, "scripts/qualify-container-adoption.py");
+  const help = spawnSync("python3", [qualifier, "--help"], {
+    encoding: "utf8",
+  });
+  assert.equal(help.status, 0, help.stderr);
+  for (const option of [
+    "--legacy-image",
+    "--candidate-image",
+    "--uid",
+    "--gid",
+    "--receipt",
+  ])
+    assert.match(help.stdout, new RegExp(option));
+
+  const fixture = spawnSync(
+    "python3",
+    [
+      "-c",
+      `
+import importlib.util, json, threading, urllib.request
+spec = importlib.util.spec_from_file_location("qualifier", ${JSON.stringify(qualifier)})
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+server = module.ThreadingHTTPServer(("127.0.0.1", 0), module.EvidenceHandler)
+thread = threading.Thread(target=server.serve_forever, daemon=True)
+thread.start()
+base = "http://127.0.0.1:%d/api/evidence/v1/" % server.server_address[1]
+health = json.load(urllib.request.urlopen(base + "health"))
+trace = json.load(urllib.request.urlopen(base + "traces/" + module.EVIDENCE_ID))
+assert health["state"] == "ready"
+assert trace["messages"][0]["text"] == module.EVIDENCE_TEXT
+server.shutdown()
+server.server_close()
+thread.join()
+`,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(fixture.status, 0, fixture.stderr);
+  assert.doesNotMatch(
+    fs.readFileSync(qualifier, "utf8"),
+    /\.ssh\/|wiki\.chrisreynolds\.me|\/Users\/chrisreynolds/,
+  );
+});
+
 test("a failed Nix export cannot leave a release artifact", (t) => {
   const temporary = fs.mkdtempSync(
     path.join(os.tmpdir(), "agent-wiki-package-test-"),

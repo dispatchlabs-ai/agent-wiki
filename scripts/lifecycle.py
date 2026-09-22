@@ -121,6 +121,24 @@ def open_lock(root: Path) -> int:
     return descriptor
 
 
+def clean_owner_temporaries(root: Path) -> None:
+    lifecycle = root / ".lifecycle"
+    removed = False
+    for entry in lifecycle.iterdir():
+        if not re.fullmatch(r"\.owner\.json\.[a-f0-9]{32}\.tmp", entry.name):
+            continue
+        details = entry.lstat()
+        if not stat.S_ISREG(details.st_mode) or entry.is_symlink():
+            raise LifecycleError(
+                "INVALID_LOCK",
+                "Interrupted owner metadata temporary must be one regular file",
+            )
+        entry.unlink()
+        removed = True
+    if removed:
+        sync_directory(lifecycle)
+
+
 @contextlib.contextmanager
 def ownership(root: Path, operation: str):
     global ACTIVE_LOCK_FD
@@ -136,6 +154,10 @@ def ownership(root: Path, operation: str):
                 f"Another managed owner holds {lock_path(root)}{suffix}",
                 3,
             ) from error
+        # owner.json is diagnostic, but atomic replacement can leave its private
+        # temporary behind after a crash. Only the current kernel-lock holder may
+        # remove a narrowly named ordinary temporary before starting a new owner.
+        clean_owner_temporaries(root)
         token = uuid.uuid4().hex
         owner = {
             "version": FORMAT,

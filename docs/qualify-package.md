@@ -79,3 +79,38 @@ Use `--headed` only for local troubleshooting. It changes browser visibility,
 not the acceptance operations. Use `--keep-evidence` when a reviewer needs the
 private command logs from a passing run. Never publish the retained directory:
 it contains a one-use setup URL and the temporary TLS private key.
+
+## Existing-state container adoption
+
+`scripts/qualify-container-adoption.py` is a separate native Linux Docker check
+for moving direct-storage state into the OCI lifecycle. Supply already loaded
+legacy and candidate images, a non-root container UID/GID that the caller can
+assign to disposable fixture paths, and a new private receipt:
+
+```sh
+python3 scripts/qualify-container-adoption.py \
+  --legacy-image agent-wiki:0.8.8-LEGACY_SOURCE \
+  --candidate-image agent-wiki:0.8.9-CANDIDATE_SOURCE \
+  --uid 1000 --gid 1000 \
+  --receipt /absolute/private/adoption-qualification.json
+```
+
+The qualifier creates its own content Git repository and asks the legacy image's
+direct bootstrap command to create a synthetic manager in a separate control
+directory. It then bind-mounts those two directories beneath a new candidate
+managed root, adopts them with an ephemeral host evidence service, and verifies:
+
+- content HEAD and principal identity survive adoption without a local trace
+  directory;
+- authenticated MCP reads, writes and an actual external trace read work before
+  and after forced container recreation;
+- backup records the external provider descriptor and contains no trace archive;
+- fresh-root restore preserves authentication, content, writes and external
+  evidence access.
+
+It uses a safe synthetic SCP-style remote with push disabled, proving adoption
+compatibility but not SSH transport or remote publication. The receipt records
+that limit; qualify the deployment's mounted passwd identity, key, `known_hosts`,
+SSH alias and push separately. No real account, SSH file, Wiki root or evidence
+archive is read. Successful runs remove the private fixture unless
+`--keep-fixture` is supplied; failures retain it and a private command log.

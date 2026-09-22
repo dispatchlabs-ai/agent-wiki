@@ -117,10 +117,12 @@ and mount the selected SSH key, `known_hosts`, and minimal SSH configuration as
 read-only files for the container identity. `WIKI_PUSH=0` keeps commits local.
 Set explicit `GIT_AUTHOR_*` and `GIT_COMMITTER_*` values when the repository does
 not have a local author identity; managed commands intentionally ignore a host's
-global Git configuration. Do not put Git credentials in the image or managed backup. See the
-[generic Compose guide](container-deployment.md) for an application-owned example;
-host-specific service, routing, identity and secret configuration belongs in the
-deployment owner's infrastructure repository.
+global Git configuration. Do not put Git credentials in the image or managed
+backup. See the [generic Compose guide](container-deployment.md) for an
+application-owned example; host-specific service, routing, identity and secret
+configuration belongs in the deployment owner's infrastructure repository. Before
+activation, run the [existing-state container adoption qualifier](qualify-package.md#existing-state-container-adoption)
+against the exact old and candidate images on the target Docker architecture.
 
 The direct entry points expose existing application operations and bypass the
 managed writer fence. Managed activation, bootstrap, maintenance, backup, and

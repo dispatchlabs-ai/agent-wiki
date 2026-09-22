@@ -294,6 +294,40 @@ test("adopt rejects unsafe Git helpers and ambiguous local evidence", (t) => {
   assert.equal(JSON.parse(result.stderr).code, "EVIDENCE_CONFLICT");
 });
 
+test("adopt retries after interrupted diagnostic owner metadata replacement", (t) => {
+  const directory = temporary(t);
+  const root = path.join(directory, "root");
+  assert.equal(bootstrap(root).status, 0);
+  fs.rmSync(path.join(root, ".lifecycle/initialized.json"));
+  const result = spawnSync(
+    python,
+    [path.join(source, "tests/fixtures/fault-owner-write.py"), lifecycle, root],
+    { cwd: source, encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const outcome = JSON.parse(result.stdout.trim().split("\n").at(-1));
+  assert.equal(outcome.first, 1);
+  assert.equal(outcome.leftovers.length, 1);
+  assert.match(outcome.leftovers[0], /^\.owner\.json\.[a-f0-9]{32}\.tmp$/);
+  assert.equal(outcome.second, 0);
+  assert.deepEqual(outcome.remaining, []);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(root, ".lifecycle/initialized.json")))
+      .origin,
+    "https://wiki.example.test",
+  );
+
+  const unsafe = path.join(
+    root,
+    ".lifecycle/.owner.json.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.tmp",
+  );
+  fs.symlinkSync(path.join(directory, "outside"), unsafe);
+  const rejected = adopt(root);
+  assert.equal(rejected.status, 1);
+  assert.equal(JSON.parse(rejected.stderr).code, "INVALID_LOCK");
+  assert.equal(fs.lstatSync(unsafe).isSymbolicLink(), true);
+});
+
 test("managed serve excludes maintenance and an explicit container bind is reachable", async (t) => {
   const directory = temporary(t);
   const root = path.join(directory, "root");
