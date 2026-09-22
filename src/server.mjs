@@ -220,13 +220,13 @@ export function createWiki({
       }
     };
     try {
-      if (req.headers.host !== new URL(origin).host)
-        return send(403, { error: "Invalid host" });
       const url = new URL(req.url, origin);
-      if (url.pathname === "/api/openapi.json" && req.method === "GET")
-        return send(200, openAPI());
       if (req.method === "GET" && url.pathname === "/healthz")
         return send(200, { status: "ok" });
+      if (req.headers.host !== new URL(origin).host)
+        return send(403, { error: "Invalid host" });
+      if (url.pathname === "/api/openapi.json" && req.method === "GET")
+        return send(200, openAPI());
       if (agentAuth) {
         const metadata =
           url.pathname === "/.well-known/oauth-authorization-server"
@@ -424,8 +424,6 @@ export function createWiki({
           res.setHeader("Location", location);
           send(303, "");
         };
-        if (req.method === "GET" && url.pathname === "/healthz")
-          return send(200, { status: "ok" });
         if (req.method === "GET" && url.pathname === "/auth/login") {
           if (!auth) return send(503, { error: "Sign-in unavailable" });
           const login = control.login(

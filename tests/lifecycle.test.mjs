@@ -33,7 +33,7 @@ function call(args, options = {}) {
 }
 
 function bootstrap(root, overrides = {}) {
-  return call([
+  const args = [
     "bootstrap",
     "--root",
     root,
@@ -43,7 +43,9 @@ function bootstrap(root, overrides = {}) {
     overrides.email || "manager@example.test",
     "--manager-name",
     overrides.name || "Manager",
-  ]);
+  ];
+  if (overrides.node) args.push("--node", overrides.node);
+  return call(args, { env: overrides.env });
 }
 
 function adopt(root, overrides = {}) {
@@ -125,6 +127,29 @@ test("bootstrap commits marker last and refuses rebootstrap or partial state", (
   const retry = bootstrap(partial);
   assert.equal(retry.status, 3);
   assert.equal(JSON.parse(retry.stderr).code, "PARTIAL_STATE");
+
+  const indexFailure = path.join(directory, "index-failure");
+  const nodeShim = path.join(directory, "node-shim");
+  fs.writeFileSync(
+    nodeShim,
+    `#!/bin/sh
+case "$1" in
+  *index-traces.mjs) exit 19 ;;
+  *) exec "$REAL_NODE" "$@" ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  const failedIndex = bootstrap(indexFailure, {
+    node: nodeShim,
+    env: { REAL_NODE: process.execPath },
+  });
+  assert.notEqual(failedIndex.status, 0);
+  assert.equal(
+    fs.existsSync(path.join(indexFailure, ".lifecycle/initialized.json")),
+    false,
+  );
+  assert.equal(bootstrap(indexFailure).status, 3);
 });
 
 test("adopt preserves existing state, accepts safe SSH aliases, and records external evidence", (t) => {
@@ -331,7 +356,11 @@ test("adopt retries after interrupted diagnostic owner metadata replacement", (t
 test("managed serve excludes maintenance and an explicit container bind is reachable", async (t) => {
   const directory = temporary(t);
   const root = path.join(directory, "root");
-  assert.equal(bootstrap(root).status, 0);
+  const created = bootstrap(root);
+  assert.equal(created.status, 0, created.stderr);
+  const setupToken = new URL(JSON.parse(created.stdout).setup_url).hash.slice(
+    1,
+  );
   const reservation = http.createServer().listen(0, "127.0.0.1");
   await once(reservation, "listening");
   const port = reservation.address().port;
@@ -370,20 +399,83 @@ test("managed serve excludes maintenance and an explicit container bind is reach
   const blocked = call(["maintenance", "--root", root, "--", "/usr/bin/true"]);
   assert.equal(blocked.status, 3);
   assert.equal(JSON.parse(blocked.stderr).code, "LIFECYCLE_BUSY");
-  const response = await new Promise((resolve, reject) => {
-    const request = http.get(
-      {
-        hostname: "127.0.0.1",
-        port,
-        path: "/healthz",
-        headers: { Host: "wiki.example.test" },
-      },
-      resolve,
-    );
-    request.on("error", reject);
-  });
-  response.resume();
-  assert.equal(response.statusCode, 200);
+  let cookie = "";
+  const request = (route, options = {}) =>
+    new Promise((resolve, reject) => {
+      const body = options.body && JSON.stringify(options.body);
+      const outgoing = http.request(
+        {
+          hostname: "127.0.0.1",
+          port,
+          path: route,
+          method: body ? "POST" : "GET",
+          headers: {
+            Host: "wiki.example.test",
+            ...(cookie ? { Cookie: cookie } : {}),
+            ...(body
+              ? {
+                  Origin: "https://wiki.example.test",
+                  "Content-Type": "application/json",
+                  "X-Wiki-CSRF": options.csrf,
+                }
+              : {}),
+          },
+        },
+        (response) => {
+          const chunks = [];
+          response.on("data", (chunk) => chunks.push(chunk));
+          response.once("end", () => {
+            for (const value of response.headers["set-cookie"] || []) {
+              const pair = value.split(";")[0];
+              const name = pair.split("=")[0];
+              cookie = [
+                ...cookie
+                  .split("; ")
+                  .filter((item) => item && !item.startsWith(name + "=")),
+                pair,
+              ].join("; ");
+            }
+            resolve({
+              status: response.statusCode,
+              body: Buffer.concat(chunks).toString("utf8"),
+            });
+          });
+        },
+      );
+      outgoing.once("error", reject);
+      outgoing.end(body);
+    });
+  assert.equal((await request("/healthz")).status, 200);
+  assert.equal((await request("/auth/local/setup")).status, 200);
+  const form = cookie
+    .split("; ")
+    .find((value) => value.startsWith("wiki_form="))
+    .slice(10);
+  assert.equal(
+    (
+      await request("/auth/local/setup", {
+        csrf: form,
+        body: {
+          token: setupToken,
+          password: "synthetic-long-test-password",
+        },
+      })
+    ).status,
+    200,
+  );
+  const readiness = await request("/api/articles/health.json");
+  assert.equal(readiness.status, 200, readiness.body);
+  assert.equal(JSON.parse(readiness.body).state, "ready");
+  assert.equal(
+    JSON.parse(readiness.body).components.traceSearch.state,
+    "ready",
+  );
+  assert.deepEqual(
+    fs
+      .readdirSync(path.join(root, "traces"))
+      .filter((name) => !/^search\.sqlite3(?:-(?:wal|shm))?$/.test(name)),
+    [],
+  );
   const closed = once(child, "close");
   child.kill("SIGTERM");
   await closed;

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.11 — 2026-09-22
+
+- Allow only `GET /healthz` to answer before canonical Host validation so load
+  balancers can check a private target address. Every other method and path keeps
+  the configured Host requirement; application authentication, Origin and CSRF
+  checks are unchanged.
+- Build the empty local trace-search index during managed bootstrap, before the
+  initialized marker is committed. A fresh installation now reports ready before
+  its first trace import; an index failure leaves explicit partial state.
+
 ## 0.8.10 — 2026-09-22
 
 - Bundle public certificate authorities and set a default Node TLS trust path in

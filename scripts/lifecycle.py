@@ -547,6 +547,15 @@ def bootstrap(args) -> None:
             ],
             env=env,
         )
+        if evidence["mode"] == "local":
+            run(
+                [
+                    args.node,
+                    str(ENGINE / "scripts" / "index-traces.mjs"),
+                    str(locations["traces"]),
+                ],
+                env=env,
+            )
         state = {
             "version": FORMAT,
             "layout": LAYOUT,

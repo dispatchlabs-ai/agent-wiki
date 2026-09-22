@@ -80,6 +80,35 @@ async function server(t, options = {}) {
     });
   return { repo, request, save, control, actor, session };
 }
+test("load balancer health checks bypass only the canonical Host guard", async (t) => {
+  const { request } = await server(t);
+  const health = await request("/healthz", {
+    headers: { Host: "10.0.2.17" },
+  });
+  assert.equal(health.status, 200);
+  assert.deepEqual(await health.json(), { status: "ok" });
+  assert.equal(
+    (
+      await request("/healthz", {
+        method: "POST",
+        headers: { Host: "10.0.2.17" },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request("/api/articles/guide/current.json", {
+        headers: { Host: "10.0.2.17" },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await request("/", { headers: { Host: "10.0.2.17" } })).status,
+    403,
+  );
+});
 test("HTTP reads, same-origin writes, idempotent retries and revision conflicts", async (t) => {
   const { request, save, repo } = await server(t);
   assert.equal((await request("/")).status, 200);
