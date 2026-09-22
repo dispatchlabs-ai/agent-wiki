@@ -109,7 +109,7 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
 }
 
 resource "aws_iam_role" "task" {
-  name_prefix        = "${var.name}-wiki-task-"
+  name_prefix        = "${substr(var.name, 0, 27)}-wiki-task-"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
   tags               = local.common_tags
 }
@@ -165,7 +165,7 @@ resource "aws_iam_role_policy" "task" {
 }
 
 resource "aws_iam_role" "execution" {
-  name_prefix        = "${var.name}-wiki-exec-"
+  name_prefix        = "${substr(var.name, 0, 27)}-wiki-exec-"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
   tags               = local.common_tags
 }

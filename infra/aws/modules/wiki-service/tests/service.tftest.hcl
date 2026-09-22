@@ -198,3 +198,20 @@ run "rejects_plaintext_override_of_secret_name" {
 
   expect_failures = [aws_ecs_task_definition.this]
 }
+
+run "plans_longest_installation_name" {
+  command = plan
+
+  variables {
+    name = "abcdefghijklmnopqrstuvwxyzabcdefghijkl"
+  }
+
+  assert {
+    condition = (
+      length(aws_iam_role.task.name_prefix) <= 38 &&
+      length(aws_iam_role.execution.name_prefix) <= 38 &&
+      aws_ecs_service.this.name == "abcdefghijklmnopqrstuvwxyzabcdefghijkl-wiki"
+    )
+    error_message = "Long installation identities must retain the full service name while fitting provider role-prefix limits."
+  }
+}
