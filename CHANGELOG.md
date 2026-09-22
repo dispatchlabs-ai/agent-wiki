@@ -2,6 +2,10 @@
 
 ## 0.8.10 — 2026-09-22
 
+- Bundle public certificate authorities and set a default Node TLS trust path in
+  host and OCI runtimes, preserving explicit operator overrides. This enables
+  verified outbound HTTPS for OIDC and remote integrations.
+
 - Add a fenced offline adoption command that validates an existing content Git
   repository and control database in place, then writes the managed marker last.
   Exact retries are safe; adoption preserves identities, history, Git remotes and

@@ -34,6 +34,13 @@ archive, article-media store, credentials, or client configuration. Keep those i
 operator-owned mutable paths. The image also contains no default customer data or
 secrets and runs as numeric user/group `65532:65532` with `/tmp` as its home.
 
+Packaged launchers default `NODE_EXTRA_CA_CERTS` to their immutable Mozilla CA
+bundle, and the OCI environment sets the equivalent image path. This supports
+verified outbound HTTPS, including OIDC discovery, independently of the host's
+certificate installation. An explicit `NODE_EXTRA_CA_CERTS` overrides this default;
+provide a readable CA bundle at that path when an installation needs private trust.
+TLS verification remains enabled.
+
 ## Build and inspect
 
 Nix flakes and the `nix-command` interface are currently experimental upstream.

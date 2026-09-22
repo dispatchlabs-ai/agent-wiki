@@ -39,6 +39,7 @@ dockerTools.buildLayeredImage {
     Env = [
       "HOME=/tmp"
       "NODE_ENV=production"
+      "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-bundle.crt"
       "PORT=4317"
       "WIKI_LISTEN_HOST=0.0.0.0"
     ];

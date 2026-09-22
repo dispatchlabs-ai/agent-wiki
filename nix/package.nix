@@ -5,6 +5,7 @@
   importNpmLock,
   makeWrapper,
   coreutils,
+  cacert,
   git,
   nodejs_24,
   openssh,
@@ -101,6 +102,7 @@ buildNpmPackage {
         name: script: ''
           makeWrapper ${nodejs_24}/bin/node "$out/bin/${name}" \
             --add-flags "$app/${script}" \
+            --set-default NODE_EXTRA_CA_CERTS ${cacert}/etc/ssl/certs/ca-bundle.crt \
             --set NODE_ENV production \
             --prefix PATH : ${runtimePath}
         ''
@@ -112,6 +114,7 @@ buildNpmPackage {
         name: script: ''
           makeWrapper ${python3}/bin/python3 "$out/bin/${name}" \
             --add-flags "$app/${script}" \
+            --set-default NODE_EXTRA_CA_CERTS ${cacert}/etc/ssl/certs/ca-bundle.crt \
             --prefix PATH : ${runtimePath}
         ''
       ) managedEntrypoints
