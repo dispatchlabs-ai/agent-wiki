@@ -83,7 +83,8 @@ test("container adoption qualifier is synthetic and serves its external evidence
     [
       "-c",
       `
-import importlib.util, json, threading, urllib.request
+import importlib.util, json, sys, threading, urllib.request
+sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location("qualifier", ${JSON.stringify(qualifier)})
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
