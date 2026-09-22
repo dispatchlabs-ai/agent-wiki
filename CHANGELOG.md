@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.9 — 2026-09-22
+
+- Restore managed backups when the data root is a writable mount under a
+  read-only filesystem, including non-root container deployments. Stage the
+  validated restore inside the locked managed root on the same filesystem;
+  publish the initialized marker only after staging cleanup. Interrupted or
+  invalid restores remain closed for explicit operator recovery.
+- Add an opt-in HTTPS endpoint qualification probe for local-manager sign-in,
+  browser/MCP attributed write/read and retained identity/article verification.
+  It uses private operator credential files and emits sanitized evidence.
+- No persisted-data migration, API change or infrastructure-module update is
+  required. Existing consistent recovery archives remain compatible.
+
 ## 0.8.8 — 2026-09-21
 
 - Add one locked Nix definition for complete Apple Silicon macOS and x86-64 Linux
