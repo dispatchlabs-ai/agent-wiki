@@ -51,6 +51,7 @@ export async function prepareTraceProjection(
 ) {
   if (!path.isAbsolute(parent))
     throw Error("Trace index parent must be absolute");
+  parent = path.resolve(parent);
   archive = fs.realpathSync(archive);
   authorityRoot = fs.realpathSync(authorityRoot);
   for (
@@ -66,6 +67,8 @@ export async function prepareTraceProjection(
     throw Error("Trace projection overlaps its archive");
   fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
   parent = fs.realpathSync(parent);
+  if (related(parent, authorityRoot) || related(authorityRoot, parent))
+    throw Error("Trace projection overlaps its archive");
   const parentStat = fs.statSync(parent);
   if (
     !parentStat.isDirectory() ||

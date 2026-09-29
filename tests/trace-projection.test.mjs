@@ -169,3 +169,21 @@ test("rejects a cache parent writable by other users", async (t) => {
   );
   assert.deepEqual(fs.readdirSync(cache), []);
 });
+
+test("normalizes traversal before creating any cache inside authority", async (t) => {
+  const { tmp, archive } = fixture(t);
+  const attempted = `${tmp}/outside/../authority/traces/cache`;
+  await assert.rejects(prepareTraceProjection(archive, attempted), /overlaps/);
+  assert.equal(fs.existsSync(path.join(archive, "cache")), false);
+  assert.equal(fs.existsSync(path.join(tmp, "outside")), false);
+  const controlAttempt = `${tmp}/outside/../authority/control/cache`;
+  await assert.rejects(
+    prepareTraceProjection(
+      archive,
+      controlAttempt,
+      path.join(tmp, "authority"),
+    ),
+    /overlaps/,
+  );
+  assert.equal(fs.existsSync(path.join(tmp, "authority", "control")), false);
+});
