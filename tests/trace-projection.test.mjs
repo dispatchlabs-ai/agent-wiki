@@ -13,7 +13,9 @@ import {
 } from "../src/trace-search.mjs";
 import { importTrace, TraceStore } from "../src/traces.mjs";
 function fixture(t) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wiki-projection-"));
+  const tmp = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), "wiki-projection-")),
+  );
   const archive = path.join(tmp, "authority", "traces"),
     cache = path.join(tmp, "cache");
   const metadata = importTrace(

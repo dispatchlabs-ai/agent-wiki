@@ -20,7 +20,7 @@ function temporary(t) {
     path.join(os.tmpdir(), "agent-wiki-lifecycle-"),
   );
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  return directory;
+  return fs.realpathSync(directory);
 }
 
 function call(args, options = {}) {
