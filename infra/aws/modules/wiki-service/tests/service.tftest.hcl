@@ -257,3 +257,18 @@ run "plans_longest_installation_name" {
     error_message = "Long installation identities must retain the full service name while fitting provider role-prefix limits."
   }
 }
+
+run "supports_existing_bucket_root_filesystem" {
+  command = apply
+  variables {
+    s3_files_prefix = ""
+  }
+  assert {
+    condition = (
+      local.data_prefix == "wiki/example/data/" &&
+      aws_s3files_access_point.data.root_directory[0].path == "/wiki/example/data" &&
+      aws_ecs_service.this.desired_count == 0
+    )
+    error_message = "An existing bucket-root filesystem must retain the exact installation path and safe initial serving count."
+  }
+}

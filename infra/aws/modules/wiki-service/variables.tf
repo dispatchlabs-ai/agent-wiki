@@ -165,19 +165,20 @@ variable "s3_files_bucket_arn" {
 }
 
 variable "s3_files_prefix" {
-  description = "Caller-owned bucket prefix exposed as the S3 Files filesystem root."
+  description = "Caller-owned bucket prefix exposed as the S3 Files filesystem root; empty means the bucket root."
   type        = string
 
   validation {
     condition = (
-      var.s3_files_prefix != "" &&
-      !startswith(var.s3_files_prefix, "/") &&
-      endswith(var.s3_files_prefix, "/") &&
-      !strcontains(var.s3_files_prefix, "//") &&
-      !strcontains(var.s3_files_prefix, "..") &&
-      trimspace(var.s3_files_prefix) == var.s3_files_prefix
+      var.s3_files_prefix == "" || (
+        !startswith(var.s3_files_prefix, "/") &&
+        endswith(var.s3_files_prefix, "/") &&
+        !strcontains(var.s3_files_prefix, "//") &&
+        !strcontains(var.s3_files_prefix, "..") &&
+        trimspace(var.s3_files_prefix) == var.s3_files_prefix
+      )
     )
-    error_message = "s3_files_prefix must be a nonempty relative prefix ending in /, without whitespace, //, or .. components."
+    error_message = "s3_files_prefix must be empty for a bucket-root filesystem or a relative prefix ending in /, without whitespace, //, or .. components."
   }
 }
 

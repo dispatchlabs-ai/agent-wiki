@@ -51,8 +51,13 @@ balancer. That path requires the packaged loopback health probe in Agent Wiki
 
 ### Module 0.1.1 compatibility qualification
 
-The provider-mocked suite passed all eight cases with OpenTofu 1.12.6 / AWS
+The provider-mocked suite passed all nine cases with OpenTofu 1.12.6 / AWS
 6.61.0 and Terraform 1.13.3 / AWS 6.64.0. Mocked apply is used where assertions
 need computed resource attributes; it creates no real infrastructure. These
 pairs are tested, while the declared version ranges express compatibility
 intent. A customer deployment still needs its own real plan and runtime checks.
+
+For a pre-existing filesystem that exposes the whole bucket, pass
+`s3_files_prefix = ""`. For a filesystem exposing a bucket subdirectory, pass
+that exact relative prefix with a trailing slash. This input describes storage
+already created by the caller; it must not invent or change its mount boundary.
