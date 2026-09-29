@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.14 — 2026-09-29
+
+- Refresh the locked NixOS 26.05 runtime to the September 28 channel revision,
+  including Node 24.21.0, curl 8.22.0, OpenSSL 3.6.4 and PCRE2 10.48.
+- Preserve application data formats and the separately pinned Wiki service
+  module 0.1.1. Existing installations still use an explicit stopped-writer
+  upgrade with their own recovery and acceptance checks.
+
 ## 0.8.13 — 2026-09-29
 
 - Package a loopback HTTP liveness command for private container deployments.

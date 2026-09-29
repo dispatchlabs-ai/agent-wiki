@@ -11,8 +11,8 @@ complete runtime closure and does not require Nix in the running container.
 
 ## Locked runtime
 
-`flake.lock` pins the August 21, 2026 NixOS 26.05 channel revision. That revision
-supplies Node 24.19.0, matching the repository's tested runtime baseline and using
+`flake.lock` pins the September 28, 2026 NixOS 26.05 channel revision. That revision
+supplies Node 24.21.0, above the repository's minimum supported runtime and using
 the channel's published binary-cache artifacts where available. `package-lock.json`
 supplies the exact JavaScript dependency graph through Nixpkgs' `importNpmLock`;
 there is no placeholder dependency hash and the build performs no unlocked npm resolution.

@@ -2,7 +2,7 @@
   description = "Agent Wiki host package and Linux OCI image";
 
   inputs.nixpkgs.url =
-    "github:NixOS/nixpkgs/5880666fd9eb563038431edb35c2d0aa595884e6";
+    "github:NixOS/nixpkgs/7fc6f2c20af09cdcaf48b92ec3121860139ec668";
 
   outputs =
     { self, nixpkgs }:
