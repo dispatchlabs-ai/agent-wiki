@@ -45,6 +45,7 @@ let
   };
   managedEntrypoints = {
     agent-wiki = "scripts/lifecycle.py";
+    agent-wiki-health = "scripts/healthcheck.py";
     agent-wiki-lifecycle = "scripts/lifecycle.py";
   };
   entrypoints = directEntrypoints // managedEntrypoints;

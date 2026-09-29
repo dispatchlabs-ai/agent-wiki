@@ -1,5 +1,5 @@
 locals {
-  module_version = "0.1.0"
+  module_version = "0.1.1"
   container_name = "agent-wiki"
   data_root      = "/wiki/${var.name}/data"
   data_prefix    = "${var.s3_files_prefix}${trimprefix(local.data_root, "/")}/"
@@ -56,12 +56,16 @@ resource "aws_security_group" "this" {
     }
   }
 
-  egress {
-    description = "Application, registry, logs, secrets, and S3 Files traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+  dynamic "egress" {
+    for_each = var.egress_rules
+    content {
+      description     = egress.value.description
+      from_port       = egress.value.from_port
+      to_port         = egress.value.to_port
+      protocol        = egress.value.protocol
+      cidr_blocks     = egress.value.cidr_blocks
+      security_groups = egress.value.security_groups
+    }
   }
 
   tags = merge(local.common_tags, {
@@ -248,7 +252,7 @@ resource "aws_iam_role_policy" "execution" {
 }
 
 locals {
-  container_definition = {
+  container_definition = merge({
     name                   = local.container_name
     image                  = var.image_uri
     essential              = true
@@ -311,7 +315,16 @@ locals {
       }
     }
     stopTimeout = var.stop_timeout_seconds
-  }
+    }, var.service_registry_arn == null ? {} : {
+    # Private discovery has no load balancer to withdraw an unhealthy task.
+    healthCheck = {
+      command     = ["CMD", "/bin/agent-wiki-health"]
+      interval    = 30
+      timeout     = 5
+      retries     = 3
+      startPeriod = 60
+    }
+  })
 }
 
 resource "aws_ecs_task_definition" "this" {
@@ -382,7 +395,7 @@ resource "aws_ecs_task_definition" "this" {
 }
 
 resource "aws_ecs_service" "this" {
-  name            = "${var.name}-wiki"
+  name            = coalesce(var.service_name, "${var.name}-wiki")
   cluster         = var.cluster_arn
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = var.desired_count
@@ -390,7 +403,7 @@ resource "aws_ecs_service" "this" {
 
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
-  health_check_grace_period_seconds  = var.health_check_grace_period_seconds
+  health_check_grace_period_seconds  = var.target_group_arn == null ? null : var.health_check_grace_period_seconds
   enable_execute_command             = false
   enable_ecs_managed_tags            = true
   propagate_tags                     = "SERVICE"
@@ -410,10 +423,20 @@ resource "aws_ecs_service" "this" {
     assign_public_ip = var.assign_public_ip
   }
 
-  load_balancer {
-    target_group_arn = var.target_group_arn
-    container_name   = local.container_name
-    container_port   = var.container_port
+  dynamic "load_balancer" {
+    for_each = var.target_group_arn == null ? [] : [var.target_group_arn]
+    content {
+      target_group_arn = load_balancer.value
+      container_name   = local.container_name
+      container_port   = var.container_port
+    }
+  }
+
+  dynamic "service_registries" {
+    for_each = var.service_registry_arn == null ? [] : [var.service_registry_arn]
+    content {
+      registry_arn = service_registries.value
+    }
   }
 
   tags = merge(local.common_tags, {
@@ -425,6 +448,11 @@ resource "aws_ecs_service" "this" {
   depends_on = [aws_iam_role_policy.execution]
 
   lifecycle {
+    precondition {
+      condition     = var.target_group_arn != null || var.service_registry_arn != null
+      error_message = "Declare an HTTP target group or private Cloud Map service so the Wiki has an explicit ingress path."
+    }
+
     precondition {
       condition     = var.desired_count == 0 || var.activation_receipt_sha256 != null
       error_message = "activation_receipt_sha256 is required before desired_count can become one."

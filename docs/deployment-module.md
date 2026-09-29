@@ -7,7 +7,7 @@ bootstrap and singleton activation procedure, release pins, local validation,
 and limits are in the [module README](../infra/aws/modules/wiki-service/README.md).
 
 The module owns only installation-specific service resources: retained ECS task
-definitions, the ECS service and its target-group attachment, a task security
+definitions, the ECS service and its target-group or private-discovery attachment, a task security
 group, one POSIX S3 Files access point, scoped runtime and execution roles, and
 one CloudWatch log group. The caller owns networking, subnets, cluster, S3 Files
 filesystem and bucket, and HTTPS ingress resources. Another deployment tool must
@@ -16,7 +16,7 @@ not rewrite module-owned ECS service fields. OpenTofu is the single owner of
 never a separate ECS `UpdateService` mutation.
 
 The application and module have separate release identities. Callers pin the
-module to an exact Git commit, AWS provider 6.61.0 through the root lockfile, and
+module to an exact Git commit, an explicitly qualified AWS provider through the root lockfile, and
 the x86_64 Linux application image to a full `sha256` digest. The module's
 `release` output records the selected module contract, application release,
 image, task revision, and service identity.
@@ -44,3 +44,7 @@ S3 Files experiments do not by themselves qualify this exact service. A live
 gate must prove acknowledged writes, task replacement without competing owners,
 permissions, interrupted-write handling, and functional restoration before an
 installation is called ready.
+
+Module 0.1.1 supports caller-owned private Cloud Map discovery without a load
+balancer. That path requires the packaged loopback health probe in Agent Wiki
+0.8.13 or newer. The operator still owns trusted HTTPS, routing and access.

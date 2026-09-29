@@ -1,7 +1,8 @@
 # Agent Wiki ECS service module
 
 This standard OpenTofu module defines one independent Agent Wiki service on
-AWS ECS/Fargate with one durable S3 Files `/data` mount. Agent Wiki remains
+AWS ECS/Fargate with one durable S3 Files `/data` mount and either a caller-owned HTTP target
+group or private Cloud Map discovery. Agent Wiki remains
 useful when Agent House and Dispatch are absent. The module does not create a
 shared platform, custom deployment bundle, VPC, cluster, S3 bucket, S3 Files
 filesystem, load balancer, certificate, DNS record, or target group.
@@ -70,9 +71,27 @@ The repository also contains a locally sourced, validating root example at
 standard interface. Terragrunt remains a later comparison on an actual
 repeated reference deployment; this module does not require it.
 
+## Private discovery
+
+For an existing private HTTPS proxy and SSM relay, set `target_group_arn = null`
+and supply `service_registry_arn` for a caller-owned Cloud Map service with an A
+record and custom health checking. Keep `ingress_security_group_ids` limited to
+that relay and set `container_port` to its fixed destination port. No load
+balancer, DNS zone or public route is created. `service_name` can retain an
+existing ECS name during an explicitly reviewed state migration.
+
+Private discovery requires Agent Wiki 0.8.13 or newer: its container probe calls
+`/bin/agent-wiki-health`, which checks the running process through loopback
+`GET /healthz` on `PORT`. ECS uses that container health for Cloud Map. This
+liveness check does not establish authenticated readiness or recovery.
+
+The module accepts Terraform/OpenTofu 1.x from 1.12.6 and AWS provider 6.x from
+6.61.0. Consumer roots must retain an exact provider lock. Version constraints
+express compatibility intent; the qualification record below names tested pairs.
+
 ## Release identities
 
-The module contract is version `0.1.0`. Future module releases use signed tags
+The module contract is version `0.1.1`. Future module releases use signed tags
 named `wiki-service-vMAJOR.MINOR.PATCH`, but an operated installation records
 the exact Git commit used by its `source` argument. The module version, source
 commit, provider lock, application version, and full `image_uri` digest are

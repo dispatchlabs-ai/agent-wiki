@@ -158,7 +158,7 @@ run "plans_one_nonroot_writer_after_receipt" {
       output.release.image_uri == "123456789012.dkr.ecr.us-east-1.amazonaws.com/agent-wiki@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" &&
       output.release.task_definition_arn == aws_ecs_task_definition.this.arn &&
       output.release.service_name == aws_ecs_service.this.name &&
-      output.release.module_version == "0.1.0"
+      output.release.module_version == "0.1.1"
     )
     error_message = "The deployment receipt output must report exact, independently selected module, application, image, task, and service identities."
   }
@@ -172,6 +172,44 @@ run "rejects_mutable_image_reference" {
   }
 
   expect_failures = [var.image_uri]
+}
+
+run "plans_private_discovery_without_load_balancer" {
+  command = plan
+
+  variables {
+    target_group_arn     = null
+    service_registry_arn = "arn:aws:servicediscovery:us-east-1:123456789012:service/srv-example123"
+    service_name         = "existing-company-wiki"
+    container_port       = 8080
+    application_version  = "0.8.13"
+    egress_rules = [
+      { description = "AWS HTTPS", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
+      { description = "Private storage", from_port = 2049, to_port = 2049, protocol = "tcp", security_groups = ["sg-2223456789abcdef0"] },
+    ]
+  }
+
+  assert {
+    condition = (
+      length(aws_ecs_service.this.load_balancer) == 0 &&
+      one(aws_ecs_service.this.service_registries).registry_arn == var.service_registry_arn &&
+      aws_ecs_service.this.name == "existing-company-wiki" &&
+      aws_ecs_service.this.health_check_grace_period_seconds == null &&
+      length(aws_security_group.this.egress) == 2 &&
+      alltrue([for rule in aws_security_group.this.egress : rule.protocol == "tcp" && contains([443, 2049], rule.from_port) && rule.from_port == rule.to_port]) &&
+      jsondecode(aws_ecs_task_definition.this.container_definitions)[0].healthCheck.command == ["CMD", "/bin/agent-wiki-health"] &&
+      one([for item in jsondecode(aws_ecs_task_definition.this.container_definitions)[0].environment : item.value if item.name == "PORT"]) == "8080"
+    )
+    error_message = "Private discovery must preserve its service identity and local health probe without creating load-balancer configuration."
+  }
+}
+
+run "rejects_missing_ingress_contract" {
+  command = plan
+  variables {
+    target_group_arn = null
+  }
+  expect_failures = [aws_ecs_service.this]
 }
 
 run "rejects_active_service_without_operator_receipt" {

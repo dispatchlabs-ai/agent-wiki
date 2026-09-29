@@ -57,3 +57,8 @@ For a new installation, omit the nested content/control bind mounts and bootstra
 an empty durable `/data` volume as shown in [portable packages](packaging.md#build-and-inspect).
 Do not use the existing-state Compose file for bootstrap because Docker creates
 the nested mount points before the lifecycle can create its fresh layout.
+
+Agent Wiki 0.8.13 adds `/bin/agent-wiki-health` in the OCI image. It probes only
+loopback `GET /healthz` on the configured `PORT` and exits nonzero when the
+service is unavailable or unhealthy. It ignores outbound HTTP proxy settings.
+Use it for container liveness; retain authenticated application acceptance.

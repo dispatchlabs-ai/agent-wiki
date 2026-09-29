@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.13 — 2026-09-29
+
+- Package a loopback HTTP liveness command for private container deployments.
+- Release Wiki service module 0.1.1 with optional private Cloud Map discovery,
+  explicit existing-service naming, and an image liveness check. Load-balancer
+  ingress remains supported; application identity and storage stay independent.
+- Allow customer roots to select Terraform/OpenTofu 1.x and AWS provider 6.x
+  from 6.61.0. Qualification records identify the versions actually tested.
+
 ## 0.8.12 — 2026-09-22
 
 - Add optional `WIKI_OIDC_AUTO_LOGIN=1` browser sign-in. A signed-out protected

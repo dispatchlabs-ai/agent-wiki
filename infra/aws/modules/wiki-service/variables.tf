@@ -31,6 +31,29 @@ variable "cluster_arn" {
 variable "target_group_arn" {
   description = "ARN of the caller-owned HTTP target group behind the HTTPS ingress. Configure its health check for /healthz."
   type        = string
+  default     = null
+}
+
+variable "service_registry_arn" {
+  description = "Optional caller-owned Cloud Map service for private discovery. Network ingress remains restricted to the declared security groups."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.service_registry_arn == null || can(regex("^arn:[^:]+:servicediscovery:[^:]+:[0-9]{12}:service/srv-[a-z0-9]+$", var.service_registry_arn))
+    error_message = "service_registry_arn must be null or a Cloud Map service ARN."
+  }
+}
+
+variable "service_name" {
+  description = "Optional existing ECS service name to preserve during an explicit state migration. Defaults to NAME-wiki."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.service_name == null || can(regex("^[A-Za-z0-9_-]{1,255}$", var.service_name))
+    error_message = "service_name must be null or a valid ECS service name."
+  }
 }
 
 variable "ingress_security_group_ids" {
@@ -47,6 +70,25 @@ variable "assign_public_ip" {
   description = "Assign a public address to the task ENI. Private subnets with controlled egress are the default."
   type        = bool
   default     = false
+}
+
+variable "egress_rules" {
+  description = "Explicit task egress. Override the default when adopting a private installation with narrower existing network rules."
+  type = list(object({
+    description     = string
+    from_port       = number
+    to_port         = number
+    protocol        = string
+    cidr_blocks     = optional(list(string), [])
+    security_groups = optional(list(string), [])
+  }))
+  default = [{
+    description = "Application, registry, logs, secrets, and S3 Files traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }]
 }
 
 variable "origin" {
