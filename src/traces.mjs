@@ -64,8 +64,12 @@ export function importTrace(root, source, title) {
   return result;
 }
 export class TraceStore {
-  constructor(root, { maxBytes = 64 * 1024 * 1024, timeout = 0 } = {}) {
+  constructor(
+    root,
+    { maxBytes = 64 * 1024 * 1024, timeout = 0, indexRoot = root } = {},
+  ) {
     this.root = root;
+    this.indexRoot = indexRoot;
     this.maxBytes = maxBytes;
     this.timeout = timeout;
     this.cache = new Map();
@@ -94,10 +98,10 @@ export class TraceStore {
     }
   }
   catalog() {
-    return metadataCatalog(this.root);
+    return metadataCatalog(this.root, null, false, this.indexRoot);
   }
   catalogPage(options, grouped = false) {
-    return metadataCatalog(this.root, options, grouped);
+    return metadataCatalog(this.root, options, grouped, this.indexRoot);
   }
   metadata(id) {
     if (!this.root || !/^[a-f0-9]{64}$/.test(id)) return null;

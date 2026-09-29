@@ -95,6 +95,36 @@ Start the packaged server through the lifecycle command:
 agent-wiki serve --root /absolute/private/wiki-data
 ```
 
+For persistent filesystems with slow SQLite queries, select a disposable local
+index parent explicitly:
+
+```sh
+agent-wiki serve --root /data --trace-index-root /tmp/wiki-trace-index
+```
+
+`WIKI_TRACE_INDEX_ROOT=/tmp/wiki-trace-index` is the equivalent managed serving
+configuration. This is a canonical absolute path outside the entire data root;
+symlinked paths and overlapping locations are rejected. Its directory must be
+owned by the serving user and must not be writable by other users. The server preserves
+`WIKI_TRACES=/data/traces` for original evidence. Under the existing exclusive
+owner fence it creates a fresh private cache directory, makes a SQLite-consistent
+backup of a compatible dialogue index (including committed WAL state), and
+verifies version, integrity and snapshot membership. A missing, stale, corrupt or
+incompatible index is rebuilt locally from the original evidence. The independent
+metadata catalog is rebuilt locally and stamped against the original archive.
+No listener, including liveness, starts until both projections are verified.
+
+The projection is opt-in and supports local evidence only. It is derived serving
+state outside backup authority: preserve and recover the original data root,
+then derive a new cache. Every replacement does this again; after exclusive
+maintenance/import, stop the maintenance owner before restarting serve. Direct
+storage writes during serving remain unsupported. Temporary cache directories may
+be removed after their owning server stops; task-local volumes disappear with the
+task. Provision enough local disk for the complete indexes and rebuild WAL, and
+qualify full-corpus startup time, broad searches, health responsiveness, original
+range bytes and replacement recovery on the actual filesystem. No file cutoff or
+trace-content rewrite is introduced.
+
 The server uses the bootstrap/adoption origin unless `--origin` or `WIKI_ORIGIN` explicitly
 overrides it. It binds `127.0.0.1` by default for a same-host HTTPS proxy. A
 container can explicitly use `--bind 0.0.0.0`; the canonical origin and Host

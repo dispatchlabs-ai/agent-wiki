@@ -37,6 +37,16 @@ read-only root with task-local `/tmp`, mounts only its access-point-scoped
 `/data`, and has explicit CPU and memory bounds. Configuration strings and secret
 references are separate; secret values never belong in HCL or state.
 
+For an application release that supports the optional managed trace projection,
+module 0.1.1 can pass `environment = { WIKI_TRACE_INDEX_ROOT = "/tmp/wiki-trace-index" }`
+through its existing configuration map. Its task-local `/tmp` mount provides the
+cache location; no module resource or application-authority layout changes are
+needed. This setting is unsupported by earlier application releases, including
+0.8.14: select a qualified immutable application release before enabling it.
+The [lifecycle contract](lifecycle.md) describes verification, disk requirements
+and stopped-owner replacement. Module version and application version remain
+independent.
+
 Local mocked plans establish the static module contract without credentials or
 cloud calls. Live acceptance remains required because the current managed
 lifecycle uses POSIX `flock`, atomic rename, Git, and SQLite/WAL behavior. Prior

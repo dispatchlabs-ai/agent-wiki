@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.15 — 2026-09-29
+
+- Add an opt-in managed serving trace-index projection on task-local storage.
+  Search, provenance and the catalog use verified disposable SQLite indexes;
+  original trace paths, JSONL bytes, citations and data formats remain unchanged.
+  Replacements derive a fresh cache before listening. Slow persistent filesystems
+  still require full-corpus startup and serving qualification before deployment.
+
 ## 0.8.14 — 2026-09-29
 
 - Refresh the locked NixOS 26.05 runtime to the September 28 channel revision,

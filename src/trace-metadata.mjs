@@ -41,9 +41,9 @@ function insert(db, m) {
     JSON.stringify({ ...m, url: `/traces/${m.id}/` }),
   );
 }
-export function rebuildMetadata(root) {
-  fs.mkdirSync(path.dirname(filename(root)), { recursive: true });
-  const temporary = filename(root) + "." + randomUUID();
+export function rebuildMetadata(root, indexRoot = root) {
+  fs.mkdirSync(path.dirname(filename(indexRoot)), { recursive: true });
+  const temporary = filename(indexRoot) + "." + randomUUID();
   try {
     const before = archiveStamp(root),
       db = new DatabaseSync(temporary);
@@ -59,16 +59,17 @@ export function rebuildMetadata(root) {
     } finally {
       db.close();
     }
-    fs.renameSync(temporary, filename(root));
+    fs.renameSync(temporary, filename(indexRoot));
   } finally {
     fs.rmSync(temporary, { force: true });
   }
 }
 export function recordImport(root, m, _before) {
-  if (!fs.existsSync(filename(root))) return;
+  const indexRoot = root;
+  if (!fs.existsSync(filename(indexRoot))) return;
   let db;
   try {
-    db = new DatabaseSync(filename(root));
+    db = new DatabaseSync(filename(indexRoot));
     db.exec("PRAGMA busy_timeout=100; BEGIN IMMEDIATE");
     const control = db.prepare("SELECT * FROM control").get();
     if (control?.version !== VERSION) return;
@@ -83,11 +84,11 @@ export function recordImport(root, m, _before) {
     db?.close();
   }
 }
-function open(root) {
+function open(root, indexRoot = root) {
   if (!root || !fs.existsSync(root)) return null;
   let db;
   try {
-    db = new DatabaseSync(filename(root), { readOnly: true });
+    db = new DatabaseSync(filename(indexRoot), { readOnly: true });
     db.exec("PRAGMA busy_timeout=100");
     const c = db.prepare("SELECT * FROM control").get();
     if (c?.version === VERSION && c.stamp === archiveStamp(root)) {
@@ -98,11 +99,16 @@ function open(root) {
     /* Missing, stale or corrupt projections are rebuilt independently. */
   }
   db?.close();
-  rebuildMetadata(root);
-  return new DatabaseSync(filename(root), { readOnly: true });
+  rebuildMetadata(root, indexRoot);
+  return new DatabaseSync(filename(indexRoot), { readOnly: true });
 }
-export function metadataCatalog(root, options = null, grouped = false) {
-  const db = open(root);
+export function metadataCatalog(
+  root,
+  options = null,
+  grouped = false,
+  indexRoot = root,
+) {
+  const db = open(root, indexRoot);
   const key = grouped ? "sessions" : "snapshots";
   if (!db) return options ? { [key]: [], total: 0, nextOffset: null } : [];
   try {

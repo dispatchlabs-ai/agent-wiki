@@ -33,9 +33,9 @@ function logicalEventKey(event, metadata, prefix) {
     ),
   );
 }
-export function indexTraces(root) {
-  fs.mkdirSync(root, { recursive: true });
-  const db = new DatabaseSync(filename(root));
+export function indexTraces(root, indexRoot = root) {
+  fs.mkdirSync(indexRoot, { recursive: true });
+  const db = new DatabaseSync(filename(indexRoot));
   try {
     db.exec(
       "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000; CREATE TABLE IF NOT EXISTS version(value INTEGER)",

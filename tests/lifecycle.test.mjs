@@ -372,6 +372,8 @@ test("managed serve excludes maintenance and an explicit container bind is reach
       "serve",
       "--root",
       root,
+      "--trace-index-root",
+      path.join(directory, "cache"),
       "--bind",
       "0.0.0.0",
       "--port",
@@ -395,6 +397,24 @@ test("managed serve excludes maintenance and an explicit container bind is reach
   await waitFor(
     () => output.includes(`Wiki: http://0.0.0.0:${port}`),
     "server did not start",
+  );
+  const projected = fs.readdirSync(path.join(directory, "cache"));
+  assert.equal(projected.length, 1);
+  assert.ok(
+    fs.existsSync(
+      path.join(directory, "cache", projected[0], "search.sqlite3"),
+    ),
+  );
+  assert.ok(
+    fs.existsSync(
+      path.join(
+        directory,
+        "cache",
+        projected[0],
+        ".metadata",
+        "catalog.sqlite3",
+      ),
+    ),
   );
   const blocked = call(["maintenance", "--root", root, "--", "/usr/bin/true"]);
   assert.equal(blocked.status, 3);
@@ -655,9 +675,31 @@ test("backup and fresh-root restore preserve authoritative state and remain writ
     .prepare("SELECT COUNT(*) AS count FROM grants")
     .get().count;
   originalControl.close();
+  const cache = path.join(directory, "task-local-cache");
+  const projection = execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      "const {prepareTraceProjection}=await import(process.argv[1]); console.log(await prepareTraceProjection(process.argv[2], process.argv[3]));",
+      new URL("../src/trace-projection.mjs", import.meta.url).href,
+      path.join(root, "traces"),
+      cache,
+    ],
+    { encoding: "utf8" },
+  ).trim();
+  fs.writeFileSync(
+    path.join(projection, "CACHE_MUST_NOT_BE_BACKED_UP"),
+    "derived only",
+  );
   const archive = path.join(directory, "independent", "wiki-backup.tar.gz");
   const backedUp = call(["backup", "--root", root, "--destination", archive]);
   assert.equal(backedUp.status, 0, backedUp.stderr);
+  const entries = execFileSync("tar", ["-tzf", archive], { encoding: "utf8" });
+  assert.doesNotMatch(
+    entries,
+    /CACHE_MUST_NOT_BE_BACKED_UP|task-local-cache|serving-/,
+  );
   const backupReceipt = JSON.parse(backedUp.stdout);
   assert.match(backupReceipt.sha256, /^[a-f0-9]{64}$/);
   assert.equal(fs.statSync(archive).mode & 0o777, 0o600);

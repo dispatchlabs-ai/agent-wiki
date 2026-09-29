@@ -698,6 +698,9 @@ def serve(args) -> None:
     with ownership(root, "serve") as descriptor:
         ready = validate_ready(root)
         env = managed_env(root, descriptor, ready["marker"])
+        index_parent = args.trace_index_root or env.get("WIKI_TRACE_INDEX_ROOT")
+        if index_parent:
+            env["WIKI_TRACE_INDEX_ROOT"] = str(ensure_external(root, Path(index_parent), "INVALID_TRACE_INDEX_ROOT"))
         env["WIKI_ORIGIN"] = args.origin or env.get("WIKI_ORIGIN") or ready["marker"]["origin"]
         env["WIKI_LISTEN_HOST"] = args.bind or env.get("WIKI_LISTEN_HOST", "127.0.0.1")
         if args.port is not None:
@@ -1202,6 +1205,7 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--bind")
     start.add_argument("--port", type=int)
     start.add_argument("--node", default="node")
+    start.add_argument("--trace-index-root", help="disposable task-local trace index parent outside the data root")
     start.set_defaults(function=serve)
     admin = subcommands.add_parser("maintenance", help="run one fenced offline command")
     admin.add_argument("--root", required=True)

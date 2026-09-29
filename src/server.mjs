@@ -59,12 +59,14 @@ import { TraceStore } from "./traces.mjs";
 import { catalogOptions } from "./trace-catalog.mjs";
 import { traceSearchHealth, traceProvenance } from "./trace-search.mjs";
 import { lifecycleLockFd, lifecycleStdio } from "./lifecycle-lock.mjs";
+import { prepareTraceProjection } from "./trace-projection.mjs";
 const assetRoot = fileURLToPath(new URL("../public/", import.meta.url));
 export function createWiki({
   repo = wikiRepo(),
   database = ":memory:",
   origin = "http://127.0.0.1:4317",
   traces = process.env.WIKI_TRACES || null,
+  traceIndexRoot = traces,
   evidenceUrl = process.env.WIKI_EVIDENCE_URL || null,
   articleMediaRoot = process.env.WIKI_ARTICLE_MEDIA || null,
   write = false,
@@ -101,7 +103,7 @@ export function createWiki({
   if (traces && evidenceUrl)
     throw Error("Configure either WIKI_TRACES or WIKI_EVIDENCE_URL");
   const evidence = evidenceUrl ? new EvidenceClient(evidenceUrl) : null;
-  const traceStore = new TraceStore(traces);
+  const traceStore = new TraceStore(traces, { indexRoot: traceIndexRoot });
   const traceSearches = traceSearchPool || new TraceSearchPool();
   const previews = new PreviewRenderer();
   const articleMedia = new ArticleMediaStore(articleMediaRoot);
@@ -135,7 +137,7 @@ export function createWiki({
     try {
       return evidence
         ? await evidence.search(query, options)
-        : await traceSearches.search(traces, query, options, signal);
+        : await traceSearches.search(traceIndexRoot, query, options, signal);
     } catch (e) {
       if (e instanceof WikiError && e.code === "INVALID_SEARCH") throw e;
       return {
@@ -1274,7 +1276,7 @@ export function createWiki({
       ) {
         try {
           const result = traceProvenance(
-            traces,
+            traceIndexRoot,
             url.searchParams.get("key") || "",
             {
               limit: Number(url.searchParams.get("limit") || 20),
@@ -1319,7 +1321,7 @@ export function createWiki({
             evidence
               ? await evidence.search(url.searchParams.get("q") || "", options)
               : await traceSearches.search(
-                  traces,
+                  traceIndexRoot,
                   url.searchParams.get("q") || "",
                   options,
                   requestAbort.signal,
@@ -1420,7 +1422,7 @@ export function createWiki({
           ...(canTrace
             ? {
                 traceArchive: traceStore.health(),
-                traceSearch: traceSearchHealth(traces),
+                traceSearch: traceSearchHealth(traceIndexRoot),
                 ...(evidence ? await evidence.health() : {}),
               }
             : {}),
@@ -1627,7 +1629,19 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  lifecycleLockFd();
+  const owner = lifecycleLockFd();
+  let traceIndexRoot = process.env.WIKI_TRACES || null;
+  if (process.env.WIKI_TRACE_INDEX_ROOT) {
+    if (owner === null)
+      throw Error("Trace projection requires managed lifecycle ownership");
+    if (!traceIndexRoot)
+      throw Error("Trace projection requires local trace evidence");
+    traceIndexRoot = await prepareTraceProjection(
+      traceIndexRoot,
+      process.env.WIKI_TRACE_INDEX_ROOT,
+      process.env.WIKI_LIFECYCLE_ROOT,
+    );
+  }
   const port = Number(process.env.PORT || 4317);
   const host = process.env.WIKI_LISTEN_HOST || "127.0.0.1";
   const origin = process.env.WIKI_ORIGIN || `http://127.0.0.1:${port}`;
@@ -1639,6 +1653,7 @@ if (
     throw Error("Enable Google/OIDC or local login");
   const auth = settings ? configuredOIDC(settings, origin) : null;
   createWiki({
+    traceIndexRoot,
     control,
     auth,
     autoLogin,
