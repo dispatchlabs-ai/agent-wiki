@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const nixpkgsRevision = "5880666fd9eb563038431edb35c2d0aa595884e6";
+const nixpkgsRevision = "7fc6f2c20af09cdcaf48b92ec3121860139ec668";
 
 test("packaging inputs carry immutable dependency and source identity", () => {
   const lock = JSON.parse(
