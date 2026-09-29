@@ -218,3 +218,8 @@ semantics. Existing S3 Files experiments are useful evidence but remain a
 separate live acceptance gate for this exact image, filesystem configuration,
 and stop/replacement workflow. Do not claim an installation ready until that
 gate, independent recovery, and functional browser/agent acceptance pass.
+
+Private installations can set `egress_rules` to retain a narrower existing
+network policy, such as HTTPS plus NFS to a storage security group. Omission
+preserves the module's original outbound policy. Provider-mocked tests exercise
+configuration only; live cloud acceptance remains a separate deployment step.

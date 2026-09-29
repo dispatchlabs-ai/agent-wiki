@@ -85,8 +85,10 @@ run "plans_safe_zero_count_foundation" {
   }
 }
 
-run "plans_one_nonroot_writer_after_receipt" {
-  command = plan
+run "configures_one_nonroot_writer_after_receipt" {
+  # Terraform resolves mocked computed attributes during apply; OpenTofu also
+  # supports this mode. No real provider calls or infrastructure are involved.
+  command = apply
 
   variables {
     desired_count             = 1
@@ -174,8 +176,10 @@ run "rejects_mutable_image_reference" {
   expect_failures = [var.image_uri]
 }
 
-run "plans_private_discovery_without_load_balancer" {
-  command = plan
+run "configures_private_discovery_without_load_balancer" {
+  # Terraform resolves mocked computed attributes during apply; OpenTofu also
+  # supports this mode. No real provider calls or infrastructure are involved.
+  command = apply
 
   variables {
     target_group_arn     = null

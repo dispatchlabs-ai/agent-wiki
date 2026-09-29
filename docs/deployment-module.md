@@ -48,3 +48,11 @@ installation is called ready.
 Module 0.1.1 supports caller-owned private Cloud Map discovery without a load
 balancer. That path requires the packaged loopback health probe in Agent Wiki
 0.8.13 or newer. The operator still owns trusted HTTPS, routing and access.
+
+### Module 0.1.1 compatibility qualification
+
+The provider-mocked suite passed all eight cases with OpenTofu 1.12.6 / AWS
+6.61.0 and Terraform 1.13.3 / AWS 6.64.0. Mocked apply is used where assertions
+need computed resource attributes; it creates no real infrastructure. These
+pairs are tested, while the declared version ranges express compatibility
+intent. A customer deployment still needs its own real plan and runtime checks.
