@@ -47,6 +47,15 @@ The [lifecycle contract](lifecycle.md) describes verification, disk requirements
 and stopped-owner replacement. Module version and application version remain
 independent.
 
+Module 0.1.2 passes `health_check_grace_period_seconds` to the ECS service for
+both load-balanced and private-discovery deployments. The default remains 60
+seconds. Select the grace from measured full-corpus initialization, allowing
+the verified application to begin listening and the unchanged container probe
+to report healthy before the scheduler replaces it. For example, a caller can
+select 600 seconds for a several-minute verified startup. The grace does not
+change probe timings, publish a healthy endpoint before initialization, or
+replace authenticated readiness and recovery checks.
+
 Local mocked plans establish the static module contract without credentials or
 cloud calls. Live acceptance remains required because the current managed
 lifecycle uses POSIX `flock`, atomic rename, Git, and SQLite/WAL behavior. Prior
@@ -59,7 +68,7 @@ Module 0.1.1 supports caller-owned private Cloud Map discovery without a load
 balancer. That path requires the packaged loopback health probe in Agent Wiki
 0.8.13 or newer. The operator still owns trusted HTTPS, routing and access.
 
-### Module 0.1.1 compatibility qualification
+### Module 0.1.2 compatibility qualification
 
 The provider-mocked suite passed all nine cases with OpenTofu 1.12.6 / AWS
 6.61.0 and Terraform 1.13.3 / AWS 6.64.0. Mocked apply is used where assertions

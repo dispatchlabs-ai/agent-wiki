@@ -1,5 +1,13 @@
 # Changelog
 
+## Wiki service module 0.1.2 — 2026-09-29
+
+- Honor the existing ECS startup health grace setting for private discovery as
+  well as load-balanced services. Callers can allow measured index initialization
+  to finish before unhealthy container checks cause scheduler replacement.
+  The default grace, container probe, application readiness and independent
+  application version remain unchanged.
+
 ## 0.8.15 — 2026-09-29
 
 - Add an opt-in managed serving trace-index projection on task-local storage.

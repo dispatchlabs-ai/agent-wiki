@@ -85,13 +85,24 @@ Private discovery requires Agent Wiki 0.8.13 or newer: its container probe calls
 `GET /healthz` on `PORT`. ECS uses that container health for Cloud Map. This
 liveness check does not establish authenticated readiness or recovery.
 
+Set `health_check_grace_period_seconds` from measured full-corpus startup time.
+The ECS service scheduler applies this grace to unhealthy container and
+load-balancer checks, including private discovery without a target group. The
+default remains 60 seconds. A caller can select, for example, 600 seconds when
+verified index initialization needs several minutes. This changes scheduler
+replacement behavior during startup; it does not change the container probe,
+publish a healthy discovery endpoint early, or establish application readiness.
+Confirm that the actual service reaches healthy state within the selected grace
+and complete authenticated browser/agent acceptance before activation is accepted.
+See the [AWS service grace contract](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CreateService.html#API_CreateService_RequestSyntax).
+
 The module accepts Terraform/OpenTofu 1.x from 1.12.6 and AWS provider 6.x from
 6.61.0. Consumer roots must retain an exact provider lock. Version constraints
 express compatibility intent; the qualification record below names tested pairs.
 
 ## Release identities
 
-The module contract is version `0.1.1`. Future module releases use signed tags
+The module contract is version `0.1.2`. Future module releases use signed tags
 named `wiki-service-vMAJOR.MINOR.PATCH`, but an operated installation records
 the exact Git commit used by its `source` argument. The module version, source
 commit, provider lock, application version, and full `image_uri` digest are

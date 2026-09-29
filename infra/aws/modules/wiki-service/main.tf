@@ -1,5 +1,5 @@
 locals {
-  module_version = "0.1.1"
+  module_version = "0.1.2"
   container_name = "agent-wiki"
   data_root      = "/wiki/${var.name}/data"
   data_prefix    = "${var.s3_files_prefix}${trimprefix(local.data_root, "/")}/"
@@ -403,7 +403,7 @@ resource "aws_ecs_service" "this" {
 
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
-  health_check_grace_period_seconds  = var.target_group_arn == null ? null : var.health_check_grace_period_seconds
+  health_check_grace_period_seconds  = var.health_check_grace_period_seconds
   enable_execute_command             = false
   enable_ecs_managed_tags            = true
   propagate_tags                     = "SERVICE"

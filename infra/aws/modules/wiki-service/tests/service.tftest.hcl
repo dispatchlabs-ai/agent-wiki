@@ -72,6 +72,11 @@ run "plans_safe_zero_count_foundation" {
   }
 
   assert {
+    condition     = aws_ecs_service.this.health_check_grace_period_seconds == 60
+    error_message = "Load-balanced services must retain the default 60-second scheduler grace."
+  }
+
+  assert {
     condition = (
       aws_ecs_service.this.deployment_minimum_healthy_percent == 0 &&
       aws_ecs_service.this.deployment_maximum_percent == 100
@@ -91,8 +96,9 @@ run "configures_one_nonroot_writer_after_receipt" {
   command = apply
 
   variables {
-    desired_count             = 1
-    activation_receipt_sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    desired_count                     = 1
+    activation_receipt_sha256         = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    health_check_grace_period_seconds = 300
     environment = {
       WIKI_WRITE = "1"
     }
@@ -104,6 +110,7 @@ run "configures_one_nonroot_writer_after_receipt" {
   assert {
     condition = (
       aws_ecs_service.this.desired_count == 1 &&
+      aws_ecs_service.this.health_check_grace_period_seconds == 300 &&
       aws_ecs_service.this.cluster == "arn:aws:ecs:us-east-1:123456789012:cluster/example" &&
       aws_ecs_service.this.task_definition == aws_ecs_task_definition.this.arn &&
       one(aws_ecs_service.this.load_balancer).target_group_arn == "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/example/0123456789abcdef" &&
@@ -160,7 +167,7 @@ run "configures_one_nonroot_writer_after_receipt" {
       output.release.image_uri == "123456789012.dkr.ecr.us-east-1.amazonaws.com/agent-wiki@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" &&
       output.release.task_definition_arn == aws_ecs_task_definition.this.arn &&
       output.release.service_name == aws_ecs_service.this.name &&
-      output.release.module_version == "0.1.1"
+      output.release.module_version == "0.1.2"
     )
     error_message = "The deployment receipt output must report exact, independently selected module, application, image, task, and service identities."
   }
@@ -182,11 +189,12 @@ run "configures_private_discovery_without_load_balancer" {
   command = apply
 
   variables {
-    target_group_arn     = null
-    service_registry_arn = "arn:aws:servicediscovery:us-east-1:123456789012:service/srv-example123"
-    service_name         = "existing-company-wiki"
-    container_port       = 8080
-    application_version  = "0.8.13"
+    target_group_arn                  = null
+    service_registry_arn              = "arn:aws:servicediscovery:us-east-1:123456789012:service/srv-example123"
+    service_name                      = "existing-company-wiki"
+    container_port                    = 8080
+    application_version               = "0.8.13"
+    health_check_grace_period_seconds = 600
     egress_rules = [
       { description = "AWS HTTPS", from_port = 443, to_port = 443, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"] },
       { description = "Private storage", from_port = 2049, to_port = 2049, protocol = "tcp", security_groups = ["sg-2223456789abcdef0"] },
@@ -198,13 +206,17 @@ run "configures_private_discovery_without_load_balancer" {
       length(aws_ecs_service.this.load_balancer) == 0 &&
       one(aws_ecs_service.this.service_registries).registry_arn == var.service_registry_arn &&
       aws_ecs_service.this.name == "existing-company-wiki" &&
-      aws_ecs_service.this.health_check_grace_period_seconds == null &&
+      aws_ecs_service.this.health_check_grace_period_seconds == 600 &&
       length(aws_security_group.this.egress) == 2 &&
       alltrue([for rule in aws_security_group.this.egress : rule.protocol == "tcp" && contains([443, 2049], rule.from_port) && rule.from_port == rule.to_port]) &&
       jsondecode(aws_ecs_task_definition.this.container_definitions)[0].healthCheck.command == ["CMD", "/bin/agent-wiki-health"] &&
+      jsondecode(aws_ecs_task_definition.this.container_definitions)[0].healthCheck.interval == 30 &&
+      jsondecode(aws_ecs_task_definition.this.container_definitions)[0].healthCheck.timeout == 5 &&
+      jsondecode(aws_ecs_task_definition.this.container_definitions)[0].healthCheck.retries == 3 &&
+      jsondecode(aws_ecs_task_definition.this.container_definitions)[0].healthCheck.startPeriod == 60 &&
       one([for item in jsondecode(aws_ecs_task_definition.this.container_definitions)[0].environment : item.value if item.name == "PORT"]) == "8080"
     )
-    error_message = "Private discovery must preserve its service identity and local health probe without creating load-balancer configuration."
+    error_message = "Private discovery must pass the caller's scheduler grace while preserving its service identity, local health probe and probe timings without a load balancer."
   }
 }
 

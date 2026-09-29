@@ -238,7 +238,7 @@ variable "stop_timeout_seconds" {
 }
 
 variable "health_check_grace_period_seconds" {
-  description = "Startup grace period before the caller-owned target group health check can replace the task."
+  description = "Startup grace period during which the ECS scheduler ignores unhealthy container and load-balancer health checks."
   type        = number
   default     = 60
 
