@@ -32,9 +32,10 @@ test("local projection preserves search, provenance, grouped catalog and origina
   const original = fs.readFileSync(
     path.join(archive, metadata.id, "source.jsonl"),
   );
-  const expected = searchTraces(archive, "wiki");
+  const expected = searchTraces(archive, "prototype");
+  assert.ok(expected.results.length > 0);
   const first = await prepareTraceProjection(archive, cache);
-  assert.deepEqual(searchTraces(first, "wiki"), expected);
+  assert.deepEqual(searchTraces(first, "prototype"), expected);
   for (const hit of expected.results)
     assert.deepEqual(
       traceProvenance(first, hit.logical_key),
@@ -58,7 +59,7 @@ test("local projection preserves search, provenance, grouped catalog and origina
   fs.rmSync(first, { recursive: true });
   const second = await prepareTraceProjection(archive, cache);
   assert.notEqual(first, second);
-  assert.deepEqual(searchTraces(second, "wiki"), expected);
+  assert.deepEqual(searchTraces(second, "prototype"), expected);
   assert.deepEqual(
     fs.readFileSync(path.join(archive, metadata.id, "source.jsonl")),
     original,
@@ -80,7 +81,7 @@ for (const defect of ["missing", "corrupt", "version", "stale"])
       db.close();
     }
     const projection = await prepareTraceProjection(archive, cache);
-    assert.equal(searchTraces(projection, "wiki").indexed, true);
+    assert.equal(searchTraces(projection, "prototype").indexed, true);
     const db = new DatabaseSync(path.join(projection, "search.sqlite3"));
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM snapshots").get().n, 1);
     db.close();
