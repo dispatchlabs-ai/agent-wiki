@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.17 — 2026-09-30
+
+- Let the authenticated CLI receive durable save receipts and uncached full-health
+  results that take longer than thirty seconds. These operations retain caller
+  cancellation without an implicit deadline; authentication, receipt identity and
+  server behavior remain unchanged. Other metadata calls retain their deadline.
+
 ## 0.8.16 — 2026-09-30
 
 - Keep loopback liveness responsive while authenticated archive health checks

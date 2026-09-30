@@ -149,11 +149,14 @@ export class WikiApiClient {
     return this.fetchFn(target, {
       ...init,
       redirect: "error",
-      // Source verification can take longer than a small metadata request.
-      // Honor caller cancellation without imposing a hidden trace-size ceiling.
+      // Source verification, durable saves and full health scans can be slow.
+      // Long calls retain caller cancellation without an implicit deadline.
       signal:
         init.signal ||
-        (target.pathname.startsWith("/api/traces/")
+        (target.pathname.startsWith("/api/traces/") ||
+        ["/api/articles/edits", "/api/articles/health.json"].includes(
+          target.pathname,
+        )
           ? undefined
           : AbortSignal.timeout(30000)),
     });

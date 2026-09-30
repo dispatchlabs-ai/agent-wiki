@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -480,3 +481,102 @@ test("CLI trace transport honors cancellation without imposing a short read dead
   await api.fetch("/api/articles/catalog.json");
   assert.ok(signals.pop() instanceof AbortSignal);
 });
+
+test(
+  "CLI saves and full health receive successful responses beyond thirty seconds",
+  { timeout: 45000 },
+  async (t) => {
+    const received = [];
+    const server = createHttpServer((req, res) => {
+      received.push({
+        route: req.url,
+        method: req.method,
+        cookie: req.headers.cookie,
+        csrf: req.headers["x-wiki-csrf"],
+      });
+      req.resume();
+      const timer = setTimeout(() => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify(
+            req.url === "/api/articles/edits"
+              ? { state: "saved", commit: "durable-synthetic-commit" }
+              : { state: "ready" },
+          ),
+        );
+      }, 31000);
+      res.once("close", () => clearTimeout(timer));
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    t.after(() => {
+      server.closeAllConnections();
+      server.close();
+    });
+    const api = new WikiApiClient({
+      origin: `http://127.0.0.1:${server.address().port}`,
+      kind: "session",
+      session: "synthetic-session",
+      csrf: "synthetic-csrf",
+    });
+    const started = Date.now();
+    const [save, health] = await Promise.all([
+      api.request("/api/articles/edits", {
+        operation_id: "slow-synthetic-save",
+        updates: [],
+      }),
+      api.request("/api/articles/health.json"),
+    ]);
+    assert.ok(Date.now() - started >= 30000);
+    assert.deepEqual(save, {
+      state: "saved",
+      commit: "durable-synthetic-commit",
+    });
+    assert.deepEqual(health, { state: "ready" });
+    assert.equal(
+      received.find((r) => r.route === "/api/articles/edits").method,
+      "POST",
+    );
+    assert.ok(
+      received.every((r) => r.cookie === "wiki_session=synthetic-session"),
+    );
+    assert.equal(
+      received.find((r) => r.route === "/api/articles/edits").csrf,
+      "synthetic-csrf",
+    );
+  },
+);
+for (const route of ["/api/articles/edits", "/api/articles/health.json"]) {
+  test(
+    `CLI caller cancellation interrupts a pending ${route} response`,
+    { timeout: 5000 },
+    async (t) => {
+      let started;
+      const pending = new Promise((resolve) => {
+        started = resolve;
+      });
+      const server = createHttpServer((req, _res) => {
+        req.resume();
+        started();
+      });
+      await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+      t.after(() => {
+        server.closeAllConnections();
+        server.close();
+      });
+      const api = new WikiApiClient({
+        origin: `http://127.0.0.1:${server.address().port}`,
+        kind: "session",
+        session: "synthetic-session",
+      });
+      const controller = new AbortController();
+      const response = api.fetch(route, {
+        method: route.endsWith("edits") ? "POST" : "GET",
+        signal: controller.signal,
+      });
+      const cancelled = assert.rejects(response, { name: "AbortError" });
+      await pending;
+      controller.abort();
+      await cancelled;
+    },
+  );
+}

@@ -5,6 +5,12 @@ control database or evidence archive. Install this source checkout with Node 24.
 and `npm ci`, then run `node bin/wiki.mjs --help` (or `npm run wiki -- --help`).
 There is no published npm package or global executable.
 
+Durable article saves, full storage health checks and original trace reads have
+no implicit client deadline. Slow storage can exceed thirty seconds; the client
+waits for the server result and honors explicit caller cancellation. If a save is
+interrupted, retry identical input with the same operation ID to recover its
+receipt. Other metadata requests retain their thirty-second deadline.
+
 ## Sign in
 
 For a local email/password account, pipe the password from your secret manager;
