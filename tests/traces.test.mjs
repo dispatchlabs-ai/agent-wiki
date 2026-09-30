@@ -21,6 +21,41 @@ function fixture(t) {
   });
   return { root, store };
 }
+test("asynchronous archive health preserves synchronous checks and observes storage failures without caching", async (t) => {
+  const { root, store } = fixture(t);
+  assert.deepEqual(await new TraceStore(null).healthAsync(), {
+    state: "disabled",
+  });
+  assert.deepEqual(await store.healthAsync(), store.health());
+  const m = importTrace(
+    root,
+    new URL("../examples/traces/codex.jsonl", import.meta.url),
+  );
+  const metadata = path.join(root, m.id, "metadata.json");
+  const original = fs.readFileSync(metadata);
+  const source = path.join(root, m.id, "source.jsonl");
+  for (const value of [
+    "invalid JSON",
+    "null",
+    JSON.stringify({ ...m, id: "wrong" }),
+    JSON.stringify({ ...m, format: "unknown" }),
+  ]) {
+    fs.writeFileSync(metadata, value);
+    assert.deepEqual(await store.healthAsync(), store.health());
+    assert.equal((await store.healthAsync()).state, "degraded");
+  }
+  fs.rmSync(metadata);
+  assert.deepEqual(await store.healthAsync(), store.health());
+  fs.writeFileSync(metadata, original);
+  assert.equal((await store.healthAsync()).state, "ready");
+  fs.renameSync(source, source + ".retained");
+  assert.deepEqual(await store.healthAsync(), store.health());
+  fs.mkdirSync(source);
+  assert.deepEqual(await store.healthAsync(), store.health());
+  fs.rmdirSync(source);
+  fs.renameSync(source + ".retained", source);
+  assert.equal((await store.healthAsync()).state, "ready");
+});
 test("an explicit caller deadline rejects a read without damaging its source or later reads", async (t) => {
   const { root, store } = fixture(t);
   const metadata = importTrace(

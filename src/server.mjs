@@ -1421,7 +1421,7 @@ export function createWiki({
           },
           ...(canTrace
             ? {
-                traceArchive: traceStore.health(),
+                traceArchive: await traceStore.healthAsync(),
                 traceSearch: traceSearchHealth(traceIndexRoot),
                 ...(evidence ? await evidence.health() : {}),
               }

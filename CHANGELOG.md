@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.16 — 2026-09-30
+
+- Keep loopback liveness responsive while authenticated archive health checks
+  every original snapshot on slow storage. Full health still reports current
+  storage failures and rechecks access before delayed responses; no health cache,
+  data format, schema or authority change is introduced.
+
 ## Wiki service module 0.1.2 — 2026-09-29
 
 - Honor the existing ECS startup health grace setting for private discovery as

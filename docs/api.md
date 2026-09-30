@@ -70,6 +70,10 @@ existing page; create pages through the API, WebMCP, or ordinary Git commits.
 
 Health reports article storage/index. Only editorial callers with trace authority
 receive trace archive/search and provider health components.
+Full trace archive health checks examine original metadata and source availability
+without holding the HTTP event loop during filesystem reads. Loopback liveness
+can respond while that full check is pending; the full response still reports
+current storage failures and rechecks authorization before delivery.
 A configured unavailable trace index degrades overall health without preventing
 article-only search or original trace/catalog reads. See [trace health and recovery](traces.md#degraded-operation).
 

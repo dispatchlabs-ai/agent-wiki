@@ -10,7 +10,7 @@ import { DatabaseSync } from "node:sqlite";
 import { saveGitEdits } from "../src/editor.mjs";
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createWiki } from "../src/server.mjs";
 import { GitWiki, git } from "../src/git-wiki.mjs";
@@ -80,6 +80,143 @@ async function server(t, options = {}) {
     });
   return { repo, request, save, control, actor, session };
 }
+function holdMetadataRead(t, filename) {
+  let entered, release;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const blocked = new Promise((resolve) => {
+    release = resolve;
+  });
+  const readFile = fs.promises.readFile;
+  t.mock.method(fs.promises, "readFile", async (file, ...options) => {
+    if (file === filename) {
+      entered();
+      await blocked;
+    }
+    return readFile(file, ...options);
+  });
+  t.after(() => release());
+  return { started, release };
+}
+async function healthArchive(t) {
+  const repo = fixture(t),
+    traces = path.join(repo, ".git", "traces");
+  const m = importTrace(
+    traces,
+    new URL("../examples/traces/codex.jsonl", import.meta.url),
+  );
+  const { indexTraces } = await import("../src/trace-search.mjs");
+  indexTraces(traces);
+  return {
+    ...(await server(t, { repo, traces })),
+    metadata: path.join(traces, m.id, "metadata.json"),
+  };
+}
+test(
+  "loopback health responds while full authenticated archive health awaits slow storage",
+  { timeout: 5000 },
+  async (t) => {
+    const { request, metadata } = await healthArchive(t);
+    const blocked = holdMetadataRead(t, metadata);
+    let finished = false;
+    const pending = request("/api/articles/health.json").then((response) => {
+      finished = true;
+      return response;
+    });
+    await blocked.started;
+    assert.equal((await request("/healthz")).status, 200);
+    assert.equal(
+      finished,
+      false,
+      "liveness must respond before the full storage scan completes",
+    );
+    blocked.release();
+    const response = await pending;
+    assert.equal(response.status, 200);
+    assert.equal(
+      (await response.json()).components.traceArchive.state,
+      "ready",
+    );
+  },
+);
+for (const failedStorage of [false, true]) {
+  test(
+    `full archive health rechecks revoked access after delayed ${failedStorage ? "failure" : "success"}`,
+    { timeout: 5000 },
+    async (t) => {
+      const { request, metadata, control, actor } = await healthArchive(t);
+      const blocked = holdMetadataRead(t, metadata);
+      const pending = request("/api/articles/health.json");
+      await blocked.started;
+      control.db
+        .prepare("UPDATE principals SET active=0 WHERE id=?")
+        .run(actor);
+      if (failedStorage) fs.writeFileSync(metadata, "invalid JSON");
+      blocked.release();
+      const response = await pending;
+      assert.equal(response.status, 404);
+      assert.doesNotMatch(
+        await response.text(),
+        /traceArchive|snapshot|degraded/,
+      );
+    },
+  );
+}
+test(
+  "a real blocked filesystem read during full health cannot stall loopback liveness",
+  { timeout: 10000 },
+  async (t) => {
+    const { request, metadata } = await healthArchive(t);
+    const original = fs.readFileSync(metadata, "utf8");
+    fs.unlinkSync(metadata);
+    execFileSync("mkfifo", [metadata]);
+    const writer = spawn(
+      process.execPath,
+      [
+        "-e",
+        `
+    const fs = require('node:fs');
+    const fd = fs.openSync(process.argv[1], 'w');
+    let released = false;
+    function release() {
+      if (released) return;
+      released = true;
+      clearTimeout(watchdog);
+      fs.writeSync(fd, process.argv[2]); fs.closeSync(fd);
+      process.disconnect();
+    }
+    // Only a test watchdog: the old blocking implementation must fail rather
+    // than hang the runner waiting for its event loop to release the FIFO.
+    const watchdog = setTimeout(release, 3000);
+    process.once('message', release);
+    process.send('reader-opened');
+  `,
+        metadata,
+        original,
+      ],
+      { stdio: ["ignore", "ignore", "ignore", "ipc"] },
+    );
+    t.after(() => writer.kill("SIGKILL"));
+    const readerOpened = once(writer, "message");
+    const stopped = once(writer, "exit");
+    let finished = false;
+    const pending = request("/api/articles/health.json").then((response) => {
+      finished = true;
+      return response;
+    });
+    await readerOpened;
+    assert.equal((await request("/healthz")).status, 200);
+    assert.equal(
+      finished,
+      false,
+      "liveness must arrive before the FIFO read is released",
+    );
+    writer.send("release");
+    assert.equal((await pending).status, 200);
+    await stopped;
+  },
+);
 test("load balancer health checks bypass only the canonical Host guard", async (t) => {
   const { request } = await server(t);
   const health = await request("/healthz", {

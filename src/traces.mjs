@@ -97,6 +97,40 @@ export class TraceStore {
       return { state: "degraded", error: e.message };
     }
   }
+  // Network storage checks must not hold the HTTP event loop while checking
+  // every original snapshot. Keep health() for existing synchronous callers.
+  async healthAsync() {
+    if (!this.root) return { state: "disabled" };
+    try {
+      for (const id of (await fs.promises.readdir(this.root)).filter((id) =>
+        /^[a-f0-9]{64}$/.test(id),
+      )) {
+        let metadata;
+        try {
+          metadata = JSON.parse(
+            await fs.promises.readFile(
+              path.join(this.root, id, "metadata.json"),
+              "utf8",
+            ),
+          );
+        } catch {
+          /* Unreadable metadata has the same health failure as health(). */
+        }
+        if (
+          !metadata ||
+          metadata.id !== id ||
+          !["codex", "pi", "claude"].includes(metadata.format) ||
+          !(
+            await fs.promises.stat(path.join(this.root, id, "source.jsonl"))
+          ).isFile()
+        )
+          throw Error("Trace archive contains an unreadable snapshot");
+      }
+      return { state: "ready" };
+    } catch (e) {
+      return { state: "degraded", error: e.message };
+    }
+  }
   catalog() {
     return metadataCatalog(this.root, null, false, this.indexRoot);
   }
