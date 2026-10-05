@@ -493,7 +493,9 @@ export function createWiki({
             login = control.consumeLogin(cookieValue(req, "wiki_login"));
             if (!login || !auth) throw Error("Invalid login");
             const identity = await auth.finish(url, login);
-            const principal = control.enroll(identity);
+            const principal = control.enroll(identity, {
+              reader: auth.enrollReader === true,
+            });
             const session = control.session(principal.id);
             res.setHeader("Set-Cookie", [
               cookie("wiki_login", "", origin, 0),

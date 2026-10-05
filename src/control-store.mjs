@@ -102,7 +102,7 @@ export class ControlStore {
       )
       .get(issuer, subject);
   }
-  enroll({ issuer, subject, name }) {
+  enroll({ issuer, subject, name }, { reader = false } = {}) {
     return this.transaction(() => {
       const existing = this.identity(issuer, subject);
       if (existing) return existing;
@@ -119,6 +119,16 @@ export class ControlStore {
       this.db
         .prepare("INSERT INTO identities VALUES (?,?,?)")
         .run(issuer, subject, id);
+      // Only first enrollment can use the operator's reader policy. Returning
+      // identities retain explicit grants and revocations, even after logout.
+      if (reader === true) {
+        this.db
+          .prepare("INSERT INTO grants VALUES ('default',?,'reader')")
+          .run(id);
+        this.db
+          .prepare("INSERT INTO audit(actor,action,target) VALUES (?,?,?)")
+          .run("system:google-workspace", "enroll:reader", id);
+      }
       return { id, name, kind: "human", active: 1 };
     });
   }

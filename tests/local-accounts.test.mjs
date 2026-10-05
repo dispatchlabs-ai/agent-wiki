@@ -43,6 +43,114 @@ test("Google config uses direct identity and can coexist with independent local 
   );
 });
 
+test("Workspace reader enrollment is opt-in and requires the restricted Google preset", () => {
+  const google = {
+    WIKI_GOOGLE_CLIENT_ID: "synthetic",
+    WIKI_GOOGLE_CLIENT_SECRET: "synthetic-secret",
+    WIKI_GOOGLE_WORKSPACE_DOMAIN: "example.com",
+  };
+  const setting = "WIKI_GOOGLE_WORKSPACE_READER_ENROLLMENT";
+  assert.equal(
+    configuredOIDC(oidcSettings(google), "https://wiki.example").enrollReader,
+    false,
+  );
+  assert.equal(
+    configuredOIDC(
+      oidcSettings({ ...google, [setting]: "0" }),
+      "https://wiki.example",
+    ).enrollReader,
+    false,
+  );
+  assert.equal(
+    configuredOIDC(
+      oidcSettings({ ...google, [setting]: "1" }),
+      "https://wiki.example",
+    ).enrollReader,
+    true,
+  );
+  for (const env of [
+    { [setting]: "1" },
+    { ...google, WIKI_GOOGLE_WORKSPACE_DOMAIN: "", [setting]: "1" },
+    { ...google, WIKI_GOOGLE_CLIENT_SECRET: "", [setting]: "1" },
+    { ...google, [setting]: "reader" },
+    { ...google, [setting]: "1", WIKI_OIDC_ISSUER: "https://id.example" },
+    {
+      WIKI_OIDC_ISSUER: "https://id.example",
+      WIKI_OIDC_CLIENT_ID: "id",
+      WIKI_OIDC_CLIENT_SECRET: "secret",
+      [setting]: "1",
+    },
+  ])
+    assert.throws(() => oidcSettings(env));
+});
+
+test("first reader enrollment is atomic and preserves explicit access decisions", (t) => {
+  const control = new ControlStore(":memory:");
+  t.after(() => control.close());
+  const owner = control.bootstrap({
+    issuer: GOOGLE_ISSUER,
+    subject: "owner",
+    name: "Owner",
+  });
+  const identity = { issuer: GOOGLE_ISSUER, subject: "reader", name: "Reader" };
+  const local = control.inviteLocal(owner, "reader@example.com", "Reader");
+  const reader = control.enroll(
+    { ...identity, email: "reader@example.com" },
+    { reader: true },
+  );
+  assert.notEqual(reader.id, local.id);
+  assert.equal(control.role(local.id), null);
+  assert.equal(control.role(reader.id), "reader");
+  assert.equal(
+    control.db
+      .prepare("SELECT count(*) n FROM organization_members WHERE principal=?")
+      .get(reader.id).n,
+    0,
+  );
+  assert.equal(
+    control.db
+      .prepare("SELECT count(*) n FROM group_members WHERE principal=?")
+      .get(reader.id).n,
+    0,
+  );
+  for (const role of ["reader", "editor", "manager", null]) {
+    control.grant(owner, reader.id, role);
+    assert.equal(control.enroll(identity, { reader: true }).id, reader.id);
+    assert.equal(control.role(reader.id), role);
+  }
+  assert.equal(
+    control.db
+      .prepare(
+        "SELECT count(*) n FROM audit WHERE action='enroll:reader' AND target=?",
+      )
+      .get(reader.id).n,
+    1,
+  );
+  const existing = control.enroll({ ...identity, subject: "existing" });
+  control.enroll({ ...identity, subject: "existing" }, { reader: true });
+  assert.equal(control.role(existing.id), null);
+  control.db
+    .prepare("UPDATE principals SET active=0 WHERE id=?")
+    .run(reader.id);
+  assert.throws(() => control.enroll(identity, { reader: true }), /disabled/);
+  for (const table of ["grants", "audit"]) {
+    control.db.exec(
+      `CREATE TRIGGER fail_enrollment BEFORE INSERT ON ${table} BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;`,
+    );
+    assert.throws(
+      () =>
+        control.enroll({ ...identity, subject: "rollback" }, { reader: true }),
+      /synthetic failure/,
+    );
+    assert.equal(control.identity(GOOGLE_ISSUER, "rollback"), undefined);
+    assert.equal(
+      control.db.prepare("SELECT count(*) n FROM principals").get().n,
+      4,
+    );
+    control.db.exec("DROP TRIGGER fail_enrollment");
+  }
+});
+
 test("local invitations, hashing, single use, revocation and reset preserve identity boundaries", async (t) => {
   const control = new ControlStore(":memory:");
   t.after(() => control.close());

@@ -25,7 +25,8 @@ test("OIDC rejects wrong issuer, audience, expiry, nonce, and callback state", a
     use: "sig",
   };
   let origin,
-    override = {};
+    override = {},
+    userInfoSubject = "owner";
   const app = http.createServer((req, res) => {
     let body;
     if (req.url === "/.well-known/openid-configuration")
@@ -40,7 +41,8 @@ test("OIDC rejects wrong issuer, audience, expiry, nonce, and callback state", a
         id_token_signing_alg_values_supported: ["RS256"],
       };
     else if (req.url === "/jwks") body = { keys: [key] };
-    else if (req.url === "/userinfo") body = { sub: "owner", name: "Owner" };
+    else if (req.url === "/userinfo")
+      body = { sub: userInfoSubject, name: "Owner" };
     else {
       const encode = (v) =>
         Buffer.from(JSON.stringify(v)).toString("base64url");
@@ -124,6 +126,9 @@ test("OIDC rejects wrong issuer, audience, expiry, nonce, and callback state", a
     hd: "example.com",
   };
   assert.equal((await workspace.finish(callback, login)).subject, "owner");
+  userInfoSubject = "different-subject";
+  await assert.rejects(() => workspace.finish(callback, login));
+  userInfoSubject = "owner";
   for (const claims of [
     {
       email: "owner@example.com",
@@ -134,6 +139,12 @@ test("OIDC rejects wrong issuer, audience, expiry, nonce, and callback state", a
       email: "owner@example.com",
       email_verified: true,
       hd: "other.example",
+    },
+    { email: "owner@example.com", email_verified: "true", hd: "example.com" },
+    {
+      email: "owner@example.com",
+      email_verified: true,
+      hd: "example.com.evil.test",
     },
     { email: "owner@example.com", email_verified: true },
     { email_verified: true, hd: "example.com" },

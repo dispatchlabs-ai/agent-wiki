@@ -27,8 +27,9 @@ remain trusted operator maintenance and must not be distributed as remote client
 Google sign-in connects directly to Google OIDC; no broker is required. Personal
 Google and Workspace accounts use the same path, without a hosted-domain or group
 requirement. Local email/password accounts also work independently of any provider.
-Both paths receive only explicit space grants; matching email addresses never link
-identities or transfer permissions.
+Both paths normally receive only explicit space grants. Operators may opt in to
+first-sign-in reader enrollment for one verified Google Workspace domain, as
+described below. Matching email addresses never link identities or transfer permissions.
 
 Export the common server configuration through your configuration/secret system
 so both operator commands and the server receive it:
@@ -71,9 +72,39 @@ WIKI_GOOGLE_WORKSPACE_DOMAIN=example.org
 This is available only with the Google preset. It sends Google's `hd` request hint
 to improve account selection, then requires a verified email and that exact `hd`
 claim from the authenticated ID-token response. The hint alone is never trusted.
-This does not link by email, infer a role or replace explicit wiki grants. Leave it
+By itself this does not link by email, infer a role or replace explicit wiki grants. Leave it
 unset to continue admitting personal Google accounts and any Workspace domain
 allowed by the OAuth client's audience.
+
+#### Optional Workspace reader enrollment
+
+For a wiki whose published articles should be readable by every member of one
+Google Workspace domain, configure an **Internal** OAuth audience and explicitly
+enable:
+
+```sh
+WIKI_GOOGLE_WORKSPACE_DOMAIN=example.org
+WIKI_GOOGLE_WORKSPACE_READER_ENROLLMENT=1
+```
+
+This option is off by default and requires the complete Google preset and a
+workspace domain; it is rejected with generic OIDC or without a domain. After
+Google validates the sign-in and the wiki verifies the exact authenticated `hd`
+claim and boolean `email_verified`, a **new** identity receives a reader grant
+atomically with enrollment. The audit action is `enroll:reader`, attributed to
+`system:google-workspace`. Readers can access published articles and citations;
+they cannot read original evidence, edit articles, or manage access. Editor and
+manager grants remain explicit. No organization/group membership is added, and
+the identity is still keyed by issuer and subject, never by email.
+
+Existing identities keep their current grant, including no access. A manager's
+revocation or a disabled identity therefore cannot be undone by signing in again.
+Before enabling the option, review any previously enrolled accounts awaiting
+access and grant intended readers explicitly. Do not automatically backfill
+revoked accounts. Setting the option back to `0` stops new automatic grants; it
+does not revoke grants already created. Existing eight-hour sessions retain the
+normal [session behavior](#session-and-request-behavior), including the limit on
+immediate upstream suspension propagation.
 
 Discovery uses `https://accounts.google.com`. Omit the generic OIDC variables when
 using the Google preset. Discovery is lazy so a provider outage does not prevent
@@ -115,9 +146,10 @@ node scripts/bootstrap.mjs 'https://accounts.google.com' 'EXACT-SUBJECT' 'Initia
 ```
 
 An OIDC principal is keyed by `(issuer, subject)`, never by display name or email.
-The subject must be the one issued to this exact client. Later Google users sign
-in once, receive no grant, and appear in **Manage access**. Check their identity
-before granting a role. No domain or company membership is inferred.
+The subject must be the one issued to this exact client. Without Workspace reader
+enrollment, later Google users sign in once, receive no grant, and appear in
+**Manage access**. Check their identity before granting a role. Company or group
+membership is not inferred.
 
 Managers can also choose **Invite someone without Google** in **Manage access**.
 Share the generated setup URL privately with the intended person. The application
@@ -272,7 +304,8 @@ handoff page that starts OIDC. That handoff preserves the path, query, and citat
 anchor, including a remote MCP authorization request awaiting human consent.
 Google/OIDC and local login return to that destination. Return destinations are
 restricted to this wiki. A newly enrolled OIDC identity without a space grant goes
-to the existing access-requested page; sign-in still grants no role. API clients
+to the existing access-requested page; only the explicit Workspace reader-enrollment
+policy can grant a role during first sign-in. API clients
 and embedded image requests still receive 401 without credentials; a browser
 session is not automatically shared with another browser profile or an external
 image renderer.

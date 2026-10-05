@@ -86,8 +86,15 @@ export async function createOIDC({
 }
 
 // The Google preset is direct OIDC. A hosted-domain boundary is optional and
-// explicit; no group or role is ever inferred from Google claims.
+// explicit. Reader enrollment is a separate operator policy, never an email match.
 export function oidcSettings(env) {
+  const readerEnrollment = env.WIKI_GOOGLE_WORKSPACE_READER_ENROLLMENT;
+  if (readerEnrollment !== undefined && !["0", "1"].includes(readerEnrollment))
+    throw Error("Google Workspace reader enrollment must be 0 or 1");
+  if (readerEnrollment === "1" && !env.WIKI_GOOGLE_WORKSPACE_DOMAIN)
+    throw Error(
+      "Google Workspace reader enrollment requires a workspace domain",
+    );
   if (
     env.WIKI_GOOGLE_CLIENT_ID ||
     env.WIKI_GOOGLE_CLIENT_SECRET ||
@@ -115,6 +122,7 @@ export function oidcSettings(env) {
       ...(env.WIKI_GOOGLE_WORKSPACE_DOMAIN
         ? { hd: env.WIKI_GOOGLE_WORKSPACE_DOMAIN }
         : {}),
+      ...(readerEnrollment === "1" ? { enrollReader: true } : {}),
     };
   }
   if (
@@ -147,6 +155,7 @@ export function configuredOIDC(settings, origin) {
     }));
   return {
     issuer: settings.issuer,
+    enrollReader: settings.enrollReader === true,
     label:
       settings.issuer === GOOGLE_ISSUER
         ? "Continue with Google"

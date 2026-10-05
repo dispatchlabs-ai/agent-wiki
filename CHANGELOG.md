@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.18 — 2026-10-05
+
+- Add opt-in reader enrollment for new identities in one verified Google Workspace
+  domain. It requires the restricted Google preset, preserves existing grants and
+  revocations, and never links identities by email. Editor and manager access
+  remain explicit. Existing installations keep their current behavior by default;
+  no persisted-data migration is required.
+
 ## 0.8.17 — 2026-09-30
 
 - Let the authenticated CLI receive durable save receipts and uncached full-health

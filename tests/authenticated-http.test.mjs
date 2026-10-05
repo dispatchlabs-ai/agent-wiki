@@ -99,6 +99,76 @@ function holdMetadataRead(t, filename) {
   t.after(() => release());
   return { started, release };
 }
+
+test("Workspace enrollment returns a reader to the article without evidence or administration access", async (t) => {
+  let rejectIdentity = false;
+  const { request, control, actor } = await server(t, {
+    auth: {
+      label: "Continue with Google",
+      enrollReader: true,
+      finish: async () => {
+        if (rejectIdentity) throw Error("Invalid workspace identity");
+        return {
+          issuer: "https://accounts.google.com",
+          subject: "synthetic-reader",
+          name: "Reader",
+        };
+      },
+    },
+  });
+  const login = async () => {
+    const pending = control.login("/wiki/guide/?from=sign-in");
+    return request("/auth/callback?code=synthetic&state=" + pending.state, {
+      headers: { Cookie: `wiki_login=${pending.token}` },
+    });
+  };
+  rejectIdentity = true;
+  assert.equal((await login()).status, 400);
+  assert.equal(
+    control.identity("https://accounts.google.com", "synthetic-reader"),
+    undefined,
+  );
+  rejectIdentity = false;
+  const response = await login();
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("location"), "/wiki/guide/?from=sign-in");
+  const cookie = response.headers
+    .get("set-cookie")
+    .match(/wiki_session=([^;]+)/)[1];
+  const headers = { Cookie: `wiki_session=${cookie}` };
+  const me = await (await request("/api/me", { headers })).json();
+  assert.equal(me.role, "reader");
+  assert.equal((await request("/wiki/guide/", { headers })).status, 200);
+  for (const route of ["/api/traces/catalog.json", "/api/access"])
+    assert.equal((await request(route, { headers })).status, 404, route);
+  assert.equal(
+    (
+      await request("/api/articles/edits", {
+        method: "POST",
+        headers: {
+          ...headers,
+          Origin: "http://wiki.test",
+          "X-Wiki-CSRF": me.csrf,
+          "X-Wiki-Write": "1",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          operation_id: "reader-rejected",
+          updates: [update("new")],
+        }),
+      })
+    ).status,
+    403,
+  );
+  const principal = control.identity(
+    "https://accounts.google.com",
+    "synthetic-reader",
+  );
+  control.grant(actor, principal.id, null);
+  assert.equal((await request("/wiki/guide/", { headers })).status, 404);
+  assert.equal((await login()).headers.get("location"), "/");
+  assert.equal(control.role(principal.id), null);
+});
 async function healthArchive(t) {
   const repo = fixture(t),
     traces = path.join(repo, ".git", "traces");

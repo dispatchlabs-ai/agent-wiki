@@ -64,7 +64,7 @@ that humans and agents can search and maintain. Articles live in a separate Git
 repository; optional Codex, Claude Code and pi snapshots preserve original conversation evidence.
 Edits appear after commit without rebuilding the site.
 
-**Version 0.8.17 — initial development version.** Linux and macOS are
+**Version 0.8.18 — initial development version.** Linux and macOS are
 supported; native Windows is not verified. The quickstart uses `main`, which may
 include unreleased work. See [verification](docs/onboarding-verification.md),
 [changelog](CHANGELOG.md), and [release policy](docs/releases.md).
@@ -75,7 +75,9 @@ Created by Chris Reynolds, cofounder of **Dispatch Labs AI**, and released under
 The example is deliberately unauthenticated and synthetic. A real wiki requires
 its own content repository, a private authentication database, HTTPS and an
 explicitly bootstrapped manager. Follow [the complete setup](docs/getting-started.md#start-a-personal-content-repository).
-Sign-in alone grants no access; managers assign reader/editor/manager permissions.
+Managers assign reader/editor/manager permissions. Operators can optionally
+enroll new, verified Google Workspace identities as readers of one domain;
+otherwise sign-in alone grants no access.
 Readers see published articles and citations; original evidence requires an
 editor/manager grant and, for agents, trace scope.
 Agent identity and permissions belong entirely to the wiki, with no external
