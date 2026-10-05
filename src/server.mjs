@@ -785,7 +785,7 @@ export function createWiki({
             200,
             shell(
               "Manage access",
-              `<h1>Manage space access</h1><p>People appear here after signing in. Sign-in alone grants no content access. Check the identity beneath each name before granting access.</p>${localLogin ? '<details class="invite-account"><summary>Invite someone without Google</summary><form id="invite-local"><label>Name<input name="name" required maxlength="200"></label><label>Email<input name="email" type="email" required maxlength="254"></label><button>Create setup link</button><p role="status"></p><output></output></form><p>Share the one-use link privately with this person, then grant access below. The link expires in 24 hours.</p></details>' : ""}<div id="access"></div>`,
+              `<h1>Manage space access</h1><p>People appear here after signing in. ${auth?.enrollReader ? "New accounts in the configured Google Workspace domain automatically receive reader access. Existing permissions and revocations are preserved." : "Sign-in alone grants no content access."} Check the identity beneath each name before granting access.</p>${localLogin ? '<details class="invite-account"><summary>Invite someone without Google</summary><form id="invite-local"><label>Name<input name="name" required maxlength="200"></label><label>Email<input name="email" type="email" required maxlength="254"></label><button>Create setup link</button><p role="status"></p><output></output></form><p>Share the one-use link privately with this person, then grant access below. The link expires in 24 hours.</p></details>' : ""}<div id="access"></div>`,
             ),
             "text/html",
           );
