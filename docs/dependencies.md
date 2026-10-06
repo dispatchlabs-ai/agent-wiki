@@ -1,6 +1,6 @@
 # Dependency review
 
-## MCP client remediation — October 6, 2026 (unreleased)
+## MCP client remediation — October 6, 2026 (0.9.4)
 
 The access-directory validation found newly indexed
 [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h).

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.4 — 2026-10-06
 
 - Redesign Access with People and Agents tabs, a searchable agent directory and
   a detail panel for wiki access, sharing and enabled tools. Show the original
