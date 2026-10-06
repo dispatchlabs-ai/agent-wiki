@@ -2,7 +2,7 @@
   description = "Agent Wiki host package and Linux OCI image";
 
   inputs.nixpkgs.url =
-    "github:NixOS/nixpkgs/7fc6f2c20af09cdcaf48b92ec3121860139ec668";
+    "github:NixOS/nixpkgs/aa48d347080940b8a2b8d2f48228674e280a3514";
 
   outputs =
     { self, nixpkgs }:
@@ -24,10 +24,10 @@
         let
           pkgs = import nixpkgs { inherit system; };
         in
-        pkgs.callPackage ./nix/package.nix {
+        pkgs.callPackage ./nix/package.nix ((import ./nix/runtime.nix { inherit pkgs; }) // {
           src = self;
           inherit sourceRevision;
-        };
+        });
     in
     {
       packages = forAllSystems (

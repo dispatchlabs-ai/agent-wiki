@@ -1,6 +1,6 @@
 {
   "name": "agent-wiki",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
   "type": "module",
   "engines": {
@@ -61,6 +61,8 @@
   "overrides": {
     "oauth4webapi": "3.8.7",
     "jose": "6.2.8",
-    "cookies": "0.9.1"
+    "cookies": "0.9.1",
+    "dompurify": "3.4.16",
+    "katex": "0.18.2"
   }
 }

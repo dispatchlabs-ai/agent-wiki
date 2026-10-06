@@ -16,7 +16,9 @@ major version zero. Document migrations for every breaking change.
 From `1.0.0`, use patch for compatible fixes, minor for compatible features or
 deprecations, and major for breaking changes. Reset lower components when bumping.
 Use `-alpha.N`, `-beta.N`, or `-rc.N` only for deliberate previews of an upcoming
-version. A normal `0.y.z` release remains initial-development software.
+version. A normal `0.y.z` release retains this pre-1.0 API compatibility policy.
+Supported deployment boundaries and security maintenance are described in
+[the security policy](../SECURITY.md).
 
 `0.1.0` completes the earlier `0.1.0-alpha.1` preview with the accumulated fixes
 and additions. It does not imply production readiness.

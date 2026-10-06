@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.3 — 2026-10-06
+
+- Patch DOMPurify and KaTeX, select OpenSSL 3.6.5 and SQLite 3.53.3 in the locked
+  runtime, and remove unused Git interpreter extensions. Document advisory
+  applicability, including the remaining unreachable sprintf-js CLI finding.
+- Clarify supported authenticated HTTPS hosting, operator logging and recovery
+  responsibilities, optional per-identity MFA, and the pre-1.0 support policy.
+  Application permissions and persisted formats remain unchanged.
+
 ## 0.9.2 — 2026-10-06
 
 - Read the current session's CSRF token when signing out, so logout works directly

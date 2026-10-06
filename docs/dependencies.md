@@ -1,5 +1,44 @@
 # Dependency review
 
+## Security remediation — October 6, 2026
+
+Release 0.9.3 updates the locked runtime and patches the browser dependencies
+reviewed below. These are security updates, so the normal dependency soak is
+waived for the fixes and their required runtime dependencies. The application,
+authorization model and persisted formats are unchanged. Exact package closure,
+fresh vulnerability-feed results and upgrade qualification belong in the signed
+release evidence; a version comparison alone is not a clean scan.
+
+| Finding                                               | Review and disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OpenSSL 3.6.4, including CVE-2026-35189               | Normal outbound TLS certificate processing can reach the memory-allocation issue. Select OpenSSL **3.6.5** throughout the serving runtime, including Node, Python, Git transport and OpenSSH dependencies. This also incorporates the other September 29 fixes.                                                                                                                                                                                                                |
+| SQLite 3.51.2                                         | The reviewed FTS5 findings require attacker-controlled SQL and, for some cases, disabled defensive mode. Wiki binds search values and does not expose arbitrary SQL or accept untrusted SQLite files as ordinary content. Nevertheless, update the shared runtime library to **3.53.3**, beyond the 3.53.2 fixes; verify both Node and Python use the selected library.                                                                                                        |
+| Perl 5.42.0                                           | Wiki does not invoke Git's Perl tools or accept Perl programs. Disable Git's unused Perl and Python extensions; the pinned package set also contains Perl 5.42.3 for build-time use. Inspect the final runtime closure separately from build dependencies.                                                                                                                                                                                                                     |
+| DOMPurify GHSA-6688-9rhm-gjv2 and GHSA-p98j-92pf-mc4p | These require particular `IN_PLACE` and hook behavior. Patch the transitive dependency to **3.4.16** rather than depending on those conditions remaining absent.                                                                                                                                                                                                                                                                                                               |
+| KaTeX GHSA-238p-pmpm-9mq7                             | Exploitation requires prior prototype pollution or attacker-controlled option prototypes. Patch the transitive dependency to **0.18.2**.                                                                                                                                                                                                                                                                                                                                       |
+| sprintf-js GHSA-hp3w-g68c-fv3c                        | No patched version is published. The affected precision formatter is reachable through argparse in the separate js-yaml command-line tool; Wiki imports gray-matter/js-yaml's library entry point, which does not load that CLI. Wiki never passes user-controlled format strings to sprintf. Retain the compatible dependency and record it as not reachable through the reviewed supported application paths, not as patched. Reassess if a CLI or formatting call is added. |
+
+The production npm audit after the patches reports four moderate affected-package
+entries for the single remaining sprintf-js advisory (the package and three
+transitive dependents), with no low, high or critical entries. Do not confuse the
+number of affected-package entries with distinct vulnerabilities. No forced
+gray-matter downgrade or incompatible parser replacement is used.
+
+The Nix package set is pinned to
+`aa48d347080940b8a2b8d2f48228674e280a3514`. Its default OpenSSL selection is not
+used: `nix/runtime.nix` selects the patched 3.6 branch for runtime consumers while
+leaving unrelated build tools on the pinned package set. Node remains 24.21.0.
+Release qualification must inspect the actual runtime closure for older OpenSSL
+copies and record the loaded Node/Python OpenSSL and SQLite versions.
+
+Primary sources: [OpenSSL 3.6 advisories](https://openssl-library.org/news/vulnerabilities-3.6/),
+[SQLite CVEs](https://www.sqlite.org/cves.html),
+[Perl 5.42.3 changes](https://perldoc.perl.org/5.42.3/perldelta),
+[DOMPurify rawtext advisory](https://github.com/advisories/GHSA-6688-9rhm-gjv2),
+[DOMPurify hook advisory](https://github.com/advisories/GHSA-p98j-92pf-mc4p),
+[KaTeX advisory](https://github.com/advisories/GHSA-238p-pmpm-9mq7),
+[sprintf-js advisory](https://github.com/advisories/GHSA-hp3w-g68c-fv3c).
+
 ## Human MFA — October 5, 2026
 
 New runtime dependencies are pinned to `@simplewebauthn/server` 14.0.2 (September

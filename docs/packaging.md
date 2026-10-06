@@ -11,9 +11,13 @@ complete runtime closure and does not require Nix in the running container.
 
 ## Locked runtime
 
-`flake.lock` pins the September 28, 2026 NixOS 26.05 channel revision. That revision
-supplies Node 24.21.0, above the repository's minimum supported runtime and using
-the channel's published binary-cache artifacts where available. `package-lock.json`
+`flake.lock` pins Nixpkgs revision `aa48d347080940b8a2b8d2f48228674e280a3514`
+(October 5, 2026). `nix/runtime.nix` selects OpenSSL 3.6.5 for runtime consumers,
+SQLite 3.53.3 comes from that package set, and Node remains 24.21.0. Git's unused
+Perl/Python extensions are disabled. See the [dependency review](dependencies.md)
+for applicability and the signed release evidence for the exact closure and
+loaded-library verification. Cached artifacts are used where compatible with
+these selections. `package-lock.json`
 supplies the exact JavaScript dependency graph through Nixpkgs' `importNpmLock`;
 there is no placeholder dependency hash and the build performs no unlocked npm resolution.
 The package builds the browser assets, prunes development dependencies, and keeps:

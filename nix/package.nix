@@ -55,7 +55,7 @@ let
     name = manifest.name;
     version = manifest.version;
     inherit sourceRevision packageLockSha256;
-    nixpkgsRevision = "7fc6f2c20af09cdcaf48b92ec3121860139ec668";
+    nixpkgsRevision = "aa48d347080940b8a2b8d2f48228674e280a3514";
     system = stdenv.hostPlatform.system;
     node = nodeVersion;
     hostRequiresNix = true;
