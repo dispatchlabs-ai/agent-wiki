@@ -60,6 +60,8 @@ The acceptance sequence verifies:
   restart;
 - an offline mode-0600 backup restores into a fresh root with the same Git HEAD,
   principal, grant, content, trace, and media;
+- the restored root rejects the earlier browser session, then accepts a fresh
+  password sign-in by the preserved synthetic manager;
 - retained synthetic writer evidence blocks serve, binds to an inspection
   manifest, recovers explicitly, and permits a new authenticated write.
 

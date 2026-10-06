@@ -796,6 +796,21 @@ try {
   await step("restored_server_start", () =>
     startWiki(restoredRoot, origin, backendPort, "server-restored"),
   );
+  const restoredSession = await context.request.get(origin + "/api/me");
+  assert(
+    restoredSession.status() === 401,
+    "Restore revived an old browser session",
+  );
+  await page.goto(origin + "/auth/sign-in?mode=local", {
+    waitUntil: "domcontentloaded",
+  });
+  await page
+    .getByLabel("Email", { exact: true })
+    .fill("manager@example.invalid");
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL(origin + "/", { timeout: 10_000 });
+  checks.restore_revokes_sessions_and_allows_fresh_sign_in = true;
   const restoredIdentity = await profile(origin);
   assert(
     restoredIdentity.id === browserEvidence.principal &&
