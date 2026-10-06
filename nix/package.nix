@@ -125,6 +125,11 @@ buildNpmPackage {
     makeWrapper ${coreutils}/bin/cat "$out/bin/agent-wiki-package-info" \
       --add-flags "$out/share/agent-wiki/package-identity.json"
 
+    # Dependency source helpers can retain Python shebangs after npm pruning.
+    # Resolve them to the selected runtime before the generic fixup discovers
+    # a build-time interpreter with a different OpenSSL dependency.
+    HOST_PATH="${python3}/bin:${nodejs_24}/bin:$HOST_PATH" patchShebangs --host --update "$out"
+
     runHook postInstall
   '';
 

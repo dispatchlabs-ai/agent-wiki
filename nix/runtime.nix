@@ -3,14 +3,18 @@
 { pkgs }:
 let
   openssl = pkgs.openssl_3_6;
+  nghttp2 = pkgs.nghttp2.override { inherit openssl; };
   ngtcp2 = pkgs.ngtcp2.override { inherit openssl; };
-  nodejs-slim = pkgs.nodejs-slim_24.override {
+  python3 = pkgs.python3.override {
     inherit openssl;
-    callPackage = pkgs.lib.callPackageWith (pkgs // { inherit ngtcp2; });
+    self = python3;
   };
-  python3 = pkgs.python3.override { inherit openssl; };
+  nodejs-slim = pkgs.nodejs-slim_24.override {
+    inherit openssl python3;
+    callPackage = pkgs.lib.callPackageWith (pkgs // { inherit nghttp2 ngtcp2; });
+  };
   curl = pkgs.curl.override {
-    inherit openssl ngtcp2;
+    inherit openssl nghttp2 ngtcp2;
     libkrb5 = pkgs.libkrb5.override { inherit openssl; };
     libssh2 = pkgs.libssh2.override { inherit openssl; };
   };

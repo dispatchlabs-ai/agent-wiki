@@ -2,9 +2,13 @@
   runCommand,
   jq,
   cacert,
+  closureInfo,
   agent-wiki,
 }:
 
+let
+  closure = closureInfo { rootPaths = [ agent-wiki ]; };
+in
 runCommand "agent-wiki-package-smoke-${agent-wiki.version}"
   {
     nativeBuildInputs = [
@@ -13,6 +17,23 @@ runCommand "agent-wiki-package-smoke-${agent-wiki.version}"
     ];
   }
   ''
+    # Inspect the built runtime, including references retained by source helpers
+    # and embedded compiler configuration, not just the selected Nix arguments.
+    while IFS= read -r store_path; do
+      case "$store_path" in
+        *-openssl-*)
+          case "$store_path" in
+            *-openssl-3.6.5|*-openssl-3.6.5-*) ;;
+            *) echo "Unreviewed OpenSSL in runtime closure: $store_path" >&2; exit 1 ;;
+          esac
+          ;;
+        *-perl-[0-9]*)
+          echo "Unused Perl interpreter in runtime closure: $store_path" >&2
+          exit 1
+          ;;
+      esac
+    done < ${closure}/store-paths
+
     identity="$(agent-wiki-package-info)"
     test "$(printf '%s' "$identity" | jq -r .name)" = agent-wiki
     test "$(printf '%s' "$identity" | jq -r .version)" = ${agent-wiki.version}
@@ -24,6 +45,8 @@ runCommand "agent-wiki-package-smoke-${agent-wiki.version}"
     const fs = require('node:fs');
     const tls = require('node:tls');
     const assert = require('node:assert/strict');
+    assert.equal(process.versions.openssl, '3.6.5');
+    assert.equal(process.versions.sqlite, '3.53.3');
     assert.equal(process.env.NODE_EXTRA_CA_CERTS, process.env.EXPECTED_CA_FILE);
     const pem = fs.readFileSync(process.env.NODE_EXTRA_CA_CERTS, 'utf8');
     assert.match(pem, /-----BEGIN CERTIFICATE-----/);
@@ -41,6 +64,9 @@ runCommand "agent-wiki-package-smoke-${agent-wiki.version}"
       EXPECTED_CA_FILE="$TMPDIR/custom-ca.crt" agent-wiki-cli --help >/dev/null
     unset NODE_OPTIONS EXPECTED_CA_FILE
     HOME="$TMPDIR" agent-wiki --help >/dev/null
+    python_bin=$(sed -n 's/^exec "\([^"]*\/bin\/python3\)".*/\1/p' "${agent-wiki}/bin/agent-wiki")
+    test -x "$python_bin"
+    "$python_bin" -c 'import ssl, sqlite3; assert ssl.OPENSSL_VERSION.split()[1] == "3.6.5"; assert sqlite3.sqlite_version == "3.53.3"'
     test -f "${agent-wiki}/libexec/agent-wiki/ui/components/site.mjs"
     mkdir "$TMPDIR/uninitialized"
     agent-wiki status --root "$TMPDIR/uninitialized" \
