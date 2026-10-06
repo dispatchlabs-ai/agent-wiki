@@ -716,6 +716,8 @@ export function createWiki({
                 body.name,
               );
               break;
+            case "rename":
+              return send(200, mfa.rename(token, body.factor, body.name));
             case "remove":
               result = mfa.remove(token, body.factor);
               break;
@@ -730,7 +732,12 @@ export function createWiki({
           }
           const { session, ...value } = result;
           establishSession(session);
-          return send(200, { saved: true, csrf: session.csrf, ...value });
+          return send(200, {
+            saved: true,
+            csrf: session.csrf,
+            status: mfa.status(actor.id),
+            ...value,
+          });
         }
         if (url.pathname === "/oauth/authorize") {
           if (req.method === "GET")

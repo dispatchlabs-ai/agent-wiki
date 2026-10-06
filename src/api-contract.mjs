@@ -529,7 +529,7 @@ export function openAPI() {
       "/api/account/security",
       "accounts.securityChange",
       "human",
-      "Manage caller's optional MFA with action totp-start, totp-finish, passkey-start, passkey-finish, remove, recovery, or disable. Exact Origin, session CSRF and sign-in within five minutes required. Enrollment returns owner-bound flow/options; factor proof finishes enrollment. Changes rotate the cookie and CSRF; first enrollment and recovery renewal return recoveryCodes once.",
+      "Manage caller's optional MFA with action totp-start, totp-finish, passkey-start, passkey-finish, rename, remove, recovery, or disable. Exact Origin, session CSRF and sign-in within five minutes required. Enrollment returns owner-bound flow/options; factor proof finishes enrollment. passkey-finish accepts an optional name (otherwise an available Passkey N label). rename requires factor and a nonempty name of at most 100 characters and changes only an owned passkey label, preserving sessions and credentials. Other changes rotate the cookie and CSRF; first enrollment and recovery renewal return recoveryCodes once. Completed changes include current status.",
     ],
     [
       "post",

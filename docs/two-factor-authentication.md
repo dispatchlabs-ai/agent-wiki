@@ -15,9 +15,14 @@ identity manages its own factors; matching email addresses do not join accounts.
 
 ## Enroll and manage methods
 
-- **Passkey:** choose a recognizable name and accept your browser's passkey
+- **Passkey:** choose **Add a passkey** and accept your browser's passkey
   prompt. The authenticator must verify you using its supported biometric or
-  device-PIN method. Multiple passkeys are supported.
+  device-PIN method. A default label such as **Passkey 1** is assigned automatically.
+  Use **Rename** afterward if a personal label helps you recognize the device.
+  Multiple passkeys are supported.
+- **After enrollment:** save the recovery-code file from the confirmation screen,
+  or expand **View recovery codes** to copy them. Optional passkey renaming keeps
+  the one-time codes on screen until you leave the page.
 - **Authenticator app:** scan the QR code, or enter the setup key, then verify
   a six-digit code. One authenticator secret is enrolled per account.
 - **Recovery code:** use one saved code when neither normal method is available.
@@ -26,10 +31,12 @@ identity manages its own factors; matching email addresses do not join accounts.
 
 Security changes require a wiki sign-in within the last five minutes, including
 the second factor when already enabled. Sign out and sign in again when asked.
-Changing factors, regenerating recovery codes, or turning protection off revokes
+Adding or removing factors, regenerating recovery codes, or turning protection off revokes
 other browser sessions and outstanding MFA challenges. These operations do not
 extend the retained session's original eight-hour expiry or authentication
-freshness. Password changes for enrolled accounts also require recent MFA proof.
+freshness. Renaming an owned passkey also requires fresh sign-in but changes only
+its label; it preserves credentials, recovery codes, sessions and their expiry.
+Password changes for enrolled accounts also require recent MFA proof.
 To remove the final factor, explicitly turn off two-factor authentication.
 
 The feature is optional. There is no organization-wide enforcement setting or

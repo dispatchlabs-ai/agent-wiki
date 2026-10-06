@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.1 — 2026-10-06
+
+- Simplify two-factor setup with separate passkey and authenticator cards, a clear
+  success state, and recovery-code download. Passkeys receive a default label
+  without an extra step before the device prompt; optional renaming afterward
+  preserves credentials, recovery codes and sessions.
+- Keep fresh authentication and owner checks for passkey renaming. Existing
+  named enrollment clients remain compatible; no data migration is required.
+
 ## 0.9.0 — 2026-10-05
 
 - Add optional per-identity two-factor authentication with user-verified passkeys,

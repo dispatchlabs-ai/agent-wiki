@@ -456,12 +456,7 @@ export class Mfa {
   async finishPasskey(sessionToken, flow, response, name) {
     const actor = this.fresh(sessionToken),
       owner = "session:" + hash(sessionToken);
-    if (typeof name !== "string" || !name.trim() || name.length > 100)
-      throw new WikiError(
-        "INVALID_NAME",
-        "Give this passkey a name, up to 100 characters.",
-        400,
-      );
+    if (name !== undefined) this.passkeyName(name);
     this.control.limitLogin("mfa:" + actor.id);
     const data = this.consumeChallenge(flow, actor.id, owner, "passkey-enroll");
     let verification;
@@ -494,7 +489,7 @@ export class Mfa {
         .run(
           credential.id,
           actor.id,
-          name.trim(),
+          name === undefined ? this.defaultPasskeyName(actor.id) : name.trim(),
           JSON.stringify({
             id: credential.id,
             publicKey: Buffer.from(credential.publicKey).toString("base64"),
@@ -507,6 +502,35 @@ export class Mfa {
         );
       this.audit(actor.id, "mfa:enroll-passkey", credential.id);
       return this.changed(actor.id, first, actor, true);
+    });
+  }
+  passkeyName(name) {
+    if (typeof name !== "string" || !name.trim() || name.length > 100)
+      throw new WikiError(
+        "INVALID_NAME",
+        "Use a passkey name between 1 and 100 characters.",
+        400,
+      );
+    return name.trim();
+  }
+  defaultPasskeyName(principal) {
+    const names = new Set(this.status(principal).factors.map((f) => f.name));
+    let number = 1;
+    while (names.has(`Passkey ${number}`)) number++;
+    return `Passkey ${number}`;
+  }
+  rename(sessionToken, factorID, name) {
+    return this.control.transaction(() => {
+      const actor = this.fresh(sessionToken);
+      const label = this.passkeyName(name);
+      const result = this.db
+        .prepare(
+          "UPDATE mfa_factors SET name=? WHERE id=? AND principal=? AND kind='passkey'",
+        )
+        .run(label, factorID, actor.id);
+      if (!result.changes) throw invalid();
+      this.audit(actor.id, "mfa:rename-passkey", factorID);
+      return { saved: true, status: this.status(actor.id) };
     });
   }
   async authenticationOptions(pendingToken) {

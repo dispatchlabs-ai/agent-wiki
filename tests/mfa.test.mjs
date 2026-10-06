@@ -527,3 +527,95 @@ test("HTTP and CLI local login cannot bypass an enrolled factor or use it withou
   assert.equal(fs.statSync(cliProfile).mode & 0o077, 0);
   assert.equal(JSON.parse(fs.readFileSync(cliProfile, "utf8")).kind, "session");
 });
+
+test("passkey rename is owner-bound, fresh, audited, and preserves credential and recovery state", (t) => {
+  const { control, mfa, principal, session } = setup(t);
+  const enrolled = enroll(mfa, session);
+  const insert = control.db.prepare(
+    "INSERT INTO mfa_factors VALUES (?,?,'passkey',?,?,?,?)",
+  );
+  insert.run(
+    "passkey-one",
+    principal,
+    "Passkey 1",
+    "synthetic credential bytes",
+    42,
+    Date.now(),
+  );
+  insert.run(
+    "passkey-three",
+    principal,
+    "Passkey 3",
+    "other synthetic credential",
+    9,
+    Date.now(),
+  );
+  assert.equal(mfa.defaultPasskeyName(principal), "Passkey 2");
+  const other = control.enroll({
+    issuer: "https://id.example",
+    subject: "rename-other",
+    name: "Other",
+  });
+  const otherSession = control.session(other.id);
+  const before = control.db
+    .prepare("SELECT * FROM mfa_factors WHERE id='passkey-one'")
+    .get();
+  const snapshot = () => ({
+    sessions: control.db.prepare("SELECT * FROM sessions").all(),
+    proofs: control.db.prepare("SELECT * FROM mfa_sessions").all(),
+    recovery: control.db.prepare("SELECT * FROM mfa_recovery").all(),
+  });
+  const original = snapshot();
+  for (const name of [undefined, null, "", "   ", "x".repeat(101), 123])
+    assert.throws(
+      () => mfa.rename(enrolled.session.token, "passkey-one", name),
+      /passkey name/,
+    );
+  assert.throws(
+    () => mfa.rename(otherSession.token, "passkey-one", "Stolen"),
+    /Verification failed/,
+  );
+  assert.throws(
+    () => mfa.rename(enrolled.session.token, "missing", "Missing"),
+    /Verification failed/,
+  );
+  const totp = mfa.status(principal).factors.find((f) => f.kind === "totp");
+  assert.throws(
+    () => mfa.rename(enrolled.session.token, totp.id, "Not a passkey"),
+    /Verification failed/,
+  );
+  const renamed = mfa.rename(
+    enrolled.session.token,
+    "passkey-one",
+    "  Personal phone  ",
+  );
+  assert.equal(renamed.saved, true);
+  assert.equal(
+    renamed.status.factors.find((f) => f.id === "passkey-one").name,
+    "Personal phone",
+  );
+  assert.deepEqual(
+    {
+      ...control.db
+        .prepare("SELECT * FROM mfa_factors WHERE id='passkey-one'")
+        .get(),
+    },
+    { ...before, name: "Personal phone" },
+  );
+  assert.deepEqual(snapshot(), original);
+  assert.equal(
+    control.db
+      .prepare(
+        "SELECT actor FROM audit WHERE action='mfa:rename-passkey' AND target='passkey-one'",
+      )
+      .get().actor,
+    principal,
+  );
+  control.db
+    .prepare("UPDATE mfa_sessions SET primary_at=? WHERE hash=?")
+    .run(Date.now() - 6 * 60000, digest(enrolled.session.token));
+  assert.throws(
+    () => mfa.rename(enrolled.session.token, "passkey-one", "Stale"),
+    /Sign out/,
+  );
+});
