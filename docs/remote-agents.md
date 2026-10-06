@@ -12,6 +12,23 @@ a name, instructions, and the wiki tools it should expose. It becomes its own
 principal, owned by you. A space manager grants it read or read/write wiki access.
 Creation alone grants no content access.
 
+Space managers use **Access → Agents** (`/access/#agents`) to find every active
+agent, including agents they do not own or use. The directory separates the
+original creator from the current owner, shows enabled tools and shared people,
+and lets managers grant or remove wiki access. Search by agent, creator or owner,
+or filter by wiki access. **Create agent** uses the same definition form and
+does not assign wiki access automatically.
+
+Creator identity comes from the original creation audit record and survives an
+ownership transfer. Operator enrollment is labeled **Operator**; missing records
+are labeled **Not recorded**, never inferred from the current owner. Account
+details distinguish separate identities with the same display name.
+
+Directory visibility does not grant permission to invoke, configure or share an
+agent. **Add person** and **Revoke** are available only to its owner or a person
+with Manage access permission. The personal `/agents/` page continues to list
+only agents owned by or shared with the signed-in person.
+
 An owner can grant another signed-in person **Use agent**, **Edit definition**, or
 **Manage access** independently. Check the displayed identity before selecting a
 person. Users without personal space access may still use an agent explicitly
@@ -82,6 +99,12 @@ store, which must be backed up along with the other identities and permissions.
   `configure` (`agent`, `definition`), `permission` (`agent`, `principal`,
   `permission`, `enabled`), `role` (`agent`, `role`), or `revoke` (`connection`).
   Human session and CSRF checks apply; each action checks its own authority.
+- `GET /api/access` requires a human manager. It returns the existing `principals`
+  directory plus `agents`: active agent IDs/names/roles, `creator` and `owner`
+  identity records (or null), `tools` (or null for legacy enrollment), `grants`
+  of people and permissions, and the caller's boolean `manage` permission.
+  Private instructions and credentials are excluded. `POST /api/access` retains
+  its role-grant contract and CSRF requirement.
 
 Remote consent currently selects independent agent authority in the default space.
 It does not implement delegated-human mode, model hosting, scheduling, client-ID

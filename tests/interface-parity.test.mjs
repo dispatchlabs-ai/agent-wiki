@@ -357,6 +357,8 @@ test("CLI browser OAuth validates state, selects explicit agent authority, rotat
     },
     { timeout: 10000 },
   );
+  assert.equal(profile.client.issuer, f.origin);
+  assert.equal(profile.tokens.issuer, f.origin);
   writeProfile(f.config, profile);
   assert.equal((await f.cli(["whoami"])).result.agent, agent.id);
   assert.equal((await f.cli(["file", fileId])).code, 0);

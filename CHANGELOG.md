@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Redesign Access with People and Agents tabs, a searchable agent directory and
+  a detail panel for wiki access, sharing and enabled tools. Show the original
+  creator separately from the current owner, including agents not shared with
+  the manager. Preserve existing invocation, configuration and sharing rights;
+  no data migration is required.
+- Patch the MCP OAuth client to 2.2.0 for issuer-bound credential storage. Keep
+  the CLI's existing origin restriction and server-side SDK unchanged.
+
 ## 0.9.3 — 2026-10-06
 
 - Patch DOMPurify and KaTeX, select OpenSSL 3.6.5 and SQLite 3.53.3 in the locked

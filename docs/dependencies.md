@@ -1,5 +1,24 @@
 # Dependency review
 
+## MCP client remediation — October 6, 2026 (unreleased)
+
+The access-directory validation found newly indexed
+[GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h).
+Pin `@modelcontextprotocol/client` to **2.2.0**, the first patched version, with
+its required core 2.2.0 dependency. Server and Node SDK packages remain 2.0.0;
+the advisory concerns the OAuth client. Both updated packages retain MIT
+licenses. The security exception waives the normal soak period.
+
+CLI browser login starts with an empty profile and preserves the SDK's complete
+client information and tokens, including `issuer`. The transport already rejects
+requests outside the configured wiki origin and redirects. Existing profiles are
+not passed back to the SDK: refresh uses the same origin's fixed token endpoint.
+No credential migration is needed for this application. The browser-login
+regression checks the saved issuers, refresh rotation and revocation.
+
+The production audit after this update reports no high or critical findings.
+The four moderate package entries for sprintf-js remain as reviewed below.
+
 ## Security remediation — October 6, 2026
 
 Release 0.9.3 updates the locked runtime and patches the browser dependencies

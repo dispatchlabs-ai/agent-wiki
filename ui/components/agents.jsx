@@ -10,7 +10,7 @@ import {
   DialogDescription,
 } from "./dialog.jsx";
 
-function Icon({ kind = "agent" }) {
+export function Icon({ kind = "agent" }) {
   return (
     <svg
       width="22"
@@ -76,7 +76,7 @@ function PersonField({ people }) {
     </Field>
   );
 }
-function Definition({ config, toolNames }) {
+export function Definition({ config, toolNames }) {
   return (
     <>
       <Field

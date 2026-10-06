@@ -174,3 +174,20 @@ if (agents) {
       agents.replaceChildren(message, reload);
     });
 }
+
+const access = document.querySelector("#access-app");
+if (access) {
+  import("./components/access.jsx")
+    .then(({ AccessApp }) => {
+      createRoot(access).render(
+        <AccessApp initial={JSON.parse(access.dataset.state)} />,
+      );
+    })
+    .catch(() => {
+      const message = document.createElement("p");
+      message.setAttribute("role", "alert");
+      message.textContent =
+        "Access controls could not load. Reload the page to try again.";
+      access.replaceChildren(message);
+    });
+}

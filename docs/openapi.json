@@ -4452,7 +4452,7 @@
     "/api/access": {
       "get": {
         "operationId": "access.list",
-        "description": "Human manager's principal directory.",
+        "description": "Human manager's principal and agent directory. Agent entries include creator, owner, wiki role, shared people, enabled tools and the caller's manage-access permission; this visibility does not grant use or configuration rights.",
         "x-wiki-permission": "manager",
         "security": [{ "browserSession": [] }],
         "responses": {

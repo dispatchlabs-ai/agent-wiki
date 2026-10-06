@@ -438,7 +438,7 @@ export function openAPI() {
       "/api/access",
       "access.list",
       "manager",
-      "Human manager's principal directory.",
+      "Human manager's principal and agent directory. Agent entries include creator, owner, wiki role, shared people, enabled tools and the caller's manage-access permission; this visibility does not grant use or configuration rights.",
     ],
     [
       "post",

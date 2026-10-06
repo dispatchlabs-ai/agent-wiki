@@ -829,6 +829,312 @@ body > main {
 }
 
 /* Agents: shadcn-style surfaces with Base UI interaction primitives. */
+.access-page {
+  width: 100%;
+}
+.access-workspace {
+  font-size: 14px;
+}
+.access-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.access-heading h1 {
+  margin: 0;
+}
+.access-tabs [role="tablist"] {
+  display: flex;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  margin-bottom: 24px;
+}
+.access-tabs [role="tab"] {
+  min-width: 110px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+}
+.access-tabs [role="tab"][data-active] {
+  color: var(--color-link);
+  border-color: var(--color-link);
+  background: var(--color-background);
+}
+.access-tabs [role="tabpanel"] {
+  padding: 0;
+}
+.access-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(310px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.access-directory,
+.access-detail,
+.access-people {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-background);
+}
+.access-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px;
+}
+.access-toolbar h2 {
+  font-size: 18px;
+  margin: 0 auto 0 0;
+}
+.access-toolbar input {
+  width: 210px;
+  min-width: 0;
+  flex: 1;
+}
+.access-toolbar select {
+  max-width: 100%;
+}
+.access-agent-table {
+  width: 100%;
+  table-layout: fixed;
+  margin: 0;
+  border-collapse: collapse;
+}
+.access-agent-table :is(th, td) {
+  padding: 16px;
+  text-align: left;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+.access-agent-table th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-muted);
+  background: var(--color-surface);
+}
+.access-agent-table th:first-child {
+  width: 46%;
+}
+.access-agent-table th:last-child {
+  width: 24%;
+}
+.access-agent-table tr[data-selected] {
+  background: color-mix(in srgb, var(--color-link) 9%, var(--color-background));
+}
+.access-agent-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--color-text);
+  box-shadow: none;
+  font-weight: 550;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.access-agent-select:hover {
+  color: var(--color-link);
+  background: none;
+}
+.access-agent-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.access-person {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.access-person small,
+.access-muted {
+  color: var(--color-muted);
+}
+.access-detail {
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+.access-detail h2 {
+  margin: 0 0 24px;
+  font-size: 21px;
+  line-height: 1.35;
+}
+.access-detail h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.access-detail section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 22px;
+  margin-top: 22px;
+}
+.access-metadata {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+.access-metadata > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 12px;
+}
+.access-metadata dd,
+.access-identities dd {
+  margin: 0;
+}
+.access-identities {
+  margin-top: 16px;
+  font-size: 12px;
+}
+.access-identities summary {
+  cursor: pointer;
+  color: var(--color-muted);
+}
+.access-identities dt {
+  margin-top: 12px;
+  font-weight: 600;
+}
+.access-detail fieldset,
+.access-people fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.access-detail form .ui-button-primary {
+  width: 100%;
+  margin-top: 12px;
+}
+.access-workspace .ui-button-primary,
+.access-workspace .ui-button-primary:hover {
+  background: var(--color-action);
+  color: var(--color-action-text);
+  border-color: var(--color-action);
+}
+.access-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.access-grants,
+.access-tools {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+}
+.access-grants li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.access-grants .access-person {
+  flex: 1 1 130px;
+}
+.access-tools li {
+  padding-block: 4px;
+}
+.access-tools code {
+  padding: 0;
+  background: none;
+  font-size: 13px;
+}
+.access-empty {
+  padding: 20px;
+  color: var(--color-muted);
+}
+.access-feedback {
+  margin: 16px 0 0;
+}
+.access-feedback:empty {
+  display: none;
+}
+#access.access-people form {
+  padding: 20px;
+  border: 0;
+  gap: 16px;
+}
+#access.access-people form + form {
+  border-top: 1px solid var(--color-border);
+}
+.access-people .access-person {
+  flex: 1 1 300px;
+}
+.access-people fieldset {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#access.access-people select {
+  margin: 0;
+}
+.access-people [role="status"]:empty {
+  display: none;
+}
+.access-page .invite-account {
+  margin-top: 0;
+}
+.access-page .invite-account fieldset {
+  display: grid;
+  gap: 14px;
+  border: 0;
+  padding: 16px 0;
+}
+@media (max-width: 1100px) {
+  .access-toolbar h2 {
+    flex-basis: 100%;
+  }
+  .access-agent-icon {
+    display: none;
+  }
+}
+@media (max-width: 850px) {
+  .access-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .access-heading {
+    flex-wrap: wrap;
+  }
+  .access-toolbar {
+    padding: 16px;
+  }
+  .access-toolbar :is(input, select) {
+    width: 100%;
+    flex-basis: 100%;
+  }
+  .access-agent-table :is(th, td) {
+    padding: 12px 8px;
+    font-size: 12px;
+  }
+  .access-detail {
+    padding: 20px;
+  }
+}
+
 .agents-page {
   width: 100%;
   max-width: 1240px;
