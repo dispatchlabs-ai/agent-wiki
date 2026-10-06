@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add client-neutral shared-memory instructions and explain how to include them
+  in an agent's global or project guidance after connecting to the wiki.
+
 ## 0.9.4 — 2026-10-06
 
 - Redesign Access with People and Agents tabs, a searchable agent directory and
