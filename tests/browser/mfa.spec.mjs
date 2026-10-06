@@ -68,6 +68,18 @@ async function local(page) {
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
+async function signOut(page) {
+  await page.getByRole("button", { name: "Account menu" }).click();
+  const response = page.waitForResponse(
+    (response) =>
+      response.url() === origin + "/auth/logout" &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
+  expect((await response).status()).toBe(200);
+  await expect(page).toHaveURL(origin + "/");
+  expect((await page.request.get(origin + "/api/me")).status()).toBe(401);
+}
 async function layouts(page, name) {
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -90,6 +102,9 @@ async function layouts(page, name) {
 }
 async function enrollTotp(page) {
   await page.goto(origin + "/account/security/");
+  await expect(
+    page.getByRole("button", { name: "Account menu" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Set up authenticator app" }).click();
   await expect(page.getByLabel("Or enter this setup key")).not.toHaveValue("");
   const secret = await page.getByLabel("Or enter this setup key").inputValue();
@@ -118,8 +133,7 @@ test("local account enrolls TOTP, signs in with a second factor, uses recovery, 
   await expect(page).toHaveURL(origin + "/wiki/guide/");
   const { totp, codes } = await enrollTotp(page);
   await layouts(page, "recovery-codes");
-  await page.getByRole("link", { name: "Back to security" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+  await signOut(page);
   await local(page);
   await expect(page).toHaveURL(origin + "/auth/mfa");
   expect((await page.request.get(origin + "/api/me")).status()).toBe(401);
@@ -178,6 +192,9 @@ test("a user-verified virtual passkey enrolls and completes a separate second-fa
   await local(page);
   await expect(page).toHaveURL(origin + "/wiki/guide/");
   await page.goto(origin + "/account/security/");
+  await expect(
+    page.getByRole("button", { name: "Account menu" }),
+  ).toBeVisible();
   await expect(page.getByLabel("Passkey name", { exact: true })).toHaveCount(0);
   await layouts(page, "choose-method");
   await page
@@ -233,7 +250,15 @@ test("a user-verified virtual passkey enrolls and completes a separate second-fa
   const download = await downloadEvent;
   expect(download.suggestedFilename()).toBe("agent-wiki-recovery-codes.txt");
   expect(fs.readFileSync(await download.path(), "utf8")).toContain(codes);
-  await page.getByRole("link", { name: "Back to security" }).click();
+  // Sign out on the enrollment result without navigation refreshing the menu.
+  await signOut(page);
+  await local(page);
+  await expect(page).toHaveURL(origin + "/auth/mfa");
+  await page
+    .getByRole("button", { name: "Use a passkey", exact: true })
+    .click();
+  await expect(page).toHaveURL(origin + "/wiki/guide/");
+  await page.goto(origin + "/account/security/");
   await expect(
     page.getByText("Synthetic platform passkey", { exact: true }),
   ).toBeVisible();
@@ -259,6 +284,7 @@ test("a user-verified virtual passkey enrolls and completes a separate second-fa
   await expect(page.getByText("Passkey 2", { exact: true })).toBeVisible();
   await expect(page.locator("#mfa-recovery-result")).toBeHidden();
 
+  await signOut(page);
   await local(page);
   await expect(page).toHaveURL(origin + "/auth/mfa");
   expect((await page.request.get(origin + "/api/me")).status()).toBe(401);
@@ -281,6 +307,7 @@ test("OIDC sign-in also requires the account's enrolled factor and retains its a
   await oidc();
   await expect(page).toHaveURL(origin + "/wiki/guide/");
   const { codes } = await enrollTotp(page);
+  await signOut(page);
   // The provider retains its own authenticated session and returns directly.
   await page.goto(origin + "/auth/login?return_to=%2Fwiki%2Fguide%2F");
   await expect(page).toHaveURL(origin + "/auth/mfa");

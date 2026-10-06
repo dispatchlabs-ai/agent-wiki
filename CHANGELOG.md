@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.2 — 2026-10-06
+
+- Read the current session's CSRF token when signing out, so logout works directly
+  after passkey or authenticator enrollment and other security changes without
+  a page reload. Keep existing CSRF checks and enrolled factors unchanged.
+- Exercise real account-menu sign-out immediately after local and OIDC MFA
+  enrollment in browser tests, including first and additional passkeys.
+
 ## 0.9.1 — 2026-10-06
 
 - Simplify two-factor setup with separate passkey and authenticator cards, a clear

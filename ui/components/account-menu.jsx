@@ -18,11 +18,15 @@ export function AccountMenu() {
     setBusy(true);
     setError("");
     try {
+      // Security changes can rotate the session without reloading this menu.
+      const current = await fetch("/api/me", { cache: "no-store" });
+      if (!current.ok) throw new Error("Please try signing out again.");
+      const { csrf } = await current.json();
       const response = await fetch("/auth/logout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Wiki-CSRF": user.csrf,
+          "X-Wiki-CSRF": csrf,
         },
         body: "{}",
       });
