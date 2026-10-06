@@ -1,5 +1,30 @@
 # Dependency review
 
+## Human MFA — October 5, 2026
+
+New runtime dependencies are pinned to `@simplewebauthn/server` 14.0.2 (September
+13), `@simplewebauthn/browser` 14.0.0 (September 2), `otpauth` 9.5.2 (September 3),
+and `qrcode` 1.5.4 (August 5, 2024), all MIT licensed. Registry publication metadata
+was checked on October 5. Browser, OTP and QR versions exceed thirty days; the
+server's major 14 release also exceeds thirty days, and the selected security
+patch exceeds fourteen days. Server 14.0.2 fixes
+[GHSA-2g3p-m8c9-hhwh](https://github.com/MasterKale/SimpleWebAuthn/security/advisories/GHSA-2g3p-m8c9-hhwh).
+The newer 14.0.3 only defers a runtime warning and remains inside the routine soak
+window. Upstream notices are retained in installed packages and browser notices.
+
+The implementation uses the upstream WebAuthn verifier with required user
+verification, exact origin/RP checks and one-use owner-bound challenges. OTPAuth
+handles standard TOTP; QRCode renders enrollment data locally. Synthetic tests
+exercise signed assertions, replay, missing user verification, wrong identity,
+origin and RP, TOTP counters, recovery and browser ceremonies. These dependencies
+do not add an external authentication service.
+
+Registry sources: [SimpleWebAuthn server](https://registry.npmjs.org/@simplewebauthn%2fserver),
+[browser](https://registry.npmjs.org/@simplewebauthn%2fbrowser),
+[OTPAuth](https://registry.npmjs.org/otpauth), [QRCode](https://registry.npmjs.org/qrcode).
+
+## Earlier review records
+
 Historical inventory reviewed September 9, 2026 against registry and upstream metadata.
 The lockfile is authoritative for current dependencies. Current CI uses the portable
 `scripts/check` on maintainer equipment; GitHub Actions is disabled.

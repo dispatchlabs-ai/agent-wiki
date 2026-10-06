@@ -22,6 +22,7 @@ Usage: node bin/wiki.mjs <command> [arguments] [--json] [--config FILE]
       Prints a browser authorization URL. Choose an explicitly shared agent.
   login --url URL --email EMAIL --password-stdin
       Signs in as your local human account. Password is read only from stdin.
+      Add --second-factor-file FILE for a private authenticator/recovery code file.
   login --connection FILE       Uses an operator-enrolled machine connection.
   logout                       Revokes this login; removes the local profile.
   logout --forget              Removes only the profile after an unrecoverable login.
@@ -65,6 +66,7 @@ try {
       connection: { type: "string" },
       email: { type: "string" },
       "password-stdin": { type: "boolean" },
+      "second-factor-file": { type: "string" },
       scope: { type: "string" },
       file: { type: "string" },
       revision: { type: "string" },
@@ -111,7 +113,12 @@ try {
           );
         let profile;
         if (values.connection) {
-          if (values.url || values.email || values["password-stdin"])
+          if (
+            values.url ||
+            values.email ||
+            values["password-stdin"] ||
+            values["second-factor-file"]
+          )
             throw new WikiError(
               "USAGE",
               "Use either a machine connection or a URL login",
@@ -136,12 +143,42 @@ try {
                 "USAGE",
                 "Provide --email and pipe a password with --password-stdin",
               );
+            let secondFactor = null;
+            if (values["second-factor-file"]) {
+              const fd = fs.openSync(
+                values["second-factor-file"],
+                fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+              );
+              try {
+                const stat = fs.fstatSync(fd);
+                if (
+                  !stat.isFile() ||
+                  stat.mode & 0o077 ||
+                  stat.size > 256 ||
+                  (process.getuid && stat.uid !== process.getuid())
+                )
+                  throw new WikiError(
+                    "USAGE",
+                    "Second-factor file must be private (0600) and contain only one code",
+                  );
+                secondFactor = fs.readFileSync(fd, "utf8").trim();
+              } finally {
+                fs.closeSync(fd);
+              }
+            }
             profile = await localLogin(
               origin,
               values.email,
               fs.readFileSync(0, "utf8").replace(/\r?\n$/, ""),
+              globalThis.fetch,
+              secondFactor,
             );
-          } else
+          } else if (values["second-factor-file"])
+            throw new WikiError(
+              "USAGE",
+              "Use --second-factor-file only with local password login",
+            );
+          else
             profile = await browserLogin(
               origin,
               values.scope || "wiki:read",

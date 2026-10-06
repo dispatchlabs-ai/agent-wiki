@@ -3,6 +3,7 @@ import { randomBytes, randomUUID, createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { WikiError } from "./errors.mjs";
+import { installMfaSchema } from "./mfa.mjs";
 export const LOCAL_ISSUER = "urn:agentic-wiki:local";
 export function localEmail(value) {
   if (
@@ -45,6 +46,7 @@ export class ControlStore {
       CREATE TABLE IF NOT EXISTS login_limits(key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, actor TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL);
     `);
+    installMfaSchema(this.db);
   }
   transaction(fn) {
     this.db.exec("BEGIN IMMEDIATE");
@@ -189,7 +191,7 @@ export class ControlStore {
       )
       .get(digest(token || ""), Date.now());
   }
-  acceptInvitation(token, password) {
+  acceptInvitation(token, password, establish = (id) => this.session(id)) {
     return this.transaction(() => {
       const invite = this.invitation(token);
       if (!invite)
@@ -207,7 +209,7 @@ export class ControlStore {
       this.db
         .prepare("DELETE FROM sessions WHERE principal=?")
         .run(invite.principal);
-      return this.session(invite.principal);
+      return establish(invite.principal);
     });
   }
   localAccount(email) {
@@ -217,7 +219,11 @@ export class ControlStore {
       )
       .get(email);
   }
-  localSession(principal, expectedPassword) {
+  localSession(
+    principal,
+    expectedPassword,
+    establish = (id) => this.session(id),
+  ) {
     return this.transaction(() => {
       const current = this.db
         .prepare(
@@ -230,7 +236,7 @@ export class ControlStore {
           "Email or password is incorrect.",
           401,
         );
-      return this.session(principal);
+      return establish(principal);
     });
   }
   resetLocal(email) {
@@ -262,7 +268,7 @@ export class ControlStore {
       return { id: account.principal, token };
     });
   }
-  replacePassword(principal, expectedPassword, password) {
+  replacePassword(principal, expectedPassword, password, assurance = {}) {
     return this.transaction(() => {
       const result = this.db
         .prepare(
@@ -276,7 +282,13 @@ export class ControlStore {
           401,
         );
       this.db.prepare("DELETE FROM sessions WHERE principal=?").run(principal);
-      return this.session(principal);
+      this.db
+        .prepare("DELETE FROM mfa_pending WHERE principal=?")
+        .run(principal);
+      this.db
+        .prepare("DELETE FROM mfa_challenges WHERE principal=?")
+        .run(principal);
+      return this.session(principal, undefined, assurance);
     });
   }
   limitLogin(identity, maximum = 10) {
@@ -304,13 +316,37 @@ export class ControlStore {
         429,
       );
   }
-  session(principal, ttl = 8 * 60 * 60 * 1000) {
+  session(
+    principal,
+    ttl = 8 * 60 * 60 * 1000,
+    { primaryAt = Date.now(), mfaAt = 0 } = {},
+  ) {
+    if (
+      this.db
+        .prepare("SELECT 1 FROM mfa_factors WHERE principal=?")
+        .get(principal) &&
+      !mfaAt
+    )
+      throw new WikiError(
+        "MFA_REQUIRED",
+        "Two-factor authentication is required.",
+        401,
+      );
     this.db.prepare("DELETE FROM sessions WHERE expires<=?").run(Date.now());
+    this.db
+      .prepare(
+        "DELETE FROM mfa_sessions WHERE hash NOT IN (SELECT hash FROM sessions)",
+      )
+      .run();
     const token = secret(),
       csrf = secret();
+    const expires = Date.now() + ttl;
+    this.db
+      .prepare("INSERT INTO mfa_sessions VALUES (?,?,?,?,?)")
+      .run(digest(token), principal, primaryAt, mfaAt, expires);
     this.db
       .prepare("INSERT INTO sessions VALUES (?,?,?,?)")
-      .run(digest(token), principal, csrf, Date.now() + ttl);
+      .run(digest(token), principal, csrf, expires);
     return { token, csrf };
   }
   authenticate(token) {
@@ -318,7 +354,7 @@ export class ControlStore {
     return (
       this.db
         .prepare(
-          "SELECT p.*,s.csrf,s.expires FROM sessions s JOIN principals p ON p.id=s.principal WHERE s.hash=? AND s.expires>? AND p.active=1 AND p.kind='human'",
+          "SELECT p.*,s.csrf,s.expires,ms.primary_at,ms.mfa_at FROM sessions s JOIN principals p ON p.id=s.principal LEFT JOIN mfa_sessions ms ON ms.hash=s.hash AND ms.principal=s.principal WHERE s.hash=? AND s.expires>? AND p.active=1 AND p.kind='human' AND (NOT EXISTS(SELECT 1 FROM mfa_factors f WHERE f.principal=p.id) OR ms.mfa_at>0)",
         )
         .get(digest(token), Date.now()) || null
     );

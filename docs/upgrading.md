@@ -1,5 +1,20 @@
 # Upgrading
 
+## 0.9.0 — optional human two-factor authentication
+
+New additive control tables support passkeys, TOTP, recovery codes and session
+assurance. Existing identities remain unenrolled. Users enable protection under
+**Your account → Two-factor authentication** after a fresh sign-in. Existing
+sessions created before this release must sign in again before enrolling.
+
+TOTP setup creates a private `WIKI_CONTROL.mfa-key` sidecar. Back it up with the
+control database using the new lifecycle tools. Restores invalidate all old MFA
+recovery codes and browser sessions; retained factors allow a new login and code
+regeneration. Once factors are enrolled, use 0.9.0-or-newer server and lifecycle
+tools: old servers cannot complete MFA, and old backups omit the encryption key.
+See [two-factor authentication](two-factor-authentication.md) for recovery and
+the exact-principal operator reset procedure. Agent credentials are unchanged.
+
 ## 0.8.7 — publication without hard links
 
 New article-media publications use complete asset/manifest directories and atomic

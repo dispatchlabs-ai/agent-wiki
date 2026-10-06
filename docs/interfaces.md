@@ -78,6 +78,14 @@ does not silently switch from human to agent authority. Machine keys identify an
 enrolled agent. Compare clients only with the same actor, authority and scope.
 Operator filesystem access is a separate authority boundary.
 
+Optional [human two-factor authentication](two-factor-authentication.md) is shared
+by Google/OIDC, local browser login and local-password CLI login. The CLI accepts
+TOTP or recovery codes through a private file; passkeys require a browser WebAuthn
+ceremony. Enrollment and security management use the account UI and authenticated
+`/api/account/security`, deliberately outside bearer/MCP administration. A pending
+first-factor login cannot authorize content or browser OAuth consent. Existing
+agent credentials retain their separate authority and lifecycle.
+
 All saves use current revision checks, atomic batches, attributed commits and
 actor/authority-bound operation receipts. Reusing identical input recovers one
 commit across interfaces; new input with an existing operation ID conflicts.

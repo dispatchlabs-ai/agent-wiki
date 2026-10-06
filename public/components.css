@@ -389,6 +389,44 @@
   width: 100%;
   box-sizing: border-box;
 }
+.auth-connections + .auth-connections {
+  margin-top: 12px;
+}
+.mfa-methods {
+  padding: 0;
+  list-style: none;
+}
+.mfa-methods li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+.mfa-methods small {
+  display: block;
+  color: var(--color-muted);
+}
+#mfa-qr {
+  max-width: 100%;
+  height: auto;
+  background: white;
+  border-radius: 8px;
+}
+#mfa-recovery-codes {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+#mfa-recovery-result .ui-button {
+  margin: 6px 6px 6px 0;
+}
+#mfa-totp-setup[hidden],
+#mfa-recovery-result[hidden] {
+  display: none;
+}
 .auth-divider {
   display: flex;
   align-items: center;

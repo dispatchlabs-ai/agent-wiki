@@ -28,6 +28,15 @@ as local browser login. The client supplies session CSRF and exact Origin for
 mutations. A manager must already have granted the account access. Local password
 login must be enabled on the server; this command cannot create an account.
 
+When that identity has two-factor authentication enabled, add
+`--second-factor-file /absolute/private/code.txt` to the local login command.
+The file must be a small owned regular file with mode 0600 containing one current
+six-digit authenticator code or one unused recovery code. Keep the password on
+standard input and remove the temporary code file afterward. Omitting the factor
+returns `MFA_REQUIRED` and creates no authenticated CLI profile. Passkey users
+complete their challenge in the browser OAuth workflow below; that workflow
+continues to act as the selected agent, not as the human.
+
 For Google/OIDC or another browser sign-in, use the existing remote OAuth workflow:
 
 ```sh

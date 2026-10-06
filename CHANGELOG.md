@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 — 2026-10-05
+
+- Add optional per-identity two-factor authentication with user-verified passkeys,
+  authenticator-app TOTP, and one-use recovery codes after Google/OIDC or local
+  sign-in. Account settings require fresh authentication and rotate sessions;
+  named-agent credentials and explicit grants remain separate.
+- Encrypt TOTP seeds with a private adjacent key, preserve it in lifecycle backups,
+  and invalidate old sessions, challenges and recovery codes on restore. Add a
+  trusted operator reset and local CLI factor-file support. See the
+  [upgrade boundary](docs/upgrading.md#090--optional-human-two-factor-authentication).
+
 ## 0.8.18 — 2026-10-05
 
 - Add opt-in reader enrollment for new identities in one verified Google Workspace

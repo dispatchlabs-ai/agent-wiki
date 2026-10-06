@@ -142,6 +142,11 @@ export function Account({ local }) {
       { className: "ui-button auth-connections", href: "/agents/" },
       "Agents and connections",
     ),
+    h(
+      "a",
+      { className: "ui-button auth-connections", href: "/account/security/" },
+      "Two-factor authentication",
+    ),
     local
       ? h(
           "section",

@@ -1,6 +1,10 @@
 import { build } from "esbuild";
 await build({
-  entryPoints: { ui: "ui/main.jsx", diagram: "ui/diagram.js" },
+  entryPoints: {
+    ui: "ui/main.jsx",
+    diagram: "ui/diagram.js",
+    mfa: "ui/mfa.js",
+  },
   outdir: "public/vendor",
   bundle: true,
   splitting: true,

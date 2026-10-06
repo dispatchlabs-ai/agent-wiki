@@ -249,12 +249,15 @@ export async function localLogin(
   email,
   password,
   fetchFn = globalThis.fetch,
+  secondFactor = null,
 ) {
   const client = new WikiApiClient(
     { origin, kind: "session" },
     { fetch: fetchFn },
   );
-  const form = await client.fetch("/", { headers: { Accept: "text/html" } });
+  const form = await client.fetch("/auth/sign-in?mode=local", {
+    headers: { Accept: "text/html" },
+  });
   await form.text();
   const csrf = form.headers
     .getSetCookie()
@@ -266,7 +269,7 @@ export async function localLogin(
       "Local password login is not available; use browser login",
       401,
     );
-  const response = await client.fetch("/auth/local/login", {
+  let response = await client.fetch("/auth/local/login", {
     method: "POST",
     headers: {
       Origin: origin,
@@ -276,7 +279,39 @@ export async function localLogin(
     },
     body: JSON.stringify({ email, password }),
   });
-  await responseJSON(response);
+  const primary = await responseJSON(response);
+  if (primary.mfaRequired) {
+    if (!secondFactor)
+      throw new WikiError(
+        "MFA_REQUIRED",
+        "Provide a current authenticator or recovery code with --second-factor-file, or use browser login with a passkey.",
+        401,
+      );
+    const pending = response.headers
+      .getSetCookie()
+      .map((c) => /^wiki_mfa=([^;]+)/.exec(c)?.[1])
+      .find(Boolean);
+    if (!pending || !primary.csrf)
+      throw new WikiError(
+        "INVALID_RESPONSE",
+        "No second-factor challenge was returned",
+        401,
+      );
+    response = await client.fetch("/auth/mfa/code", {
+      method: "POST",
+      headers: {
+        Origin: origin,
+        "Content-Type": "application/json",
+        Cookie: `wiki_mfa=${pending}`,
+        "X-Wiki-CSRF": primary.csrf,
+      },
+      body: JSON.stringify({
+        code: secondFactor,
+        recovery: !/^\d{6}$/.test(secondFactor),
+      }),
+    });
+    await responseJSON(response);
+  }
   const session = response.headers
     .getSetCookie()
     .map((c) => /^wiki_session=([^;]+)/.exec(c)?.[1])

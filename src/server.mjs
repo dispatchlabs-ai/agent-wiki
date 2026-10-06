@@ -5,11 +5,15 @@ import { agentsPage } from "./agents-ui.mjs";
 import { AgentStore } from "./agent-store.mjs";
 import { AgentAuth } from "./agent-auth.mjs";
 import { hashPassword, verifyPassword } from "./passwords.mjs";
+import { Mfa } from "./mfa.mjs";
+import QRCode from "qrcode";
 import {
   signInPage,
   autoSignInPage,
   setupPage,
   accountPage,
+  mfaPage,
+  securityPage,
 } from "./login-ui.mjs";
 import { ControlStore, secret, localEmail } from "./control-store.mjs";
 import {
@@ -94,6 +98,7 @@ export function createWiki({
       "Local login requires HTTPS, except explicit loopback development",
     );
   const mcpIdentity = new AsyncLocalStorage();
+  const mfa = control ? new Mfa(control, origin) : null;
   const agentAuth = control
     ? new AgentAuth(new AgentStore(control), origin)
     : null;
@@ -184,6 +189,7 @@ export function createWiki({
       return originalWriteHead.call(this, status, ...args);
     };
     let browserAsset = false,
+      securityDocument = false,
       diagramDocument = false;
     const responseHeaders = (type) => ({
       "Content-Type": `${type}; charset=utf-8`,
@@ -193,7 +199,7 @@ export function createWiki({
       "Referrer-Policy": "no-referrer",
       "Content-Security-Policy": diagramDocument
         ? "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'self'; sandbox allow-scripts"
-        : "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; frame-src 'self'",
+        : `default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'${securityDocument ? " data:" : ""}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; frame-src 'self'`,
     });
     const send = (status, value, type = "application/json") => {
       if (protectedResponse) {
@@ -348,7 +354,14 @@ export function createWiki({
           let size = 0;
           for await (const chunk of req) {
             size += chunk.length;
-            if (size > (url.pathname === "/api/agents" ? 32768 : 8192))
+            if (
+              size >
+              (url.pathname === "/api/agents" ||
+              url.pathname === "/api/account/security" ||
+              url.pathname.startsWith("/auth/mfa/")
+                ? 32768
+                : 8192)
+            )
               throw new WikiError(
                 "REQUEST_TOO_LARGE",
                 "Request too large",
@@ -376,7 +389,21 @@ export function createWiki({
           res.setHeader("Set-Cookie", [
             cookie("wiki_session", session.token, origin),
             cookie("wiki_form", "", origin, 0),
+            cookie("wiki_mfa", "", origin, 0),
           ]);
+        };
+        const primarySession = (result) => {
+          if (result.session) {
+            establishSession(result.session);
+            return false;
+          }
+          control.logout(cookieValue(req, "wiki_session"));
+          res.setHeader("Set-Cookie", [
+            cookie("wiki_mfa", result.pending, origin, 300),
+            cookie("wiki_session", "", origin, 0),
+            cookie("wiki_form", "", origin, 0),
+          ]);
+          return true;
         };
         const pauseAutoLogin = () =>
           cookie("wiki_oidc_auto", "paused", origin, 31536000);
@@ -400,7 +427,7 @@ export function createWiki({
           if (!body || typeof body !== "object")
             return send(400, { error: "Invalid request" });
           control.limitLogin("source:" + req.socket.remoteAddress, 200);
-          let session;
+          let result;
           if (url.pathname === "/auth/local/setup") {
             if (
               typeof body.token !== "string" ||
@@ -411,7 +438,9 @@ export function createWiki({
                 error: "This setup link is invalid or expired.",
               });
             const password = await hashPassword(body.password);
-            session = control.acceptInvitation(body.token, password);
+            result = control.acceptInvitation(body.token, password, (id) =>
+              mfa.beginSignIn(id, "/", password),
+            );
           } else {
             let email;
             try {
@@ -427,15 +456,69 @@ export function createWiki({
             );
             if (!valid || !account?.active)
               return send(401, { error: "Email or password is incorrect." });
-            session = control.localSession(account.principal, account.password);
+            result = control.localSession(
+              account.principal,
+              account.password,
+              (id) =>
+                mfa.beginSignIn(
+                  id,
+                  returnPath(body.returnTo),
+                  account.password,
+                ),
+            );
           }
-          establishSession(session);
+          if (primarySession(result))
+            return send(200, {
+              mfaRequired: true,
+              csrf: result.csrf,
+              redirect: "/auth/mfa",
+            });
           return send(200, { signedIn: true });
         }
         const redirect = (location) => {
           res.setHeader("Location", location);
           send(303, "");
         };
+        if (url.pathname === "/auth/mfa" && req.method === "GET") {
+          try {
+            const pending = mfa.pending(cookieValue(req, "wiki_mfa"));
+            return send(
+              200,
+              mfaPage(pending.csrf, mfa.status(pending.principal)),
+              "text/html",
+            );
+          } catch {
+            return redirect("/auth/sign-in");
+          }
+        }
+        if (url.pathname.startsWith("/auth/mfa/") && req.method === "POST") {
+          const pendingToken = cookieValue(req, "wiki_mfa"),
+            pending = mfa.pending(pendingToken);
+          if (!sameOrigin() || req.headers["x-wiki-csrf"] !== pending.csrf)
+            return send(403, { error: "Invalid verification request." });
+          const body = await readJSON();
+          if (url.pathname === "/auth/mfa/passkey/options")
+            return send(200, await mfa.authenticationOptions(pendingToken));
+          let result;
+          if (url.pathname === "/auth/mfa/code")
+            result = mfa.verifyCode(
+              pendingToken,
+              body?.code,
+              body?.recovery === true,
+            );
+          else if (url.pathname === "/auth/mfa/passkey/verify")
+            result = await mfa.verifyPasskey(
+              pendingToken,
+              body?.flow,
+              body?.response,
+            );
+          else return send(404, { error: "Not found" });
+          establishSession(result.session);
+          return send(200, {
+            signedIn: true,
+            redirect: returnPath(result.destination),
+          });
+        }
         if (req.method === "GET" && url.pathname === "/auth/sign-in") {
           const destination = returnPath(url.searchParams.get("return_to"));
           const localOnly = url.searchParams.get("mode") === "local";
@@ -496,12 +579,17 @@ export function createWiki({
             const principal = control.enroll(identity, {
               reader: auth.enrollReader === true,
             });
-            const session = control.session(principal.id);
+            const result = mfa.beginSignIn(
+              principal.id,
+              returnPath(login.destination),
+            );
+            const needsFactor = primarySession(result);
             res.setHeader("Set-Cookie", [
+              .../** @type {string[]} */ (res.getHeader("Set-Cookie")),
               cookie("wiki_login", "", origin, 0),
-              cookie("wiki_session", session.token, origin),
               cookie("wiki_oidc_auto", "", origin, 0),
             ]);
+            if (needsFactor) return redirect("/auth/mfa");
             return redirect(
               control.role(principal.id) ? returnPath(login.destination) : "/",
             );
@@ -586,6 +674,64 @@ export function createWiki({
           req.headers["x-wiki-csrf"] === actor.csrf &&
           (!req.headers["sec-fetch-site"] ||
             req.headers["sec-fetch-site"] === "same-origin");
+        if (url.pathname === "/account/security/" && req.method === "GET") {
+          securityDocument = true;
+          let fresh = true;
+          try {
+            mfa.fresh(token);
+          } catch {
+            fresh = false;
+          }
+          return send(
+            200,
+            securityPage(actor.csrf, mfa.status(actor.id), fresh),
+            "text/html",
+          );
+        }
+        if (url.pathname === "/api/account/security") {
+          if (req.method === "GET") return send(200, mfa.status(actor.id));
+          if (req.method !== "POST" || !csrf())
+            return send(403, { error: "Invalid request" });
+          const body = await readJSON();
+          let result;
+          switch (body?.action) {
+            case "totp-start": {
+              const enrollment = mfa.beginTotp(token);
+              const qr = await QRCode.toDataURL(enrollment.uri, {
+                errorCorrectionLevel: "M",
+              });
+              mfa.fresh(token);
+              return send(200, { ...enrollment, qr });
+            }
+            case "totp-finish":
+              result = mfa.finishTotp(token, body.flow, body.code);
+              break;
+            case "passkey-start":
+              return send(200, await mfa.beginPasskey(token));
+            case "passkey-finish":
+              result = await mfa.finishPasskey(
+                token,
+                body.flow,
+                body.response,
+                body.name,
+              );
+              break;
+            case "remove":
+              result = mfa.remove(token, body.factor);
+              break;
+            case "recovery":
+              result = mfa.regenerate(token);
+              break;
+            case "disable":
+              result = mfa.disable(token);
+              break;
+            default:
+              return send(400, { error: "Unknown security action" });
+          }
+          const { session, ...value } = result;
+          establishSession(session);
+          return send(200, { saved: true, csrf: session.csrf, ...value });
+        }
         if (url.pathname === "/oauth/authorize") {
           if (req.method === "GET")
             return send(
@@ -700,6 +846,14 @@ export function createWiki({
             return send(401, {
               error: "Current password is incorrect or the session expired.",
             });
+          if (
+            mfa.enabled(actor.id) &&
+            Number(actor.mfa_at) < Date.now() - 5 * 60 * 1000
+          )
+            return send(403, {
+              error:
+                "Sign out and sign in with your second factor again before changing your password.",
+            });
           const password = await hashPassword(body.password);
           if (!control.authenticate(token))
             return send(401, { error: "Sign in required" });
@@ -707,6 +861,7 @@ export function createWiki({
             actor.id,
             account.password,
             password,
+            { mfaAt: Number(actor.mfa_at) || 0 },
           );
           establishSession(session);
           return send(200, { saved: true });

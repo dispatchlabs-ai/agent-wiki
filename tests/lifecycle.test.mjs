@@ -9,6 +9,9 @@ import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
+import * as OTPAuth from "otpauth";
+import { ControlStore } from "../src/control-store.mjs";
+import { Mfa } from "../src/mfa.mjs";
 
 const source = fileURLToPath(new URL("..", import.meta.url));
 const lifecycle = path.join(source, "scripts/lifecycle.py");
@@ -47,6 +50,72 @@ function bootstrap(root, overrides = {}) {
   if (overrides.node) args.push("--node", overrides.node);
   return call(args, { env: overrides.env });
 }
+
+test("MFA backups include the matching key and restores discard sessions and all old recovery codes", (t) => {
+  const directory = temporary(t),
+    root = path.join(directory, "root");
+  const boot = bootstrap(root);
+  assert.equal(boot.status, 0, boot.stderr);
+  const control = new ControlStore(path.join(root, "control/control.sqlite3"));
+  const principal = control.db
+    .prepare("SELECT id FROM principals WHERE kind='human'")
+    .get().id;
+  const mfa = new Mfa(control, "https://wiki.example.test");
+  const session = control.session(principal);
+  const start = mfa.beginTotp(session.token);
+  const totp = new OTPAuth.TOTP({
+    secret: OTPAuth.Secret.fromBase32(start.secret),
+  });
+  const enrolled = mfa.finishTotp(session.token, start.flow, totp.generate());
+  const pending = mfa.beginSignIn(principal);
+  const originalKey = fs.readFileSync(control.filename + ".mfa-key");
+  control.close();
+  const archive = path.join(directory, "backup.tar.gz");
+  const backup = call(["backup", "--root", root, "--destination", archive]);
+  assert.equal(backup.status, 0, backup.stderr);
+  const restored = path.join(directory, "restored");
+  const restore = call(["restore", "--root", restored, "--archive", archive]);
+  assert.equal(restore.status, 0, restore.stderr);
+  const fresh = new ControlStore(
+    path.join(restored, "control/control.sqlite3"),
+  );
+  t.after(() => fresh.close());
+  const restoredMfa = new Mfa(fresh, "https://wiki.example.test");
+  assert.deepEqual(fs.readFileSync(fresh.filename + ".mfa-key"), originalKey);
+  assert.equal(restoredMfa.enabled(principal), true);
+  assert.equal(restoredMfa.status(principal).recoveryCodes, 0);
+  assert.equal(fresh.authenticate(enrolled.session.token), null);
+  assert.throws(() => restoredMfa.pending(pending.pending));
+  const next = restoredMfa.beginSignIn(principal);
+  assert.throws(() =>
+    restoredMfa.verifyCode(next.pending, enrolled.recoveryCodes[0], true),
+  );
+  assert.throws(() => restoredMfa.verifyCode(next.pending, totp.generate()));
+  const stored = fresh.db
+    .prepare("SELECT data,counter FROM mfa_factors WHERE kind='totp'")
+    .get();
+  assert.equal(restoredMfa.unseal(principal, stored.data), start.secret);
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: (Number(stored.counter) + 1) * 30000,
+  });
+  assert.equal(
+    fresh.authenticate(
+      restoredMfa.verifyCode(next.pending, totp.generate()).session.token,
+    ).id,
+    principal,
+  );
+  fs.unlinkSync(path.join(root, "control/control.sqlite3.mfa-key"));
+  const missing = call([
+    "backup",
+    "--root",
+    root,
+    "--destination",
+    path.join(directory, "missing.tar.gz"),
+  ]);
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /MFA|authenticator/i);
+});
 
 function adopt(root, overrides = {}) {
   const args = [

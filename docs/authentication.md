@@ -165,8 +165,9 @@ r=8, p=1. At most two derivations run concurrently; excess work receives 429.
 Unknown accounts perform a dummy derivation. Durable limits allow ten attempts per
 email or password-change account per 15 minutes and 200 per socket source address.
 Behind a proxy, that source limit is shared: forwarded headers are not trusted.
-There is no public signup, email delivery, MFA, or self-service recovery in this
-foundation. **Your account** allows password changes with the current password;
+There is no public signup, email delivery, or self-service password recovery.
+Optional [two-factor authentication](two-factor-authentication.md) protects both
+local and Google/OIDC identities. **Your account** allows password changes with the current password;
 changes rotate the session and invalidate other sessions.
 
 ## Session and request behavior
@@ -244,6 +245,11 @@ considering Google login operational.
 
 Back up the authoritative control database together with the full content Git
 repository, immutable trace archive, and configured published article-media store.
+When authenticator-app enrollment exists, include the private adjacent
+`control.sqlite3.mfa-key` file. The supported lifecycle backup checks and preserves
+this key; losing it makes enrolled TOTP secrets unrecoverable. Supported restores
+invalidate browser/MFA challenges and recovery codes and advance the TOTP replay
+window. See [MFA recovery](two-factor-authentication.md#backup-and-recovery).
 Stop the service, writers, trace ingestion and article-media publication before
 copying the SQLite file and any WAL, or use SQLite's consistent backup facilities.
 Protect the backup like credentials and private content. A restore of old sessions

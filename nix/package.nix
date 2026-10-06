@@ -36,6 +36,7 @@ let
     agent-wiki-bootstrap-direct = "scripts/provision-local.mjs";
     agent-wiki-bootstrap-oidc-direct = "scripts/bootstrap.mjs";
     agent-wiki-local-account-direct = "scripts/local-account.mjs";
+    agent-wiki-reset-mfa-direct = "scripts/reset-mfa.mjs";
     agent-wiki-agent-admin-direct = "scripts/agent-admin.mjs";
     agent-wiki-agent-keygen = "scripts/agent-keygen.mjs";
     agent-wiki-agent-mcp = "scripts/agent-mcp.mjs";

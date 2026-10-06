@@ -56,7 +56,11 @@ for (const id of ["local-login", "local-setup", "password-change"]) {
             },
             body: JSON.stringify(
               id === "local-login"
-                ? { email: fields.email, password: fields.password }
+                ? {
+                    email: fields.email,
+                    password: fields.password,
+                    returnTo: destination,
+                  }
                 : { token: setupToken, password: fields.password },
             ),
           },
@@ -64,6 +68,10 @@ for (const id of ["local-login", "local-setup", "password-change"]) {
         const result = await response.json();
         if (!response.ok) throw Error(result.error || "Sign-in failed");
         form.reset();
+        if (result.mfaRequired) {
+          location.assign(result.redirect);
+          return;
+        }
         // The sign-in form is served at the requested URL. Assigning that same
         // URL with a fragment does not reload it, so fetch the page anew.
         if (login) {

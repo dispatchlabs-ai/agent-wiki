@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from urllib.parse import urlsplit, urlunsplit
 import uuid
 
@@ -369,6 +370,20 @@ def validate_sqlite(filename: Path) -> dict:
         principals = connection.execute("SELECT COUNT(*) FROM principals").fetchone()[0]
         if managers < 1 or principals < 1:
             raise LifecycleError("INVALID_CONTROL", "Control store has no manager")
+        has_mfa = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mfa_factors'").fetchone()
+        totp = connection.execute("SELECT data FROM mfa_factors WHERE kind='totp'").fetchall() if has_mfa else []
+        key_path = Path(str(filename) + ".mfa-key")
+        if totp or key_path.exists() or key_path.is_symlink():
+            if key_path.is_symlink() or not key_path.is_file() or key_path.stat().st_mode & 0o077 or key_path.stat().st_size != 32:
+                raise LifecycleError("INVALID_CONTROL", "MFA encryption key must be one private 32-byte file beside the control database")
+            key_id = hashlib.sha256(key_path.read_bytes()).hexdigest()
+            for row in totp:
+                try:
+                    matches = json.loads(row[0]).get("keyId") == key_id
+                except (ValueError, AttributeError):
+                    matches = False
+                if not matches:
+                    raise LifecycleError("INVALID_CONTROL", "MFA encryption key does not match the control database")
         return {"integrity": integrity, "managers": managers, "principals": principals}
     finally:
         connection.close()
@@ -764,6 +779,11 @@ def manifest_files(root: Path) -> dict[str, dict]:
 
 
 def sqlite_backup(source: Path, target: Path) -> None:
+    source_key = Path(str(source) + ".mfa-key")
+    if source_key.exists() or source_key.is_symlink():
+        validate_sqlite(source)
+        shutil.copyfile(source_key, Path(str(target) + ".mfa-key"))
+        os.chmod(Path(str(target) + ".mfa-key"), 0o600)
     source_db = sqlite3.connect(str(source))
     target_db = sqlite3.connect(str(target))
     try:
@@ -1029,6 +1049,18 @@ def restore(args) -> None:
                 staging.mkdir(mode=0o700)
                 extract_validated(archive, members, staging)
                 validate_staging(staging, manifest)
+                # A restored snapshot must not resurrect in-progress second-factor
+                # ceremonies or cookies that were valid when it was captured.
+                restored_control = sqlite3.connect(staging / "control" / "control.sqlite3")
+                try:
+                    has_mfa = restored_control.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mfa_factors'").fetchone()
+                    if has_mfa:
+                        for table in ("sessions", "logins", "login_destinations", "mfa_sessions", "mfa_pending", "mfa_challenges", "mfa_recovery"):
+                            restored_control.execute(f"DELETE FROM {table}")
+                        restored_control.execute("UPDATE mfa_factors SET counter=MAX(counter,?) WHERE kind='totp'", (int(time.time() // 30) + 1,))
+                        restored_control.commit()
+                finally:
+                    restored_control.close()
                 stores = ["content", "control", "article-media"]
                 if manifest["evidence"]["mode"] == "local":
                     stores.append("traces")
