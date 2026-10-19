@@ -13,7 +13,8 @@ build. Browser controls are bundled locally during `npm ci`. An agent client use
 [Try the walkthrough](docs/getting-started.md) ·
 [Connect an agent](docs/getting-started.md#connect-codex-cli) ·
 [Find a contribution](docs/roadmap.md) ·
-[API reference](docs/api.md) · [Terminal CLI](docs/cli.md) · [Interface inventory](docs/interfaces.md)
+[API reference](docs/api.md) · [Terminal CLI](docs/cli.md) · [Interface inventory](docs/interfaces.md) ·
+[Use cases](USE_CASES.md)
 
 ## Use it with your AI agent
 
