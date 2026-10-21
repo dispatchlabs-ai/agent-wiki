@@ -1,5 +1,28 @@
 # Dependency review
 
+## MCP refresh — October 21, 2026
+
+The concurrent-article investigation also refreshed the MCP client and server to
+**2.3.1**, the Node adapter to **2.1.1**, and the locked Hono dependency to
+**4.13.13**. The production audit now has no high or critical findings; the four
+moderate package entries for the previously reviewed, unreachable sprintf-js CLI
+path remain. No forced gray-matter downgrade was applied.
+
+Agent Wiki already creates a separate MCP server for each request, the unaffected
+pattern in [the shared-transport advisory](https://github.com/modelcontextprotocol/typescript-sdk/security/advisories/GHSA-jm63-cq47-j5jp).
+Its own agent authentication verifies the wiki audience; it does not use the SDK's
+optional bearer middleware. The CLI already rejects cross-origin requests and
+redirects. These findings do not establish a cause for an observed service outage.
+
+For [input-validation memory exhaustion](https://github.com/modelcontextprotocol/typescript-sdk/security/advisories/GHSA-46jr-4wx8-v453),
+the MCP server now counts input elements before schema validation. Its 4,000-element
+budget exceeds every writer-accepted edit: ten updates, each with 100 related
+links, 100 questions and 20 evidence records, require fewer than 3,000 elements.
+The SDK transport also receives the existing 512,000-byte request bound. This
+adds no concurrency limit and preserves the application's accepted input sizes.
+Hono's patched static-serving code is not used by Wiki's explicit asset routes.
+Persisted articles, receipts, identities and credential profiles are unchanged.
+
 ## Test dependency removal — October 16, 2026
 
 The automated suites and acceptance runners have been removed. Their direct

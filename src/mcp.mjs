@@ -33,6 +33,11 @@ export function createWikiMcp({
       const server = new McpServer(
         { name: "agent-wiki", version: packageInfo.version },
         {
+          // A legal ten-article edit, including all 100 related links, 100
+          // questions and 20 evidence records per article, is below 3,000.
+          // Bound malformed input before schema validation; this does not
+          // limit concurrent requests or reduce the writer's accepted sizes.
+          maxToolInputElements: 4000,
           instructions:
             `Wiki URL: ${origin}. Use absolute links in answers and citations. Resolve site-relative article and source URLs against this Wiki URL, preserving the path, query and fragment.\n\n` +
             (agent
@@ -113,7 +118,7 @@ export function createWikiMcp({
       return server;
     },
     // Return JSON normally, while allowing the SDK to stream notifications.
-    { responseMode: "auto" },
+    { responseMode: "auto", maxRequestBodySize: 512000 },
   );
   return {
     handle: toNodeHandler({

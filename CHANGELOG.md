@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Update the MCP client/server and Node adapter to their compatible patched
+  versions. Bound malformed tool arguments before schema validation without
+  reducing accepted article batches or limiting concurrent clients. Refresh the
+  locked Hono dependency; see [the dependency review](docs/dependencies.md).
+
+- Keep health and authentication responsive during concurrent article work by
+  moving ongoing Git refresh and search-index publication off the HTTP thread.
+  Share refreshes, preserve matching article/index snapshots, reuse one snapshot
+  per save and keep successful preview workers warm. Retain atomic writes,
+  revision checks, retry receipts and preview resource limits. See the
+  [focused performance measurements](docs/article-refresh-performance.md).
+
 - Remove automated tests, test fixtures, Playwright configuration, and standalone
   package/container/client acceptance runners. Remove test-only dependencies and
   the package smoke derivation. Keep contract, formatting, type, build, package

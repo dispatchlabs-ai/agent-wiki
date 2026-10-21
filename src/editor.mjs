@@ -46,6 +46,7 @@ export function saveGitEdits(
   actor = null,
   authority = null,
   publish = (fn) => fn(),
+  snapshot = null,
 ) {
   if (
     !draft ||
@@ -61,7 +62,7 @@ export function saveGitEdits(
       ...draft,
       operation_id: operationIdentity(actor, authority, publicOperation),
     };
-  const wiki = new GitWiki(repo);
+  const wiki = snapshot || new GitWiki(repo);
   const fingerprint = sha(JSON.stringify(draft));
   const prior = wiki.receipt(draft.operation_id);
   if (prior) {
@@ -212,7 +213,10 @@ export function saveGitEdits(
     });
   }
   for (const p of proposed.values())
-    for (const target of [...references(p.body), ...p.related])
+    for (const target of [
+      ...(wiki.linkCache.get(p.blob) || references(p.body)),
+      ...p.related,
+    ])
       if (!proposed.has(target))
         throw new WikiError(
           "INVALID_EDIT",
@@ -298,6 +302,7 @@ if (
           return { actor: actor.id, authority: null };
         };
         const initial = authorize();
+        const snapshot = new GitWiki(repo);
         const verified = await verifyDraftEvidence(
           repo,
           {
@@ -309,6 +314,7 @@ if (
             ),
           },
           conversationsEnabled() ? process.env.WIKI_EVIDENCE_URL : null,
+          snapshot,
         );
         const publish = (commit) => {
           const checked = () => {
@@ -324,6 +330,7 @@ if (
           initial.actor,
           initial.authority,
           publish,
+          snapshot,
         );
       } finally {
         control?.close();

@@ -29,6 +29,25 @@ export class WikiSearch {
       this.db.prepare("INSERT INTO meta VALUES('schema',?)").run(SCHEMA);
     }
   }
+  // Keep serving queries on the same WAL snapshot as the adopted article tree.
+  // The refresh connection may publish a newer index in parallel; it becomes
+  // visible here only when the main thread adopts its matching Git snapshot.
+  pin(commit) {
+    if (this.pinned) this.db.exec("COMMIT");
+    this.pinned = false;
+    this.db.exec("BEGIN");
+    try {
+      const indexed = this.db
+        .prepare("SELECT value FROM meta WHERE key='commit'")
+        .get()?.value;
+      if (indexed !== commit)
+        throw Error("Article index revision does not match its snapshot");
+      this.pinned = true;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
   sync(wiki) {
     const started = performance.now();
     if (
@@ -85,7 +104,10 @@ export class WikiSearch {
             .prepare("INSERT INTO passage_map VALUES(?,?)")
             .run(p.id, inserted.lastInsertRowid);
         }
-        for (const target of new Set([...references(p.body), ...p.related]))
+        for (const target of new Set([
+          ...(wiki.linkCache?.get(p.blob) || references(p.body)),
+          ...p.related,
+        ]))
           this.db.prepare("INSERT INTO links VALUES(?,?)").run(p.id, target);
         changed++;
       }

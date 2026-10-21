@@ -21,9 +21,9 @@
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
-    "@modelcontextprotocol/client": "2.2.0",
-    "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@simplewebauthn/browser": "14.0.0",
     "@simplewebauthn/server": "14.0.2",
     "esbuild": "0.28.2",

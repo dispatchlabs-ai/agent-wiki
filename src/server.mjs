@@ -29,6 +29,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createWikiMcp } from "./mcp.mjs";
 import { McpApiClient } from "./mcp-response.mjs";
 import { PreviewRenderer } from "./preview.mjs";
+import { ArticleRefresh } from "./article-refresh.mjs";
 import { TraceSearchPool } from "./trace-search-pool.mjs";
 import { createWikiTools } from "../public/wiki-tools.js";
 import { disclosureOptions } from "./trace-disclosure.mjs";
@@ -44,6 +45,7 @@ import { WikiError } from "./errors.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { GitWiki, wikiRepo } from "./git-wiki.mjs";
@@ -122,31 +124,72 @@ export function createWiki({
   const traceSearches = traceSearchPool || new TraceSearchPool();
   const previews = new PreviewRenderer();
   const articleMedia = new ArticleMediaStore(articleMediaRoot);
-  const wiki = new GitWiki(repo),
-    index = new WikiSearch(database),
+  const wiki = new GitWiki(repo);
+  // A temporary on-disk projection lets the refresh worker and serving reader
+  // share SQLite's WAL, including when an embedding requests an ephemeral index.
+  const temporaryIndex =
+    database === ":memory:"
+      ? fs.mkdtempSync(path.join(os.tmpdir(), "wiki-article-index-"))
+      : null;
+  if (temporaryIndex) database = path.join(temporaryIndex, "index.sqlite3");
+  let index, stats;
+  try {
+    index = new WikiSearch(database);
+    stats = index.sync(wiki);
+    index.pin(wiki.head);
+  } catch (error) {
+    index?.close();
+    if (temporaryIndex)
+      fs.rmSync(temporaryIndex, { recursive: true, force: true });
+    throw error;
+  }
+  const articleRefresh = new ArticleRefresh(wiki, database),
     citations = new ArticleCitations(),
     cache = new Map();
-  let stats = index.sync(wiki),
-    error = null,
+  let error = null,
     storageError = null,
-    indexError = null;
-  function refresh() {
-    const previous = { ...wiki };
-    try {
-      if (wiki.refresh()) cache.clear();
-      storageError = null;
-    } catch (e) {
-      Object.assign(wiki, previous);
-      error = storageError = e.message;
-      return;
-    }
-    try {
-      stats = index.sync(wiki);
-      error = indexError = null;
-    } catch (e) {
-      Object.assign(wiki, previous);
-      error = indexError = e.message;
-    }
+    indexError = null,
+    refreshUnavailable = false,
+    refreshing = null;
+  async function refresh(afterWrite = false) {
+    // A save must observe a check begun after its commit, even when another
+    // request was already checking the previous HEAD.
+    if (afterWrite && refreshing) await refreshing;
+    if (refreshing) return refreshing;
+    refreshing = articleRefresh
+      .refresh()
+      .then(async (result) => {
+        if (result.error) {
+          error = result.error;
+          if (result.stage === "storage") storageError = result.error;
+          else indexError = result.error;
+          return;
+        }
+        index.pin(result.snapshot?.head || wiki.head);
+        if (result.snapshot) {
+          Object.assign(wiki, result.snapshot);
+          cache.clear();
+        }
+        // Once both readers have adopted the same commit, checkpoint on the
+        // worker and repin before another refresh. This gives SQLite a reader
+        // gap for WAL recycling even during continuously advancing Git HEADs.
+        const checkpoint = await articleRefresh.checkpoint();
+        if (checkpoint.error) throw Error(checkpoint.error);
+        index.pin(wiki.head);
+        stats = result.stats;
+        error = storageError = indexError = null;
+        refreshUnavailable = false;
+      })
+      .catch((failure) => {
+        // A worker crash can occur after committing its index but before sending
+        // the matching article snapshot. Do not serve that uncertain combination.
+        error = indexError = failure.message;
+        refreshUnavailable = true;
+      })
+      .finally(() => {
+        refreshing = null;
+      });
+    return refreshing;
   }
   async function htmlTraceSearch(query, options, signal) {
     try {
@@ -164,7 +207,9 @@ export function createWiki({
       };
     }
   }
-  const timer = setInterval(refresh, 1000);
+  const timer = setInterval(() => {
+    void refresh();
+  }, 1000);
   timer.unref();
   const handleRequest = async (req, res) => {
     const requestAbort = new AbortController();
@@ -1000,7 +1045,6 @@ export function createWiki({
         }
         return send(405, { error: "Method not allowed" });
       }
-      refresh();
       if (url.pathname === "/mcp" || url.pathname === "/mcp/") {
         if (
           (req.headers.origin !== undefined && req.headers.origin !== origin) ||
@@ -1174,7 +1218,7 @@ export function createWiki({
             },
           );
         }
-        refresh();
+        await refresh(true);
         return send(200, {
           ...JSON.parse(out),
           publication: error ? "refresh-failed" : "live",
@@ -1182,6 +1226,14 @@ export function createWiki({
       }
       if (req.method !== "GET")
         return send(405, { error: "Method not allowed" });
+      // MCP's loopback read performs this check once, after dispatch. Previews
+      // need no committed snapshot; saves refresh after their writer commits.
+      await refresh();
+      if (refreshUnavailable)
+        return send(503, {
+          error: "Article index is recovering",
+          code: "WIKI_UNAVAILABLE",
+        });
       const vendor = /^\/assets\/vendor\/([a-zA-Z0-9.-]+\.(?:js|txt))$/.exec(
         url.pathname,
       );
@@ -1808,7 +1860,14 @@ export function createWiki({
     void previews.close().catch(console.error);
     void traceSearches.close().catch(console.error);
     clearInterval(timer);
-    index.close();
+    void articleRefresh
+      .close()
+      .finally(() => {
+        index.close();
+        if (temporaryIndex)
+          fs.rmSync(temporaryIndex, { recursive: true, force: true });
+      })
+      .catch(console.error);
     traceStore.close();
   });
   return server;

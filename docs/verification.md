@@ -13,6 +13,10 @@ Use the synthetic example for manual functional verification and report what was
 actually exercised. The dated results below describe earlier source revisions
 and do not establish test coverage for current `main`.
 
+The [October 21 article-refresh investigation](article-refresh-performance.md)
+records focused synthetic concurrency, health-latency and recovery checks for
+the subsequent source correction. It does not establish deployed performance.
+
 ## 0.6.0 interface and authorization review — September 16, 2026
 
 The release adds a separately enforced editorial-evidence boundary, an ordinary

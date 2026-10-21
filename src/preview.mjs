@@ -16,7 +16,7 @@ const failure = (code) =>
     code === "PREVIEW_TOO_LARGE" ? 413 : 503,
   );
 
-/** A bounded, disposable worker pool for untrusted draft Markdown. */
+/** Reusable workers; failed, cancelled or timed-out jobs discard their worker. */
 export class PreviewRenderer {
   constructor({
     workers = 2,
@@ -37,7 +37,11 @@ export class PreviewRenderer {
   render(body, signal) {
     if (this.closed) return Promise.reject(failure("PREVIEW_CLOSED"));
     if (signal?.aborted) return Promise.reject(failure("PREVIEW_CANCELLED"));
-    if (this.workers.size >= this.limit && this.queue.length >= this.queueLimit)
+    if (
+      this.workers.size >= this.limit &&
+      [...this.workers.values()].every((job) => job !== null) &&
+      this.queue.length >= this.queueLimit
+    )
       return Promise.reject(failure("PREVIEW_BUSY"));
     return new Promise((resolve, reject) => {
       const job = { body, worker: null, done: false, finish: null };
@@ -53,10 +57,15 @@ export class PreviewRenderer {
         signal?.removeEventListener("abort", abort);
         const index = this.queue.indexOf(job);
         if (index !== -1) this.queue.splice(index, 1);
-        // Retain the occupied slot until exit, including while terminating it.
-        if (job.worker) void job.worker.terminate();
+        // Failed workers retain their slot until exit. Successful workers keep
+        // the expensive renderer imports warm for the next independent draft.
+        if (job.worker) {
+          if (error) void job.worker.terminate();
+          else this.workers.set(job.worker, null);
+        }
         if (error) reject(error);
         else resolve(html);
+        this.pump();
       };
       signal?.addEventListener("abort", abort, { once: true });
       this.queue.push(job);
@@ -65,48 +74,53 @@ export class PreviewRenderer {
   }
 
   pump() {
-    while (
-      !this.closed &&
-      this.workers.size < this.limit &&
-      this.queue.length
-    ) {
-      const job = this.queue.shift();
-      let worker;
-      try {
-        worker = new Worker(this.workerUrl, {
-          workerData: { body: job.body, maxBytes: 2 * 1024 * 1024 },
-          resourceLimits: { maxOldGenerationSizeMb: 128 },
+    while (!this.closed && this.queue.length) {
+      let worker = [...this.workers].find(([, job]) => job === null)?.[0];
+      if (!worker) {
+        if (this.workers.size >= this.limit) return;
+        try {
+          worker = new Worker(this.workerUrl, {
+            workerData: { maxBytes: 2 * 1024 * 1024 },
+            resourceLimits: { maxOldGenerationSizeMb: 128 },
+          });
+        } catch {
+          this.queue.shift().finish(failure("PREVIEW_FAILED"));
+          continue;
+        }
+        this.workers.set(worker, null);
+        worker.on("message", (result) => {
+          const job = this.workers.get(worker);
+          if (typeof result?.html === "string") job?.finish(null, result.html);
+          else
+            job?.finish(
+              failure(
+                result?.code === "PREVIEW_TOO_LARGE"
+                  ? result.code
+                  : "PREVIEW_FAILED",
+              ),
+            );
         });
-      } catch {
-        job.finish(failure("PREVIEW_FAILED"));
-        continue;
+        worker.once("error", () => {
+          this.workers.get(worker)?.finish(failure("PREVIEW_FAILED"));
+          void worker.terminate();
+        });
+        worker.once("exit", () => {
+          this.workers.get(worker)?.finish(failure("PREVIEW_FAILED"));
+          this.workers.delete(worker);
+          this.pump();
+        });
       }
+      const job = this.queue.shift();
       job.worker = worker;
       this.workers.set(worker, job);
-      worker.once("message", (result) => {
-        if (typeof result?.html === "string") job.finish(null, result.html);
-        else
-          job.finish(
-            failure(
-              result?.code === "PREVIEW_TOO_LARGE"
-                ? result.code
-                : "PREVIEW_FAILED",
-            ),
-          );
-      });
-      worker.once("error", () => job.finish(failure("PREVIEW_FAILED")));
-      worker.once("exit", () => {
-        job.finish(failure("PREVIEW_FAILED"));
-        this.workers.delete(worker);
-        this.pump();
-      });
+      worker.postMessage({ body: job.body });
     }
   }
 
   async close() {
     this.closed = true;
     for (const job of [...this.queue, ...this.workers.values()])
-      job.finish(failure("PREVIEW_CLOSED"));
+      job?.finish(failure("PREVIEW_CLOSED"));
     await Promise.all(
       [...this.workers.keys()].map((worker) => worker.terminate()),
     );

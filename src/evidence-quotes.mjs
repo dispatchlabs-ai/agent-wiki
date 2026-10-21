@@ -32,7 +32,7 @@ export function validateEvidence(value) {
 
 // Called inside the writer lock. Receipts are checked before contacting the archive:
 // a retry must still recover its durable result when the source service is offline.
-export async function verifyDraftEvidence(repo, draft, base) {
+export async function verifyDraftEvidence(repo, draft, base, snapshot = null) {
   const verified = new Map();
   if (
     !draft ||
@@ -41,7 +41,10 @@ export async function verifyDraftEvidence(repo, draft, base) {
     draft.updates.length > 10
   )
     return verified;
-  if (new GitWiki(repo).receipt(draft.operation_id)) return verified;
+  if (!draft.updates.some((update) => update?.evidence !== undefined))
+    return verified;
+  if ((snapshot || new GitWiki(repo)).receipt(draft.operation_id))
+    return verified;
   const client = base ? new EvidenceClient(base) : null;
   const events = new Map();
   for (const update of draft.updates) {
