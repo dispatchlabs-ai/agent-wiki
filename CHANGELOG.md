@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.5 — 2026-10-21
+
+Compatible update; no persisted-data migration or minimum-runtime change.
+
 - Update the MCP client/server and Node adapter to their compatible patched
   versions. Bound malformed tool arguments before schema validation without
   reducing accepted article batches or limiting concurrent clients. Refresh the
