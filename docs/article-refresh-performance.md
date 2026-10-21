@@ -96,3 +96,56 @@ Focused synthetic checks also verified:
 Static contract, formatting and type checks passed. Temporary repositories,
 databases and diagnostic processes were removed after verification. Live rollout,
 container CPU/storage qualification and release packaging are separate steps.
+
+## Authorization on remote storage — 0.9.6
+
+The 0.9.5 refresh correction did not address synchronous control-store reads.
+An OAuth MCP article read performs 121 authorization SELECTs across request
+admission, capability checks, the loopback API request and response checks.
+Autocommit acquired and released a filesystem read lock for each statement.
+Local disk qualification with a human session did not reproduce the cost of
+this agent path on remote storage.
+
+`ControlStore.read` now groups each synchronous authorization phase in one
+short deferred SQLite transaction. Nested checks reuse their caller's transaction;
+they cannot commit or roll back an outer publication transaction. The helper
+rejects asynchronous callbacks. Every snapshot ends before the next await or
+request, and publication still rechecks current authority inside its existing
+immediate write transaction. Permission results are not cached and authorization
+checks are not removed. No concurrency limit or deployment resource change was
+introduced.
+
+An isolated Linux amd64 task used the same S3 Files mount type, 0.5 vCPU and 2 GiB
+allocation as the reported failure. It created only disposable fictional content
+and identities. Sixteen OAuth authorization calls performed the same 192 SELECTs
+in both versions: ungrouped calls took 2,144–2,164 ms; grouped calls took
+184–185 ms. The equivalent local-storage observations were 9.4–10.0 ms and
+7.4–7.8 ms, respectively.
+
+A second isolated task compared 48 concurrent OAuth MCP article reads against
+0.9.5 and the correction. Control data and fictional Git content were on S3 Files;
+the derived article index was local. An independent client probed health every
+100 ms with a four-second deadline.
+
+| Observation                                        |     0.9.5 | 0.9.6 correction |
+| -------------------------------------------------- | --------: | ---------------: |
+| 48 concurrent OAuth MCP reads                      | 54,659 ms |         5,542 ms |
+| Health checks reaching the deadline                |  13 of 15 |          0 of 36 |
+| Maximum successful health latency in corrected run |         — |           192 ms |
+
+The corrected task also completed eight concurrent, disjoint OAuth MCP saves in
+54.5 seconds, using identical-operation retries for the existing writer lock.
+All 475 health probes succeeded; the longest took 906 ms. Exact body readback,
+idempotent retry and cross-origin rejection passed. All synthetic state was removed.
+
+These single-run measurements isolate remote authorization locking; they are not
+capacity guarantees or a full managed-deployment qualification. Exact package
+acceptance and deployment receipts are separate release evidence.
+
+Focused synthetic checks revoked an agent's grant while an external evidence
+request was pending. Protected response data remained unavailable, and a pending
+save left Git HEAD and article bytes unchanged. Restoring the grant allowed the
+same operation to succeed. Revoking a human session during the same asynchronous
+read also denied the response. No read transaction remained open across the wait.
+Independent review checked nested snapshots, exception cleanup, synchronous-only
+callbacks, cross-origin rejection and preservation of the publication fence.

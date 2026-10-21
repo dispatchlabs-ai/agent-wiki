@@ -229,15 +229,17 @@ export function createWiki({
     const originalWriteHead = res.writeHead;
     const authorizeResponse = () => {
       if (!protectedResponse) return;
-      if (agentToken) agentAuth.require(agentToken, agentAction);
-      else {
-        if (!control.authenticate(token))
-          throw new WikiError("NOT_FOUND", "Not found", 404);
-        control.require(
-          actor.id,
-          responseAction === "trace" ? "editor" : "reader",
-        );
-      }
+      control.read(() => {
+        if (agentToken) agentAuth.require(agentToken, agentAction);
+        else {
+          if (!control.authenticate(token))
+            throw new WikiError("NOT_FOUND", "Not found", 404);
+          control.require(
+            actor.id,
+            responseAction === "trace" ? "editor" : "reader",
+          );
+        }
+      });
     };
     res.writeHead = function (status, ...args) {
       if (status < 400) authorizeResponse();
@@ -257,34 +259,44 @@ export function createWiki({
         : `default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'${securityDocument ? " data:" : ""}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; frame-src 'self'`,
     });
     const send = (status, value, type = "application/json") => {
-      if (protectedResponse) {
-        try {
-          authorizeResponse();
-        } catch {
-          protectedResponse = false;
-          return send(404, { error: "Not found", code: "NOT_FOUND" });
+      const deliver = () => {
+        if (protectedResponse) {
+          try {
+            authorizeResponse();
+          } catch {
+            protectedResponse = false;
+            return send(404, { error: "Not found", code: "NOT_FOUND" });
+          }
         }
-      }
-      if (
-        status >= 400 &&
-        type === "application/json" &&
-        value?.error &&
-        !value.code
-      )
-        value = { ...value, code: `HTTP_${status}` };
-      res.writeHead(status, responseHeaders(type));
-      res.end(type === "application/json" ? JSON.stringify(value) : value);
+        if (
+          status >= 400 &&
+          type === "application/json" &&
+          value?.error &&
+          !value.code
+        )
+          value = { ...value, code: `HTTP_${status}` };
+        res.writeHead(status, responseHeaders(type));
+        res.end(type === "application/json" ? JSON.stringify(value) : value);
+      };
+      // Preflight and writeHead are one synchronous response phase. Release
+      // this snapshot before any later request or asynchronous work.
+      return protectedResponse ? control.read(deliver) : deliver();
     };
     // Only the verified local trace-range route may supply a spool. Ordinary
     // article/provider JSON must never select filesystem reads or cleanup paths.
     const sendTraceLines = async (spool) => {
       try {
-        authorizeResponse();
+        const headers = () => {
+          authorizeResponse();
+          if (res.destroyed) return;
+          res.writeHead(200, {
+            ...responseHeaders("application/json"),
+            "Content-Length": spool.size,
+          });
+        };
+        if (protectedResponse) control.read(headers);
+        else headers();
         if (res.destroyed) return;
-        res.writeHead(200, {
-          ...responseHeaders("application/json"),
-          "Content-Length": spool.size,
-        });
         await pipeline(fs.createReadStream(spool.path), res);
       } finally {
         await fs.promises.rm(spool.directory, { recursive: true, force: true });
@@ -378,30 +390,35 @@ export function createWiki({
         req.headers.authorization !== undefined &&
         !url.pathname.startsWith("/assets/")
       ) {
-        res.setHeader("WWW-Authenticate", agentAuth.challenge());
-        const identity = agentAuth.bearer(req.headers.authorization);
-        agentToken = identity.token;
-        actor = identity.actor;
-        agentAction = agentAuth.action(url.pathname);
-        agentAuth.require(agentToken, agentAction);
-        if (
-          (req.headers.origin !== undefined && req.headers.origin !== origin) ||
-          req.headers["sec-fetch-site"] === "cross-site"
-        )
-          return send(403, { error: "Invalid origin" });
-        protectedResponse = true;
-        try {
-          agentAuth.require(agentToken, "trace");
-          canTrace = conversations;
-        } catch {
-          canTrace = false;
-        }
-        try {
-          agentAuth.require(agentToken, "write");
-          canWrite = write;
-        } catch {
-          canWrite = false;
-        }
+        const admitted = control.read(() => {
+          res.setHeader("WWW-Authenticate", agentAuth.challenge());
+          const identity = agentAuth.bearer(req.headers.authorization);
+          agentToken = identity.token;
+          actor = identity.actor;
+          agentAction = agentAuth.action(url.pathname);
+          agentAuth.require(agentToken, agentAction);
+          if (
+            (req.headers.origin !== undefined &&
+              req.headers.origin !== origin) ||
+            req.headers["sec-fetch-site"] === "cross-site"
+          )
+            return false;
+          protectedResponse = true;
+          try {
+            agentAuth.require(agentToken, "trace");
+            canTrace = conversations;
+          } catch {
+            canTrace = false;
+          }
+          try {
+            agentAuth.require(agentToken, "write");
+            canWrite = write;
+          } catch {
+            canWrite = false;
+          }
+          return true;
+        });
+        if (!admitted) return send(403, { error: "Invalid origin" });
       } else if (control && !url.pathname.startsWith("/assets/")) {
         const sameOrigin = () =>
           req.headers.origin === origin &&
@@ -1832,16 +1849,18 @@ export function createWiki({
       agentContext: () => {
         const header = mcpIdentity.getStore()?.Authorization;
         if (!header) return null;
-        const { actor } = agentAuth.bearer(header);
-        const agent = agentAuth.agents.get(actor.id);
-        const definition = control.db
-          .prepare("SELECT config FROM agent_definitions WHERE id=?")
-          .get(actor.definition);
-        return {
-          name: agent.name,
-          definition: actor.definition,
-          config: JSON.parse(definition.config),
-        };
+        return control.read(() => {
+          const { actor } = agentAuth.bearer(header);
+          const agent = agentAuth.agents.get(actor.id);
+          const definition = control.db
+            .prepare("SELECT config FROM agent_definitions WHERE id=?")
+            .get(actor.definition);
+          return {
+            name: agent.name,
+            definition: actor.definition,
+            config: JSON.parse(definition.config),
+          };
+        });
       },
       request: (route, draft, signal) =>
         mcpApi.request(route, draft, signal, mcpIdentity.getStore()),

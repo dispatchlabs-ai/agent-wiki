@@ -59,6 +59,27 @@ export class ControlStore {
       throw e;
     }
   }
+  /** Read one synchronous authorization snapshot without per-statement locking. */
+  read(fn) {
+    const evaluate = () => {
+      const value = fn();
+      if (value && typeof value.then === "function")
+        throw Error("Control-store read snapshots must be synchronous");
+      return value;
+    };
+    // Publication already owns a write transaction. Do not nest, commit or
+    // roll back its transaction when checking authority inside it.
+    if (this.db.isTransaction) return evaluate();
+    this.db.exec("BEGIN");
+    try {
+      const value = evaluate();
+      this.db.exec("COMMIT");
+      return value;
+    } catch (error) {
+      if (this.db.isTransaction) this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
   bootstrap({
     issuer,
     subject,

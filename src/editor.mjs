@@ -301,7 +301,7 @@ if (
           control.require(actor.id, "editor");
           return { actor: actor.id, authority: null };
         };
-        const initial = authorize();
+        const initial = control ? control.read(authorize) : authorize();
         const snapshot = new GitWiki(repo);
         const verified = await verifyDraftEvidence(
           repo,

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.9.6 — 2026-10-21
+
+Compatible fix; no persisted-data migration or minimum-runtime change.
+
+- Group each synchronous authorization phase in a short SQLite read transaction.
+  This avoids repeated filesystem lock operations for OAuth and runtime-agent
+  checks on remote storage, keeping health checks responsive during concurrent
+  requests. Recheck current authority before protected responses and inside the
+  final write transaction; never retain a snapshot across asynchronous work.
+  See the [storage qualification](docs/article-refresh-performance.md#authorization-on-remote-storage--096).
+
 ## 0.9.5 — 2026-10-21
 
 Compatible update; no persisted-data migration or minimum-runtime change.
