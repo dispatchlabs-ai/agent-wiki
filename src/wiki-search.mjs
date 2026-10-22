@@ -7,6 +7,10 @@ import { references } from "./wiki.mjs";
 
 const SCHEMA = "markdown-sections-v4";
 export class WikiSearch {
+  #results = new Map();
+  #resultBytes = 0;
+  #resultCommit;
+
   constructor(filename) {
     if (filename !== ":memory:")
       fs.mkdirSync(path.dirname(filename), { recursive: true, mode: 0o700 });
@@ -30,6 +34,9 @@ export class WikiSearch {
     }
     this.snippets = this.db.prepare(
       "SELECT snippet(passages,6,'','',' … ',30) AS snippet FROM passages WHERE passages MATCH ? AND rowid=?",
+    );
+    this.revision = this.db.prepare(
+      "SELECT value FROM meta WHERE key='commit'",
     );
   }
   // Keep serving queries on the same WAL snapshot as the adopted article tree.
@@ -163,6 +170,29 @@ export class WikiSearch {
     const match = terms
       .map((t) => (t.startsWith('"') ? t : `"${t}"*`))
       .join(" AND ");
+    // The commit is read inside this query's pinned snapshot, including for
+    // standalone readers. Never reuse results from a newer or older index.
+    const commit = this.revision.get()?.value;
+    if (commit !== this.#resultCommit) {
+      this.#results.clear();
+      this.#resultBytes = 0;
+      this.#resultCommit = commit;
+    }
+    const key =
+      commit && typeof topic === "string"
+        ? JSON.stringify([query, topic, state, limit, offset])
+        : null;
+    const cached = key && this.#results.get(key);
+    const copy = (result) => ({
+      ...result,
+      articles: result.articles.map((article) => ({ ...article })),
+      milliseconds: performance.now() - start,
+    });
+    if (cached) {
+      this.#results.delete(key);
+      this.#results.set(key, cached);
+      return copy(cached.result);
+    }
     let rows;
     if (match) {
       rows = this.db
@@ -204,15 +234,33 @@ export class WikiSearch {
           : {}),
         url: `/wiki/${row.id}/${row.anchor ? "#" + row.anchor : ""}`,
       }));
-    return {
+    const result = {
       total: all.length,
       truncated: rows.length === 400,
       nextOffset: offset + limit < all.length ? offset + limit : null,
       articles,
-      milliseconds: performance.now() - start,
     };
+    if (key) {
+      const bytes = Buffer.byteLength(JSON.stringify(result));
+      // Bound retained result data, not accepted queries or result sizes.
+      if (bytes <= 4 * 1024 * 1024) {
+        while (
+          this.#results.size >= 64 ||
+          this.#resultBytes + bytes > 4 * 1024 * 1024
+        ) {
+          const oldest = this.#results.keys().next().value;
+          this.#resultBytes -= this.#results.get(oldest).bytes;
+          this.#results.delete(oldest);
+        }
+        this.#results.set(key, { result, bytes });
+        this.#resultBytes += bytes;
+      }
+    }
+    return copy(result);
   }
   close() {
     this.db.close();
+    this.#results.clear();
+    this.#resultBytes = 0;
   }
 }

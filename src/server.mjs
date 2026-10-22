@@ -231,17 +231,21 @@ export function createWiki({
       canWrite = write,
       canTrace = conversations && !control,
       responseAction = "read";
+    let mcpAgent = null;
     const originalWriteHead = res.writeHead;
-    const authorizeResponse = () => {
+    const authorizeResponse = (
+      action = agentAction,
+      humanAction = responseAction,
+    ) => {
       if (!protectedResponse) return;
       control.read(() => {
-        if (agentToken) agentAuth.require(agentToken, agentAction);
+        if (agentToken) agentAuth.require(agentToken, action);
         else {
           if (!control.authenticate(token))
             throw new WikiError("NOT_FOUND", "Not found", 404);
           control.require(
             actor.id,
-            responseAction === "trace" ? "editor" : "reader",
+            humanAction === "trace" ? "editor" : "reader",
           );
         }
       });
@@ -397,11 +401,12 @@ export function createWiki({
       ) {
         const admitted = control.read(() => {
           res.setHeader("WWW-Authenticate", agentAuth.challenge());
-          const identity = agentAuth.bearer(req.headers.authorization);
+          const identity = agentAuth.bearer(req.headers.authorization, true);
           agentToken = identity.token;
           actor = identity.actor;
           agentAction = agentAuth.action(url.pathname);
-          agentAuth.require(agentToken, agentAction);
+          if (agentAction && !identity.permissions[agentAction])
+            throw new WikiError("NOT_FOUND", "Not found", 404);
           if (
             (req.headers.origin !== undefined &&
               req.headers.origin !== origin) ||
@@ -409,17 +414,20 @@ export function createWiki({
           )
             return false;
           protectedResponse = true;
-          try {
-            agentAuth.require(agentToken, "trace");
-            canTrace = conversations;
-          } catch {
-            canTrace = false;
-          }
-          try {
-            agentAuth.require(agentToken, "write");
-            canWrite = write;
-          } catch {
-            canWrite = false;
+          canTrace = conversations && identity.permissions.trace;
+          canWrite = write && identity.permissions.write;
+          if (url.pathname === "/mcp" || url.pathname === "/mcp/") {
+            // The run pins an immutable definition. Capture display/tool metadata
+            // here; operation and response checks still read current authority.
+            const agent = agentAuth.agents.get(actor.id);
+            const definition = control
+              .prepare("SELECT config FROM agent_definitions WHERE id=?")
+              .get(actor.definition);
+            mcpAgent = {
+              name: agent.name,
+              definition: actor.definition,
+              config: JSON.parse(definition.config),
+            };
           }
           return true;
         });
@@ -1106,11 +1114,19 @@ export function createWiki({
           }
         }
         return await mcpIdentity.run(
-          agentToken
-            ? { Authorization: `Bearer ${agentToken}` }
-            : control
-              ? { Cookie: `wiki_session=${token}`, "X-Wiki-CSRF": actor.csrf }
-              : {},
+          {
+            headers: agentToken
+              ? { Authorization: `Bearer ${agentToken}` }
+              : control
+                ? { Cookie: `wiki_session=${token}`, "X-Wiki-CSRF": actor.csrf }
+                : {},
+            agent: mcpAgent,
+            authorizeResult: (pathname) =>
+              authorizeResponse(
+                agentToken ? agentAuth.action(pathname) : null,
+                evidencePath(pathname) ? "trace" : "read",
+              ),
+          },
           () =>
             mcpVariants.get(`${canWrite}:${canTrace}`).handle(req, res, body),
         );
@@ -1812,24 +1828,17 @@ export function createWiki({
       write: writable,
       evidenceAccess,
       externalEvidence: !!evidence,
-      agentContext: () => {
-        const header = mcpIdentity.getStore()?.Authorization;
-        if (!header) return null;
-        return control.read(() => {
-          const { actor } = agentAuth.bearer(header);
-          const agent = agentAuth.agents.get(actor.id);
-          const definition = control
-            .prepare("SELECT config FROM agent_definitions WHERE id=?")
-            .get(actor.definition);
-          return {
-            name: agent.name,
-            definition: actor.definition,
-            config: JSON.parse(definition.config),
-          };
-        });
+      agentContext: () => mcpIdentity.getStore()?.agent || null,
+      request: async (route, draft, signal) => {
+        const context = mcpIdentity.getStore();
+        try {
+          return await mcpApi.request(route, draft, signal, context?.headers);
+        } finally {
+          // MCP may send stream headers before the tool finishes. Check again
+          // before releasing its result, including revocation after the API reply.
+          context?.authorizeResult(new URL(route, origin).pathname);
+        }
       },
-      request: (route, draft, signal) =>
-        mcpApi.request(route, draft, signal, mcpIdentity.getStore()),
     });
   const mcpVariants = new Map();
   for (const writable of [false, true])

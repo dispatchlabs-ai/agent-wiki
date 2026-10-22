@@ -575,6 +575,7 @@ async function run() {
           "writer-worker",
           "control-store",
           "agent-store",
+          "agent-auth",
           "wiki-search",
           "mcp-response",
           "server",

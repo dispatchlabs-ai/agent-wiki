@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Increase authenticated article throughput by consolidating current authorization
+  queries, reading MCP agent metadata during admission, and reusing search results
+  only within the same indexed commit. Preserve selectors, ranking and fresh
+  permission checks; recheck the operation's permission before returning each MCP tool result.
+  See [larger-corpus and hosted measurements](docs/article-refresh-performance.md#authorization-and-search-reuse--october-22-2026).
 - Reduce read and health latency under concurrent load by reusing compiled
   authorization queries and extracting search snippets only for returned results.
   Keep live permission checks, ranking, pagination and consistent search snapshots.

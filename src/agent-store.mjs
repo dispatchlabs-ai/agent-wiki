@@ -483,18 +483,26 @@ export class AgentStore {
     const r =
       this.control
         .prepare(
-          "SELECT * FROM agent_runs WHERE id=? AND active=1 AND expires>?",
+          `SELECT r.* FROM agent_runs r
+          JOIN agents a ON a.id=r.agent
+          JOIN principals agent ON agent.id=a.id AND agent.active=1
+          JOIN principals initiator ON initiator.id=r.initiator AND initiator.active=1
+          WHERE r.id=? AND r.active=1 AND r.expires>?
+          AND (a.owner=r.initiator OR EXISTS (
+            SELECT 1 FROM agent_permissions p
+            WHERE p.agent=r.agent AND p.principal=r.initiator AND p.permission='invoke'
+          ))`,
         )
         .get(id, this.now()) || fail();
-    this.get(r.agent);
     if (r.runtime_key) this.key(r.agent, r.runtime_key);
-    this.require(r.initiator, r.agent, "invoke");
     const d =
       r.mode === "delegated" ? this.delegation(r.delegation, r.agent) : null;
     return { ...r, scope: JSON.parse(r.scope), subject: d?.subject || null };
   }
   authorize(runId, space, action) {
-    const r = this.run(runId);
+    return this.#authorizeRun(this.run(runId), space, action);
+  }
+  #authorizeRun(r, space, action) {
     if (!permits(r.scope, space, action)) fail();
     if (r.mode === "delegated") {
       const d = this.delegation(r.delegation, r.agent);
@@ -607,22 +615,23 @@ export class AgentStore {
     this.record("operator", "agent:revoke-key", agent + ":" + kid);
   }
   key(agent, kid) {
-    this.get(agent);
+    return this.#keyRecord(agent, kid).jwk;
+  }
+  #keyRecord(agent, kid) {
     const k =
       this.control
         .prepare(
-          "SELECT jwk FROM agent_keys WHERE agent=? AND kid=? AND active=1",
+          `SELECT k.jwk,k.authorization FROM agent_keys k
+          JOIN agents a ON a.id=k.agent
+          JOIN principals p ON p.id=a.id AND p.active=1
+          WHERE k.agent=? AND k.kid=? AND k.active=1`,
         )
         .get(agent, kid) || fail();
-    const authorization = JSON.parse(
-      this.control
-        .prepare("SELECT authorization FROM agent_keys WHERE agent=? AND kid=?")
-        .get(agent, kid).authorization,
-    );
+    const authorization = JSON.parse(k.authorization);
     if (authorization.expires !== null && authorization.expires <= this.now())
       fail();
     this.require(authorization.initiator, agent, "invoke");
-    return JSON.parse(k.jwk);
+    return { jwk: JSON.parse(k.jwk), authorization };
   }
   issue(
     agent,
@@ -737,57 +746,82 @@ export class AgentStore {
     });
   }
   authenticate(token, audience) {
+    return this.#authenticate(token, audience).actor;
+  }
+  #authenticate(token, audience) {
     const row = this.control
       .prepare(
         "SELECT * FROM agent_tokens WHERE hash=? AND audience=? AND expires>?",
       )
       .get(digest(token), audience, this.now());
-    if (!row) return this.authenticateRemote(token, audience);
+    if (!row) return this.#authenticateRemote(token, audience);
     const r = this.run(row.run);
-    this.key(r.agent, row.kid);
-    const enrollment = JSON.parse(
-      this.control
-        .prepare("SELECT authorization FROM agent_keys WHERE agent=? AND kid=?")
-        .get(r.agent, row.kid).authorization,
-    );
+    const { authorization: enrollment } = this.#keyRecord(r.agent, row.kid);
     return {
-      ...(enrollment.expires === null ? { credential: row.kid } : {}),
-      id: r.agent,
-      kind: "agent",
-      run: r.id,
-      subject: r.subject,
-      mode: r.mode,
-      definition: r.definition,
-      scope: JSON.parse(row.scope),
-      expires: row.expires,
+      run: r,
+      actor: {
+        ...(enrollment.expires === null ? { credential: row.kid } : {}),
+        id: r.agent,
+        kind: "agent",
+        run: r.id,
+        subject: r.subject,
+        mode: r.mode,
+        definition: r.definition,
+        scope: JSON.parse(row.scope),
+        expires: row.expires,
+      },
     };
   }
   authenticateRemote(token, audience) {
+    return this.#authenticateRemote(token, audience).actor;
+  }
+  #authenticateRemote(token, audience) {
     const row = this.control
       .prepare(
-        "SELECT g.*,t.expires token_expires FROM remote_tokens t JOIN remote_grants g ON g.id=t.grant_id WHERE t.hash=? AND t.kind='access' AND t.expires>? AND g.expires>? AND g.active=1",
+        `SELECT g.*,t.expires token_expires FROM remote_tokens t
+        JOIN remote_grants g ON g.id=t.grant_id
+        JOIN principals p ON p.id=g.principal AND p.kind='human' AND p.active=1
+        WHERE t.hash=? AND t.kind='access' AND t.expires>? AND g.expires>? AND g.active=1`,
       )
       .get(digest(token), this.now(), this.now());
     if (!row || audience !== row.audience) fail();
-    this.human(row.principal);
     const r = this.run(row.run);
     if (r.agent !== row.agent || r.initiator !== row.principal) fail();
     return {
-      id: r.agent,
-      kind: "agent",
-      run: r.id,
-      initiator: r.initiator,
-      subject: r.subject,
-      mode: r.mode,
-      definition: r.definition,
-      scope: r.scope,
-      expires: row.token_expires,
+      run: r,
+      actor: {
+        id: r.agent,
+        kind: "agent",
+        run: r.id,
+        initiator: r.initiator,
+        subject: r.subject,
+        mode: r.mode,
+        definition: r.definition,
+        scope: r.scope,
+        expires: row.token_expires,
+      },
     };
   }
   requireToken(token, audience, space, action) {
-    const actor = this.authenticate(token, audience);
+    const { actor, run } = this.#authenticate(token, audience);
     if (!permits(actor.scope, space, action)) fail();
-    this.authorize(actor.run, space, action);
+    this.#authorizeRun(run, space, action);
     return actor;
+  }
+  /** Evaluate admission capabilities together; never retain them across phases. */
+  inspectToken(token, audience, space) {
+    const { actor, run } = this.#authenticate(token, audience);
+    const permissions = {};
+    for (const action of actions) {
+      permissions[action] = false;
+      if (!permits(actor.scope, space, action)) continue;
+      try {
+        this.#authorizeRun(run, space, action);
+        permissions[action] = true;
+      } catch {
+        // A missing optional capability must not reject the authenticated actor.
+      }
+    }
+    return { actor, permissions };
   }
 }

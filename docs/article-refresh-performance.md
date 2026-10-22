@@ -389,3 +389,124 @@ Focused disposable verification additionally covered:
 Contract, formatting and static type checks passed. The synthetic fixtures,
 diagnostic scripts and databases were removed. This is unreleased source work;
 hosted-storage, container and deployment qualification remain separate.
+
+## Authorization and search reuse — October 22, 2026
+
+The follow-up to `cb33b2b` targets repeated authorization work and the cost of
+searching a larger corpus. Within one synchronous authorization phase, token
+validation now reuses its validated run, evaluates admission capabilities together,
+and joins active-principal/run/key checks instead of repeating separate lookups.
+Every protected operation, response and publication still checks current
+authority; no authorization cache is shared across requests. The OAuth fixture reduced a complete HTTP read from 67 SELECTs
+to 14; an MCP article read fell from 121 to 29.
+
+Article search retains up to 64 recent results, with a 4 MiB serialized-result
+budget. The key includes the query and all selectors. The indexed Git commit is
+read inside the caller's existing pinned or standalone read transaction; a changed
+commit clears the cache. Returned objects are copied, oversized results remain
+complete and uncached, and authorization still runs on every HTTP/MCP request.
+Ranking, snippets, grouping, truncation and pagination are unchanged. This helps
+repeated searches; it does not make a new uncached query faster.
+
+MCP captures the run's immutable agent definition during admission instead of
+opening a separate authorization transaction to obtain the same metadata. Actual
+API admission, response and save-publication checks still read current authority.
+MCP can send stream headers before a tool finishes, so the final implementation
+also checks the operation's current permission immediately before returning its
+result. This closes a reproduced gap where a role was revoked after the inner API
+had sent its reply. There are still five short authorization phases for an OAuth
+MCP article read: the removed metadata phase is replaced by the result check.
+Concurrent requests retain separate identities and result checks.
+
+A larger experiment bypassed loopback HTTP for article reads. It reached about
+5.6× local throughput, but regressed health responsiveness and saves on S3 Files.
+Adding event-loop yields reduced event-loop delay without repairing those hosted
+regressions. That direct-dispatch experiment was rejected; the final code keeps
+the existing MCP HTTP bridge. Its adverse results remain in the raw record. No
+request concurrency cap, persisted schema or host configuration was changed.
+
+The [raw record](benchmarks/authorization-throughput-2026-10-22.json) preserves
+baseline, qualified and exploratory results, including unsuccessful iterations.
+The local runs use supported Node 24.22.1 on macOS arm64. All fixtures are
+synthetic, load is closed-loop with 48 readers and eight writers, and rates include
+drain. Search requests repeat one query, so the cache benefits this particular
+workload. Save acknowledgements are checked against historical Git revisions;
+each run also checks an identical retry and a four-way revision conflict.
+
+### Local larger-corpus result
+
+With 2,000 reader articles, about 8 KiB of filler per article and a 60-second
+admission window, the repeated baseline measured 244.0 reads/second, 284.7 ms read
+p95 and 66.3 ms health p95. The final source measured 900.7 and 886.8 reads/second
+in two sequential runs: about 3.6–3.7× throughput. Read p95 was 184.1 and 177.3 ms,
+and health p95 was 5.6 and 5.9 ms. All requests succeeded. The first baseline is
+also retained; it measured 231.9 reads/second and 284.4 ms read p95.
+
+| Local workload                                            | Reads/second | Read p95 | Health p95 | Saves verified |
+| --------------------------------------------------------- | -----------: | -------: | ---------: | -------------: |
+| 2,000 articles, 60 seconds, baseline repeat               |        244.0 | 284.7 ms |    66.3 ms |            184 |
+| Same, final source                                        |        900.7 | 184.1 ms |     5.6 ms |            195 |
+| Same, final repeat                                        |        886.8 | 177.3 ms |     5.9 ms |            193 |
+| 200 articles, 30 seconds, final source                    |        952.1 | 107.5 ms |     8.5 ms |            108 |
+| 200 articles, 30 seconds, final repeat                    |      1,214.7 |  84.1 ms |     6.4 ms |            134 |
+| 200 articles, ten-article saves, 30 seconds, final source |      1,083.2 | 100.7 ms |     8.2 ms |             65 |
+
+The five final-source runs verified all 695 saves, 1,280 historical article
+revisions and 2,213 health probes with zero measured request errors. Their largest
+health observation was 31.4 ms; this does not establish a worst-case bound or remove
+the earlier connection-tail limitation. Larger-corpus writer throughput increased
+modestly. In the smaller corpus, final-source save throughput varied from 3.39 to
+4.20 saves/second against baseline observations of 4.02–4.20. The initial small
+run's write regression was not repeated, but is retained: this is not a claim of
+uniform improvement for every operation. The final small-corpus repeat preceded a
+fresh baseline repeat to check order/host variation; both completed without errors.
+
+Uncached search was checked separately against 2,000 articles and a 27.3 MB index.
+Alternating baseline/candidate queries used 220 distinct but equivalent strings,
+forcing misses. Baseline p50/p95 were 6.59/7.96 ms; final search code measured
+6.64/8.06 ms. Repeating one query changed p50/p95 from 6.54/7.91 ms to 0.011/0.026 ms.
+These 440 exact-result comparisons distinguish reuse from an uncached-search
+speedup. An earlier authorization-only profile found FTS candidate extraction and
+snippets dominated main-thread samples, motivating this cache; the raw summary
+includes idle samples and is not normalized CPU attribution.
+
+### Hosted compatibility and saturation diagnostic
+
+Disposable Linux amd64 tasks used the existing deployed container's Node 24.21.0
+runtime and dependency closure with the tested source files overlaid. This is
+**not qualification of the current Node 24.22.1 minimum or a new release image**.
+The client and server shared 0.5 vCPU and 2 GiB; the control database, Git content
+and article index occupied newly created synthetic directories on S3 Files. The
+workload used 1,000 reader articles, about 4 KiB of filler each, 48 readers, eight
+writers and 60 seconds of admission. No live wiki content or service configuration
+was changed.
+
+The latest baseline observed 7.78 reads/second and 10.46 seconds read p95, 251
+four-second health timeouts, 16 acknowledged saves and two `WRITER_BUSY` responses.
+The final-source diagnostic observed 10.60 reads/second and 3.70 seconds read p95,
+90 health timeouts, 21 acknowledged saves and three `WRITER_BUSY` responses.
+Every acknowledged save, retry and conflict check passed, but these runs exited
+nonzero because the workload still saturated this setup. They do not establish
+hosted capacity or an error-free operating point. Earlier baseline/prototype runs
+and an interrupted post-load verification are retained with their failures.
+
+SQL wall-time profiles concentrated in the first control-store read and `COMMIT`,
+consistent with remote-filesystem transaction-lock costs. Search reuse does not
+remove these costs. The exact mechanism behind every health and connection tail
+was not isolated. The direct-dispatch experiment's higher local throughput did not
+justify its hosted regression, so it is absent from the final source. Further
+hosted improvements require work on the remaining synchronous storage path or a
+separately evaluated storage/runtime architecture; this task changed neither.
+
+Focused disposable checks additionally verified 387 authorization comparisons,
+810 search comparisons plus six invalid-input cases, snapshot publication and
+invalidation, cache eviction, oversized uncached results, caller mutation isolation,
+26 HTTP/MCP result comparisons and 32 concurrent identity checks. MCP tool results
+were checked after internal reads; pending evidence reads and writes still reject
+revoked authority, rejected publication leaves Git unchanged, and an identical
+operation can succeed after authority is restored. No control read transaction
+remained open across asynchronous work.
+
+The cloud tasks stopped and removed their synthetic storage. Their disposable task
+definitions and log streams were removed after retaining the measurements. The
+source remains unreleased and undeployed.

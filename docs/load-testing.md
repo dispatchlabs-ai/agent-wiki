@@ -24,7 +24,10 @@ npm run --silent benchmark:load > load-results.json
 ## Workload and measurements
 
 Each reader repeatedly reads full article JSON four times and searches once.
-Readers cycle through 200 seeded articles. Each writer owns a separate article
+Readers cycle through 200 seeded articles. Searches repeat the same `sensor` query
+and limit, so this workload benefits from reuse of results for an unchanged index.
+It does not measure a stream of unique search queries; measure uncached search
+separately when that matches the intended workload. Each writer owns a separate article
 or batch, reads its current revisions, and submits an actual Git-backed save.
 There is no artificial pause between requests and no measured retry. A separate
 client probe calls `/healthz` every 100 ms with a four-second deadline.
@@ -151,3 +154,14 @@ snapshot. There is no new request queue or concurrency cap.
 compare the persistent-writer baseline with the optimized read path, including
 repeated mixed/batch profiles and a longer mixed run. The runner fingerprints the
 authorization, search and MCP bridge source alongside the writer and article loader.
+
+## Larger corpora and authorization
+
+The next correction consolidates current authorization queries and caches a
+bounded set of search results for the indexed Git commit. MCP captures immutable
+agent-definition metadata during admission, eliminating a redundant transaction;
+each tool result checks the requested operation's current permission. See
+[the local and hosted measurement record](article-refresh-performance.md#authorization-and-search-reuse--october-22-2026)
+for repeated larger-corpus results, uncached-search checks, rejected direct-dispatch
+experiments and hosted saturation limits. Local measurements and the compatibility
+run on an older deployed runtime are not release qualification.

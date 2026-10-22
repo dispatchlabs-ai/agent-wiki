@@ -155,7 +155,7 @@ export class AgentAuth {
       throw denied();
     }
   }
-  bearer(header) {
+  bearer(header, inspect = false) {
     if (
       typeof header !== "string" ||
       !/^Bearer [A-Za-z0-9_-]{43}$/i.test(header)
@@ -163,7 +163,12 @@ export class AgentAuth {
       throw denied();
     const token = header.slice(7);
     try {
-      return { token, actor: this.agents.authenticate(token, this.resource) };
+      return {
+        token,
+        ...(inspect
+          ? this.agents.inspectToken(token, this.resource, "default")
+          : { actor: this.agents.authenticate(token, this.resource) }),
+      };
     } catch {
       throw denied();
     }
