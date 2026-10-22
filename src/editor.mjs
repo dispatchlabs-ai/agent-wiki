@@ -242,43 +242,44 @@ export function saveGitEdits(
   return { ...receipt, commit };
 }
 
-async function readDraft() {
-  const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
+// Reuse parsed articles and store connections, never permission decisions. Each
+// save refreshes committed state under the same cross-process filesystem lock.
+export class GitEditor {
+  constructor(repo, { control = null, evidenceUrl = null, push = false } = {}) {
+    this.repo = repo;
+    this.options = { control, evidenceUrl, push };
+    this.control = null;
+    this.agents = null;
+    this.snapshot = null;
+  }
 
-if (
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
-  const repo = wikiRepo();
-  try {
-    const draft = await readDraft();
-    await withWriterLock(repo, async () => {
-      let result;
-      let control;
-      try {
-        let agents;
-        if (process.env.WIKI_HTTP_WRITE === "1") {
-          control = new ControlStore(process.env.WIKI_CONTROL);
-          agents = process.env.WIKI_AGENT_TOKEN
-            ? new AgentStore(control)
-            : null;
-        }
+  async save(
+    draft,
+    { session = null, agentToken = null, audience = null } = {},
+    lockOptions = {},
+  ) {
+    const repo = this.repo;
+    return withWriterLock(
+      repo,
+      async () => {
+        if (this.options.control && !this.control)
+          this.control = new ControlStore(this.options.control);
+        const control = this.control;
+        if (control && agentToken && !this.agents)
+          this.agents = new AgentStore(control);
         const authorize = () => {
           if (!control) return { actor: null, authority: null };
-          if (agents) {
-            const actor = agents.requireToken(
-              process.env.WIKI_AGENT_TOKEN,
-              process.env.WIKI_AGENT_AUDIENCE,
+          if (agentToken) {
+            const actor = this.agents.requireToken(
+              agentToken,
+              audience,
               "default",
               "write",
             );
             if (draft?.updates?.some((update) => update?.evidence?.length))
-              agents.requireToken(
-                process.env.WIKI_AGENT_TOKEN,
-                process.env.WIKI_AGENT_AUDIENCE,
+              this.agents.requireToken(
+                agentToken,
+                audience,
                 "default",
                 "trace",
               );
@@ -296,13 +297,15 @@ if (
               },
             };
           }
-          const actor = control.authenticate(process.env.WIKI_SESSION);
+          const actor = control.authenticate(session);
           if (!actor) throw new WikiError("NOT_FOUND", "Not found", 404);
           control.require(actor.id, "editor");
           return { actor: actor.id, authority: null };
         };
         const initial = control ? control.read(authorize) : authorize();
-        const snapshot = new GitWiki(repo);
+        if (this.snapshot) this.snapshot.refresh();
+        else this.snapshot = new GitWiki(repo);
+        const snapshot = this.snapshot;
         const verified = await verifyDraftEvidence(
           repo,
           {
@@ -313,7 +316,7 @@ if (
               draft?.operation_id,
             ),
           },
-          conversationsEnabled() ? process.env.WIKI_EVIDENCE_URL : null,
+          this.options.evidenceUrl,
           snapshot,
         );
         const publish = (commit) => {
@@ -323,7 +326,7 @@ if (
           };
           return control ? control.transaction(checked) : checked();
         };
-        result = saveGitEdits(
+        const result = saveGitEdits(
           repo,
           draft,
           verified,
@@ -332,22 +335,57 @@ if (
           publish,
           snapshot,
         );
-      } finally {
-        control?.close();
-      }
+        // Retry also retries a previously failed push. A failed remote never makes
+        // the local durable commit disappear or creates a duplicate revision.
+        try {
+          if (this.options.push)
+            git(repo, ["push", "origin", "main"], { timeout: 30000 });
+          result.remote = this.options.push ? "pushed" : "not-requested";
+        } catch {
+          result.remote = "push-failed";
+        }
+        return result;
+      },
+      lockOptions,
+    );
+  }
 
-      // Retry also retries a previously failed push. A failed remote never makes
-      // the local durable commit disappear or creates a duplicate revision.
-      try {
-        if (process.env.WIKI_PUSH === "1")
-          git(repo, ["push", "origin", "main"], { timeout: 30000 });
-        result.remote =
-          process.env.WIKI_PUSH !== "1" ? "not-requested" : "pushed";
-      } catch {
-        result.remote = "push-failed";
-      }
-      console.log(JSON.stringify(result));
+  close() {
+    this.control?.close();
+    this.control = this.agents = this.snapshot = null;
+  }
+}
+
+async function readDraft() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const repo = wikiRepo();
+  let editor;
+  try {
+    const draft = await readDraft();
+    if (process.env.WIKI_HTTP_WRITE === "1" && !process.env.WIKI_CONTROL)
+      throw Error("A control database is required");
+    editor = new GitEditor(repo, {
+      control:
+        process.env.WIKI_HTTP_WRITE === "1" ? process.env.WIKI_CONTROL : null,
+      evidenceUrl: conversationsEnabled()
+        ? process.env.WIKI_EVIDENCE_URL
+        : null,
+      push: process.env.WIKI_PUSH === "1",
     });
+    const result = await editor.save(draft, {
+      session: process.env.WIKI_SESSION,
+      agentToken: process.env.WIKI_AGENT_TOKEN,
+      audience: process.env.WIKI_AGENT_AUDIENCE,
+    });
+    console.log(JSON.stringify(result));
   } catch (e) {
     console.error(
       JSON.stringify({
@@ -357,5 +395,7 @@ if (
       }),
     );
     process.exitCode = 1;
+  } finally {
+    editor?.close();
   }
 }

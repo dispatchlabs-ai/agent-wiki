@@ -140,6 +140,7 @@ async function run() {
   const config = {
     readers: integer("BENCH_READERS", 48),
     writers: integer("BENCH_WRITERS", 8),
+    writesPerWriter: integer("BENCH_WRITES_PER_WRITER", 0),
     seconds: integer("BENCH_SECONDS", 10, 1),
     articles: integer("BENCH_ARTICLES", 200, 1),
     bodyBytes: integer("BENCH_BODY_BYTES", 2048, 100, 45000),
@@ -439,7 +440,12 @@ async function run() {
       ),
       ...lanes.map((lane, writer) =>
         (async () => {
-          for (let n = 0; performance.now() < deadline; n++) {
+          for (
+            let n = 0;
+            performance.now() < deadline &&
+            (!config.writesPerWriter || n < config.writesPerWriter);
+            n++
+          ) {
             try {
               const current = await Promise.all(
                 lane.map((id) =>
@@ -560,6 +566,27 @@ async function run() {
           fs.readFileSync(new URL("../src/git-wiki.mjs", import.meta.url)),
         )
         .digest("hex"),
+      engineSha256: Object.fromEntries(
+        [
+          "git-wiki",
+          "editor",
+          "writer-lock",
+          "writer",
+          "writer-worker",
+          "server",
+        ]
+          .filter((name) =>
+            fs.existsSync(new URL(`../src/${name}.mjs`, import.meta.url)),
+          )
+          .map((name) => [
+            name,
+            createHash("sha256")
+              .update(
+                fs.readFileSync(new URL(`../src/${name}.mjs`, import.meta.url)),
+              )
+              .digest("hex"),
+          ]),
+      ),
       config,
       fixtureArticles: ids.length + lanes.flat().length + 1,
       elapsedSeconds,
@@ -575,7 +602,7 @@ async function run() {
         rejectedStaleWrites: 3,
       },
       scope:
-        "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS excludes editor subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee.",
+        "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee.",
     };
     console.log(JSON.stringify(result, null, 2));
     if (Object.keys(errors).length) process.exitCode = 1;

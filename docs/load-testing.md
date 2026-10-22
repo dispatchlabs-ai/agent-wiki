@@ -34,8 +34,10 @@ latency, separate failed-request latencies, error-code counts, drain time, serve
 event-loop delay, sampled server RSS and server CPU use. Throughput uses the
 whole measured interval including drain; readers stop admitting work at the
 configured deadline even if writers need longer to finish. CPU/RSS includes the
-server and its worker threads, but excludes spawned editor processes and the
-load client. A CPU value of 100% represents one core.
+server and its worker threads, but excludes subprocesses and the load client.
+Comparisons against older process-per-save source therefore account for different
+parts of writer CPU/RSS; do not compare them as total resource use. A CPU value of
+100% represents one core. Engine file hashes identify uncommitted candidate source.
 
 After measurement, the runner reads back **every acknowledged article revision**,
 including older revisions that another operation has since replaced. It retries
@@ -53,17 +55,18 @@ cleanup. No content remote is configured, and the runner never pushes content.
 
 ## Choose a load
 
-| Variable           |                Default | Meaning                                                                            |
-| ------------------ | ---------------------: | ---------------------------------------------------------------------------------- |
-| `BENCH_READERS`    |                     48 | Concurrent read/search loops; zero disables them.                                  |
-| `BENCH_WRITERS`    |                      8 | Concurrent read/edit/save loops; zero disables them.                               |
-| `BENCH_SECONDS`    |                     10 | Admission window in whole seconds.                                                 |
-| `BENCH_ARTICLES`   |                    200 | Read corpus; writer articles and one conflict article are additional.              |
-| `BENCH_BODY_BYTES` |                   2048 | ASCII filler bytes per article, plus a short heading/operation marker; 100–45,000. |
-| `BENCH_BATCH`      |                      1 | Articles per atomic save, from 1 to 10.                                            |
-| `BENCH_TRANSPORT`  |                  `mcp` | `mcp` or direct `http` article APIs, both with OAuth agent authorization.          |
-| `BENCH_TIMEOUT_MS` |                  30000 | Per-request wall-clock deadline.                                                   |
-| `BENCH_TMPDIR`     | OS temporary directory | Existing parent directory for a fresh, uniquely named synthetic fixture.           |
+| Variable                  |                Default | Meaning                                                                            |
+| ------------------------- | ---------------------: | ---------------------------------------------------------------------------------- |
+| `BENCH_READERS`           |                     48 | Concurrent read/search loops; zero disables them.                                  |
+| `BENCH_WRITERS`           |                      8 | Concurrent read/edit/save loops; zero disables them.                               |
+| `BENCH_WRITES_PER_WRITER` |                      0 | Maximum iterations per writer; zero repeats until the admission deadline.          |
+| `BENCH_SECONDS`           |                     10 | Admission window in whole seconds.                                                 |
+| `BENCH_ARTICLES`          |                    200 | Read corpus; writer articles and one conflict article are additional.              |
+| `BENCH_BODY_BYTES`        |                   2048 | ASCII filler bytes per article, plus a short heading/operation marker; 100–45,000. |
+| `BENCH_BATCH`             |                      1 | Articles per atomic save, from 1 to 10.                                            |
+| `BENCH_TRANSPORT`         |                  `mcp` | `mcp` or direct `http` article APIs, both with OAuth agent authorization.          |
+| `BENCH_TIMEOUT_MS`        |                  30000 | Per-request wall-clock deadline.                                                   |
+| `BENCH_TMPDIR`            | OS temporary directory | Existing parent directory for a fresh, uniquely named synthetic fixture.           |
 
 For a short investigation, run these profiles **sequentially** so they do not
 compete for the same machine:
@@ -76,6 +79,9 @@ BENCH_READERS=48 BENCH_WRITERS=8 npm run benchmark:load
 # More contention, then the benefit and cost of larger atomic batches.
 BENCH_READERS=128 BENCH_WRITERS=32 npm run benchmark:load
 BENCH_BATCH=10 npm run benchmark:load
+
+# One simultaneous burst, stopping when all 32 writer iterations finish.
+BENCH_READERS=0 BENCH_WRITERS=32 BENCH_WRITES_PER_WRITER=1 npm run benchmark:load
 
 # Separate MCP overhead from the underlying authenticated HTTP operations.
 BENCH_TRANSPORT=http npm run benchmark:load
@@ -116,8 +122,19 @@ checks, atomic commits, authorization, retry receipts and writer serialization
 are unchanged. There is no new request concurrency limit.
 
 See [the measurement record](article-refresh-performance.md#concurrent-load-runner-and-git-object-batching--october-22-2026)
-for the observed improvement and remaining contention. The next useful experiments
-are longer runs, the same workload on hosted storage, and profiling snapshot/link
-parsing and writer process startup. Reusing a writer process would require explicit
-checks of authorization, snapshot freshness and failure recovery; this change does
-not introduce one.
+for the observed improvement and remaining contention.
+
+## Writer contention
+
+The next October 22 correction reuses a background writer with an arrival-order
+queue. It refreshes the cached snapshot inside the existing filesystem lock and
+keeps authorization fresh at work admission and publication. Queued requests and
+external lock waits share the existing ten-second budget; there is no additional
+concurrency cap. Atomic batches populate the private Git index in one command.
+The standalone CLI retains the same cross-process lock and shared editor logic.
+
+[Writer measurements and correctness checks](article-refresh-performance.md#writer-contention--october-22-2026)
+compare mixed traffic, ten-article batches and a fixed 32-writer burst against the
+batched-reader baseline. Longer runs and isolated hosted-storage qualification
+remain useful next steps. A local successful burst does not establish unlimited
+writer capacity or remove the documented `WRITER_BUSY` retry path.

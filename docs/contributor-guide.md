@@ -11,11 +11,12 @@ never introduce a second authoritative conversation representation.
 ## Where to change behavior
 
 - Git history and publication: `src/git-wiki.mjs`; write coordination:
-  `src/editor.mjs`. No-op saves retain article revisions; receipts remain durable.
+  `src/editor.mjs`; the server's persistent FIFO worker: `src/writer.mjs` and
+  `src/writer-worker.mjs`. No-op saves retain article revisions; receipts remain durable.
 - Markdown syntax and anchors: `src/markdown-structure.mjs` and `src/wiki.mjs`.
   Rendering, link validation, and search must agree on supported syntax.
 - Browser/HTTP edit shapes: `public/edit-contract.js`. The writer owns validation;
-  `src/errors.mjs` defines failures that cross the subprocess boundary.
+  `src/errors.mjs` defines failures that cross the writer boundary.
 - Trace interpretation: pure `src/trace-format.mjs`; presentation:
   `src/trace-worker.mjs`; derived dialogue search: `src/trace-search.mjs`.
 

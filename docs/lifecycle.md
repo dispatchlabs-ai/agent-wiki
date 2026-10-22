@@ -146,7 +146,8 @@ Account and agent administration, trace import/indexing, and media publication
 belong behind this command in a managed installation.
 
 The wrapper holds a POSIX advisory `flock` on the stable `owner.lock` inode. It
-passes the open descriptor through the server, editor, and Git subprocesses, so
+passes the open descriptor through the server, writer threads, standalone editors,
+and Git subprocesses, so
 an orphaned writer retains ownership after its parent dies. Descendants verify
 that descriptor 3 is the same regular inode as this root's `owner.lock`; an
 environment variable alone is not accepted as proof. No process steals the lock

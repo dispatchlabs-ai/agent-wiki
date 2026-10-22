@@ -30,6 +30,7 @@ import { createWikiMcp } from "./mcp.mjs";
 import { McpApiClient } from "./mcp-response.mjs";
 import { PreviewRenderer } from "./preview.mjs";
 import { ArticleRefresh } from "./article-refresh.mjs";
+import { Writer } from "./writer.mjs";
 import { TraceSearchPool } from "./trace-search-pool.mjs";
 import { createWikiTools } from "../public/wiki-tools.js";
 import { disclosureOptions } from "./trace-disclosure.mjs";
@@ -46,7 +47,6 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { GitWiki, wikiRepo } from "./git-wiki.mjs";
 import { WikiSearch } from "./wiki-search.mjs";
@@ -66,7 +66,7 @@ import {
 import { TraceStore } from "./traces.mjs";
 import { catalogOptions } from "./trace-catalog.mjs";
 import { traceSearchHealth, traceProvenance } from "./trace-search.mjs";
-import { lifecycleLockFd, lifecycleStdio } from "./lifecycle-lock.mjs";
+import { lifecycleLockFd } from "./lifecycle-lock.mjs";
 import { prepareTraceProjection } from "./trace-projection.mjs";
 const assetRoot = fileURLToPath(new URL("../public/", import.meta.url));
 export function createWiki({
@@ -143,6 +143,11 @@ export function createWiki({
       fs.rmSync(temporaryIndex, { recursive: true, force: true });
     throw error;
   }
+  const writer = new Writer(repo, {
+    control: control?.filename,
+    evidenceUrl,
+    push,
+  });
   const articleRefresh = new ArticleRefresh(wiki, database),
     citations = new ArticleCitations(),
     cache = new Map();
@@ -1178,66 +1183,27 @@ export function createWiki({
         } catch {
           return send(400, { error: "Invalid JSON" });
         }
-        const worker = spawn(
-          process.execPath,
-          [fileURLToPath(new URL("./editor.mjs", import.meta.url))],
-          {
-            cwd: repo,
-            env: {
-              ...process.env,
-              WIKI_REPO: repo,
-              WIKI_HTTP_WRITE: control ? "1" : "0",
-              WIKI_CONTROL: control?.filename || "",
-              WIKI_SESSION: token || "",
-              WIKI_AGENT_TOKEN: agentToken || "",
-              WIKI_AGENT_AUDIENCE: origin + "/mcp",
-              WIKI_GIT_LOCKED: "0",
-              WIKI_PUSH: push ? "1" : "0",
-              WIKI_EVIDENCE_URL: evidenceUrl || "",
-              WIKI_CONVERSATIONS: conversations ? "1" : "0",
-            },
-            stdio: lifecycleStdio(["pipe", "pipe", "pipe"]),
-          },
-        );
-        let out = "",
-          err = "";
-        worker.stdout.on("data", (b) => (out += b));
-        worker.stderr.on("data", (b) => (err += b));
-        worker.stdin.on("error", () => {});
-        worker.stdin.end(JSON.stringify(draft));
-        const code = await new Promise((resolve, reject) => {
-          worker.on("error", reject);
-          worker.on("close", resolve);
-        });
-        if (code !== 0) {
-          let failure;
-          for (const line of err.trim().split("\n").reverse()) {
-            try {
-              const candidate = JSON.parse(line);
-              if (
-                typeof candidate.code === "string" &&
-                Number.isInteger(candidate.status)
-              ) {
-                failure = candidate;
-                break;
-              }
-            } catch {
-              /* Runtime warnings may accompany the structured failure. */
-            }
-          }
+        let receipt;
+        try {
+          receipt = await writer.save(draft, {
+            session: token,
+            agentToken,
+            audience: origin + "/mcp",
+          });
+        } catch (failure) {
           return send(
-            [400, 403, 404, 409, 503].includes(failure?.status)
+            [400, 403, 404, 409, 503].includes(failure.status)
               ? failure.status
               : 503,
             {
-              error: failure?.error || "Writer unavailable",
-              code: failure?.code || "WRITER_UNAVAILABLE",
+              error: failure.message || "Writer unavailable",
+              code: failure.code || "WRITER_UNAVAILABLE",
             },
           );
         }
         await refresh(true);
         return send(200, {
-          ...JSON.parse(out),
+          ...receipt,
           publication: error ? "refresh-failed" : "live",
         });
       }
@@ -1873,6 +1839,7 @@ export function createWiki({
         makeMcp(writable, evidenceAccess),
       );
   server.on("close", () => {
+    void writer.close().catch(console.error);
     mcpApi.close();
     for (const mcp of mcpVariants.values())
       void mcp.close().catch(console.error);

@@ -254,7 +254,7 @@ the failure. Writer failures also return a stable `code`: `INVALID_EDIT` (400),
 `REVISION_CONFLICT`, `OPERATION_CONFLICT`, `BRANCH_CONFLICT`, or `WORKTREE_CONFLICT`
 (409), and `WRITER_BUSY` or `WRITER_UNAVAILABLE` (503). The CLI emits the same
 structured error on stderr with `status`; clients need not classify prose. Unknown
-subprocess failures are 503. A failure can follow a durable commit: retain the same
+worker failures are 503. A failure can follow a durable commit: retain the same
 operation ID when retrying. Browser tool schemas and writer string/batch limits
 share `public/edit-contract.js`; Git/revision/link checks remain server-side.
 
@@ -266,6 +266,22 @@ contains every changed page and its operation receipt. Only those paths are then
 restored to the real index and worktree. It does not commit unrelated files or
 force-push. The internal `saveGitEdits` helper assumes its caller owns the lock;
 use the CLI or HTTP interface for coordinated writes.
+
+Each server queues saves in arrival order on a persistent background writer.
+The existing ten-second wait budget covers the service queue, worker startup and
+filesystem-lock wait together. An expired queued save returns `WRITER_BUSY` without
+running; an acquired lock is held through validation, publication and any requested
+push. There is no additional admission/concurrency cap. Separate servers and CLI
+writers still coordinate through the filesystem lock; FIFO order is per server.
+
+The worker reuses parsed articles and database connections, refreshes Git HEAD
+inside the lock before every save, and rechecks current authorization before work
+and at publication. Invalid committed trees reject saves until repaired; a cached
+snapshot cannot authorize a stale write. Graceful shutdown drains admitted saves.
+After an unexpected worker exit, its active operation returns `WRITER_UNAVAILABLE`
+and a replacement starts only after exit. An uncertain operation is never replayed
+automatically; retry identical input to recover its receipt. Crash lock recovery
+below still applies, including when the server process itself remains alive.
 
 Do not race human or other uncoordinated Git edits against the service writer.
 Compare-and-swap protects the branch ref, but cannot preserve a human edit to the
@@ -288,7 +304,8 @@ repositories requiring those policies need a deliberate integration.
 The writer uses Node filesystem operations on local Linux and macOS filesystems;
 no extra locking utility is needed. Normal completion and exceptions release the
 lock. A writer killed abruptly can leave the directory behind. Other writers wait
-up to ten seconds, then fail with its location. Locks are never stolen based on
+up to their remaining ten-second budget, then fail with its location; requests that
+expire in the service queue report a queue timeout. Locks are never stolen based on
 age or PID, so a delayed writer cannot resume after its lock has been taken away.
 
 After a crash, stop every server and CLI writer for that content checkout. Inspect

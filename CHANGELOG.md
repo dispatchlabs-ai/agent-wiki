@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Reuse one background writer per server, serving saves in arrival order and
+  refreshing its parsed snapshot under the existing Git lock. Keep fresh
+  authorization checks, the ten-second wait budget, atomic batches and retry
+  receipts. Populate each batch's private Git index in one command. See
+  [writer contention measurements](docs/article-refresh-performance.md#writer-contention--october-22-2026).
 - Batch Git object reads when loading article snapshots, reducing subprocess work
   while a save holds the writer lock. Preserve unchanged article reuse, byte
   bounds, exact content, authorization, revisions and retry receipts.

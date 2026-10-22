@@ -204,3 +204,96 @@ invalid filenames, packed objects and historical revisions. No operator content
 or authentication data was used. Contract, formatting and static type checks
 passed. Hosted storage, Linux container resource quotas, releases and deployment
 remain separate qualification work.
+
+## Writer contention — October 22, 2026
+
+The next correction replaces a fresh editor process for every HTTP/MCP save with
+one reusable background writer and an arrival-order queue per server. The worker
+retains parsed article objects and control-store connections, refreshes Git state
+**inside the filesystem lock** before each operation, and checks current authority
+before preparation and at publication. Permission decisions are never cached.
+Standalone editors and other servers still coordinate through the same directory
+lock. The existing ten-second wait covers queueing, worker startup and external
+lock acquisition together; this adds no admission/concurrency cap.
+
+Atomic batches also populate their private Git index with one `update-index
+--index-info` invocation. The branch compare-and-swap, private-index isolation,
+revision checks, receipt identity, evidence verification and authorization fence
+remain in place. Graceful worker shutdown drains admitted saves. A crashed worker
+is replaced only after exit; an uncertain active operation is reported for an
+identical retry, and a retained filesystem lock still requires documented recovery.
+
+The baseline is `a58327e`, including the preceding batched article loader. All runs
+used Node 24.22.1 on macOS arm64 and local temporary storage, approximately 2 KiB
+of filler per article, OAuth-authenticated MCP and no measured retries. Mixed runs
+had 48 readers and eight writers with a ten-second admission window. Their corpus
+had 209 articles for single-article saves and 281 for ten-article batches. The
+fixed burst used 32 writers, no readers and one iteration per writer (233 articles).
+All rates and elapsed times include drain. The [raw record](benchmarks/writer-contention-2026-10-22.json)
+retains engine fingerprints, intermediate runs and complete error/correctness data.
+
+| Workload / observation                  |       Baseline |  Final source |
+| --------------------------------------- | -------------: | ------------: |
+| Mixed, one article: successful saves    |             29 |            42 |
+| Mixed, one article: saves/second        |          2.232 |         3.605 |
+| Mixed, one article: save p50 / p95      |  2.44 / 6.76 s | 1.87 / 2.15 s |
+| Mixed, one article: elapsed             |        12.99 s |       11.65 s |
+| Mixed, ten articles: successful saves   |             17 |            24 |
+| Mixed, ten articles: saves/second       |          1.105 |         1.782 |
+| Mixed, ten articles: save p50 / p95     | 3.79 / 10.57 s | 3.71 / 3.85 s |
+| Mixed, ten articles: writer timeouts    |              1 |             0 |
+| Mixed, ten articles: elapsed            |        15.38 s |       13.47 s |
+| Fixed 32-writer burst: successful saves |             24 |            32 |
+| Fixed 32-writer burst: writer timeouts  |              8 |             0 |
+| Fixed 32-writer burst: save p95         |        10.55 s |        7.42 s |
+| Fixed 32-writer burst: elapsed          |        11.04 s |        7.79 s |
+
+Mixed save throughput increased about 62%, and its p95 fell about 68%. Ten-article
+batch throughput increased about 61%. The final mixed, batch and burst runs verified
+42, 240 and 32 article revisions respectively, with no request failures and all
+receipt/conflict checks passing. A repeated final batch run verified another 240
+revisions without errors, at 1.816 saves/second and 3.78-second save p95. The
+intermediate persistent-worker-only results are retained separately; private-index
+batching improved that candidate's ten-article throughput from 1.516 to 1.782 saves/s.
+
+Read latency did not improve: single-article mixed read p95 rose from 157 to 172 ms,
+and ten-article mixed read p95 rose from 191 to 195 ms. Every primary and repeated
+final health probe completed within its four-second deadline, but health maxima
+were variable: mixed 665 ms, batch 1.42 s, repeated batch 2.06 s and burst 28 ms.
+The batch server event-loop maximum stayed at 87–101 ms. These measurements do not
+establish lower read/health tails or production capacity. Server CPU/RSS now includes
+the writer thread, whereas the baseline metrics excluded editor subprocesses; those
+resource totals are not directly comparable.
+
+Additional diagnostics reproduced health tails with a separate client socket pool.
+A temporary timing probe placed the delay before the server's request handler,
+after TCP connection; its instrumentation warnings are disclosed in the raw record.
+The cause of those dispatch tails remains unresolved by this writer change.
+
+Focused disposable checks verified:
+
+- FIFO publication and captured queued inputs; independent worker instances and a
+  concurrent standalone CLI retain cross-process serialization and exact readback.
+- Cached state observes external commits, rejects stale revisions and invalid trees,
+  recovers after repair, and rejects dirty worktrees without losing unrelated files.
+- A conflict in a multi-article batch leaves no partial article or commit. Changed
+  operation payloads conflict; identical retries recover the original commit after
+  subsequent edits and after the evidence service goes offline.
+- Human and agent identity stays per request. Revocation while queued or while
+  evidence is pending prevents publication; a restored grant permits retry. Revoked
+  credentials and sessions cannot recover a protected receipt.
+- Queue and external-lock waits share the existing ten-second budget. Graceful close
+  drains pending saves; idle/active worker failure restarts only after exit. A crashed
+  publisher retains the directory fence for recovery.
+- Git subprocesses launched from the worker inherit the verified managed lifecycle
+  descriptor. Killing the parent during synthetic publication leaves the orphaned Git
+  process holding that kernel fence until it exits.
+- A disposable local bare remote verifies push success, durable local commits after
+  push failure and identical-operation push retry without duplicate revisions.
+- Standalone authenticated mode fails closed when its control database is missing;
+  invalid deployment configuration retains structured writer errors.
+
+No operator data, live configuration or deployment was changed by qualification.
+These are local source observations, not release/container or hosted-storage
+acceptance. Long sustained runs, larger histories and isolated hosted CPU/storage
+remain separate qualification work.

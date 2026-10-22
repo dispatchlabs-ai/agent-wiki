@@ -372,6 +372,7 @@ export function commitFiles(
   const env = { ...process.env, GIT_INDEX_FILE: index };
   try {
     git(repo, ["read-tree", expectedHead], { env });
+    const entries = [];
     for (const [name, text] of Object.entries(files)) {
       if (
         !/^wiki\/(?:[a-z0-9-]+\/)*[a-z0-9-]+\.md$/.test(name) &&
@@ -379,12 +380,14 @@ export function commitFiles(
       )
         throw Error("Invalid write path");
       const blob = git(repo, ["hash-object", "-w", "--stdin"], { input: text });
-      git(
-        repo,
-        ["update-index", "--add", "--cacheinfo", `100644,${blob},${name}`],
-        { env },
-      );
+      entries.push(`100644 ${blob}\t${name}\n`);
     }
+    // All paths are validated above. Populate the private index in one Git
+    // invocation, amortizing process and index-lock work across atomic batches.
+    git(repo, ["update-index", "--index-info"], {
+      env,
+      input: entries.join(""),
+    });
     const tree = git(repo, ["write-tree"], { env });
     const commit = git(repo, ["commit-tree", tree, "-p", expectedHead], {
       input: message + "\n",
