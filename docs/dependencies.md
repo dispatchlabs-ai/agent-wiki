@@ -7,7 +7,8 @@ requires Node 24.22.1 or 26.12.1 for supported source installations. The Nix
 package selects Node 24.22.1, including the TLS fixes and Undici 7.30.1.
 Because Nix links shared libraries, it also selects c-ares 1.34.9 and applies
 [Brotli commit 0ed4268](https://github.com/google/brotli/commit/0ed4268a4401abcb4472096340477cf4af7d1a2b)
-to both Node and curl. Brotli still reports version 1.2.0; the patch provenance
+to both Node and curl. The HTTP/2 utilities retained through Node's build
+metadata also use c-ares 1.34.9. Brotli still reports version 1.2.0; the patch provenance
 and loaded library path establish the fix. OpenSSL 3.6.5 is retained.
 
 This is a runtime security update, independent of the npm audit. Qualification

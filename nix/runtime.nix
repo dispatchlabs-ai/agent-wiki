@@ -3,7 +3,11 @@
 { pkgs }:
 let
   openssl = pkgs.openssl_3_6;
-  nghttp2 = pkgs.nghttp2.override { inherit openssl; };
+  nghttp2 = pkgs.nghttp2.override {
+    inherit openssl;
+    # Node's retained development metadata also includes the HTTP/2 utilities.
+    c-aresMinimal = cares;
+  };
   ngtcp2 = pkgs.ngtcp2.override { inherit openssl; };
   python3 = pkgs.python3.override {
     inherit openssl;
