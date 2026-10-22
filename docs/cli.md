@@ -1,7 +1,7 @@
 # Use the wiki from a terminal
 
 The ordinary CLI is an authenticated HTTP client. It reads no content repository,
-control database or evidence archive. Install this source checkout with Node 24.19+
+control database or evidence archive. Install this source checkout with Node 24.22.1+ or 26.12.1+ (within those major versions)
 and `npm ci`, then run `node bin/wiki.mjs --help` (or `npm run wiki -- --help`).
 There is no published npm package or global executable.
 

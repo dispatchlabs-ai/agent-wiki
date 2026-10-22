@@ -18,7 +18,7 @@ build. Browser controls are bundled locally during `npm ci`. An agent client use
 
 ## Use it with your AI agent
 
-Give an agent with terminal access, Git and Node 24.19+ this prompt:
+Give an agent with terminal access, Git and Node 24.22.1+ or 26.12.1+ (within those major versions) this prompt:
 
 > Follow https://github.com/dispatchlabs-ai/agent-wiki/blob/main/docs/agent-workflow.md
 > to run Agent Wiki's synthetic example in a new directory. Use its MCP tools to
@@ -36,7 +36,7 @@ local process running. A browser is optional for the agent; you can open the URL
 
 ## Try it manually
 
-Requires **Linux or macOS, Node 24.19+, and Git**. Node's built-in SQLite
+Requires **Linux or macOS, Node 24.22.1+ or 26.12.1+ (within those major versions), and Git**. Node's built-in SQLite
 is used; no database server is needed. On Windows, run the commands in
 [Ubuntu under WSL2](docs/getting-started.md#windows-with-wsl2).
 
@@ -68,7 +68,7 @@ article-only wiki with `WIKI_CONVERSATIONS=0`; the optional conversation archive
 UI and evidence tools are disabled without deleting stored data. Existing
 installations remain enabled by default. See [the setting and its scope](docs/traces.md#enable-or-disable-conversations).
 
-**Version 0.9.6 — pre-1.0 release.** Linux and macOS are
+**Version 0.10.0 — pre-1.0 release.** Linux and macOS are
 supported; native Windows is not verified. The quickstart uses `main`, which may
 include unreleased work. See [verification](docs/onboarding-verification.md),
 [changelog](CHANGELOG.md), and [release policy](docs/releases.md).

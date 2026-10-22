@@ -13,7 +13,9 @@ complete runtime closure and does not require Nix in the running container.
 
 `flake.lock` pins Nixpkgs revision `aa48d347080940b8a2b8d2f48228674e280a3514`
 (October 5, 2026). `nix/runtime.nix` selects OpenSSL 3.6.5 for runtime consumers,
-SQLite 3.53.3 comes from that package set, and Node remains 24.21.0. Git's unused
+SQLite 3.53.3 comes from that package set. The focused runtime overrides select
+Node 24.22.1, c-ares 1.34.9, and Brotli 1.2.0 with upstream security commit
+`0ed4268a4401abcb4472096340477cf4af7d1a2b`. Git's unused
 Perl/Python extensions are disabled. See the [dependency review](dependencies.md)
 for applicability and the signed release evidence for the exact closure and
 loaded-library verification. Cached artifacts are used where compatible with

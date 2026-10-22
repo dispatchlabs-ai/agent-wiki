@@ -1,10 +1,10 @@
 {
   "name": "agent-wiki",
-  "version": "0.9.6",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24.19.0"
+    "node": ">=24.22.1 <25 || >=26.12.1 <27"
   },
   "scripts": {
     "start": "node src/server.mjs",

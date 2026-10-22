@@ -4,7 +4,7 @@ Chris Reynolds maintains this project, affiliated with Dispatch Labs AI. Discuss
 large changes with the maintainer before implementing them. Small fixes should
 explain the problem, resulting behavior, and relevant verification.
 
-Use Linux or macOS, Node 24.19 or later, and Git. Run `npm ci` and
+Use Linux or macOS, Node 24.22.1+ or 26.12.1+ (within those major versions), and Git. Run `npm ci` and
 `npm run check`. This checks generated contracts, formatting, and static types;
 `npm ci` builds browser assets. Use synthetic content and temporary repositories
 for manual verification. Never submit private wiki content, real agent traces,

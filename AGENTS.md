@@ -1,8 +1,9 @@
 # Agent guidance
 
 - Read README.md and the relevant docs before changing behavior.
-- Run `npm ci` for setup and `npm run check` before submitting changes. Linux or macOS,
-  Node 24.19+ and Git are required. `npm run example` uses synthetic data.
+- Run `npm ci` for setup and `npm run check` before submitting changes. Use Linux
+  or macOS, Git, and a supported Node version from README.md. `npm run example`
+  uses synthetic data.
 - Keep the engine independent of content and deployment. Git owns article history;
   immutable JSONL owns trace evidence; indexes and rendered caches are derived.
 - Preserve on-demand rendering of Markdown articles and JSONL conversations.
