@@ -510,3 +510,13 @@ remained open across asynchronous work.
 The cloud tasks stopped and removed their synthetic storage. Their disposable task
 definitions and log streams were removed after retaining the measurements. The
 source remains unreleased and undeployed.
+
+## Storage isolation — October 22, 2026
+
+The follow-up [controlled storage experiment](storage-performance.md) holds the
+application source, runtime and container constant while comparing task-local
+disk with S3 Files. It records repeated application loads, split control-database
+placement, focused SQLite transaction timings and kernel NFS operation counts.
+This directly tests the storage hypothesis above without comparing the hosted
+task's CPU allocation with the local workstation. It changes no production engine
+behavior or deployment.

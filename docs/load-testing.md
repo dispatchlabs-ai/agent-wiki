@@ -109,6 +109,13 @@ production content or authentication data. Local-disk timings do not predict S3
 Files latency. The existing [remote-storage measurements](article-refresh-performance.md#authorization-on-remote-storage--096)
 show why that second measurement matters.
 
+The [same-container storage experiment](storage-performance.md) compares local
+disk with S3 Files, repeats both placements in reversed order, and separately
+moves the control database while retaining the other files on their original
+filesystem. Its SQLite transaction probe also records actual NFS operation
+counts. This distinguishes a storage cost from a comparison between different
+machines; it does not turn a saturated half-vCPU load into a capacity guarantee.
+
 ## First bottleneck: loading articles for each save
 
 Before the October 22 source correction, each newly constructed `GitWiki` launched
