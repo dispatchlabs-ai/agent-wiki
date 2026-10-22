@@ -58,7 +58,7 @@
   "overrides": {
     "oauth4webapi": "3.8.7",
     "jose": "6.2.8",
-    "dompurify": "3.4.16",
+    "dompurify": "3.4.17",
     "katex": "0.18.2"
   }
 }

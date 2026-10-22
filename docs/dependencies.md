@@ -314,3 +314,10 @@ reports zero vulnerabilities. Registry sources: [Base UI](https://registry.npmjs
 [remark-directive](https://registry.npmjs.org/remark-directive),
 [remark-math](https://registry.npmjs.org/remark-math),
 [rehype-katex](https://registry.npmjs.org/rehype-katex).
+
+## October 22 release follow-up
+
+The final 0.10.0 production audit identified three new DOMPurify advisories:
+GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr and GHSA-c6gr-qvv4-5v3f.
+The transitive override is now 3.4.17, preserving the compatible sanitizer API.
+The earlier 3.4.16 audit above is historical; the release records a fresh audit.

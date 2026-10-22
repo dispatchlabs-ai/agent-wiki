@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 — 2026-10-22
+
+Breaking runtime requirement: use Node 24.22.1+ or 26.12.1+ within those major
+versions. Upgrade Node before installing; Node 25 is no longer supported.
+Persisted data, API contracts, identities, and grants require no migration.
 
 - Increase authenticated article throughput by consolidating current authorization
   queries, reading MCP agent metadata during admission, and reusing search results
@@ -23,12 +27,8 @@
   reads, searches and saves, with latency/error reporting and write correctness
   checks. See [load testing](docs/load-testing.md).
 
-## 0.10.0 — 2026-10-22
-
-Breaking runtime requirement: use Node 24.22.1+ or 26.12.1+ within those major
-versions. Upgrade Node before installing; Node 25 is no longer supported.
-Persisted data, API contracts, identities, and grants require no migration.
-
+- Patch the transitive DOMPurify dependency to 3.4.17 for the newly published
+  sanitizer advisories.
 - Package Node 24.22.1 with the October 21 security fixes, patched shared Brotli
   and c-ares 1.34.9. Preserve OpenSSL 3.6.5 and SQLite 3.53.3. Apply the same
   Brotli patch to Git's HTTP transport through curl.
