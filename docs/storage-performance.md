@@ -73,6 +73,10 @@ arrival rate. Every application run failed the runner's no-errors criterion.
 The local-storage runs also show that replacing NFS alone does not establish
 adequate capacity for 56 concurrent clients on this task. CPU allocation was not
 varied, so the experiment does not assign every remaining failure to CPU.
+The subsequent [CPU scaling experiment](cpu-scaling.md) varies 0.5, 1 and 2 vCPU
+with fixed memory, local storage and a separate load generator for each server.
+It addresses compute sizing without changing this storage experiment's results
+or establishing a production persistent-storage design.
 
 Across all eight application runs, every one of the 200 acknowledged saves was
 verified through its historical revision. All identical receipt retries and

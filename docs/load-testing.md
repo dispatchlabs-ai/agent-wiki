@@ -116,6 +116,13 @@ filesystem. Its SQLite transaction probe also records actual NFS operation
 counts. This distinguishes a storage cost from a comparison between different
 machines; it does not turn a saturated half-vCPU load into a capacity guarantee.
 
+The [separate-client CPU experiment](cpu-scaling.md) then varies the server
+between 0.5, 1 and 2 vCPU at a fixed 4 GiB, with all storage local. Each server
+has an independently allocated load generator. Two passes increase and decrease
+concurrency, retain errors, and separate writer startup from warm measurements.
+Use its per-level latency and correctness results when assessing the tested
+allocation; concurrency counts are continuous loops, not human-user counts.
+
 ## First bottleneck: loading articles for each save
 
 Before the October 22 source correction, each newly constructed `GitWiki` launched
