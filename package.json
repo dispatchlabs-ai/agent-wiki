@@ -10,6 +10,7 @@
     "start": "node src/server.mjs",
     "example": "node scripts/example.mjs",
     "benchmark:serve": "node scripts/benchmark-serve.mjs",
+    "benchmark:load": "node scripts/benchmark-load.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "check": "node scripts/contracts.mjs --check && prettier --check . && npm run typecheck",
     "format": "prettier --write .",

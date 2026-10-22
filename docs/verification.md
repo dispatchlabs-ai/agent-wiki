@@ -17,6 +17,10 @@ The [October 21 article-refresh investigation](article-refresh-performance.md)
 records focused synthetic concurrency, health-latency and recovery checks for
 the subsequent source correction. It does not establish deployed performance.
 
+Use the opt-in [concurrent load runner](load-testing.md) for synthetic authenticated
+read/write measurements and acknowledged-write checks. It is separate from
+`npm run check` and does not restore the removed application/browser test suites.
+
 ## 0.6.0 interface and authorization review — September 16, 2026
 
 The release adds a separately enforced editorial-evidence boundary, an ordinary

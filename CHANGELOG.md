@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Batch Git object reads when loading article snapshots, reducing subprocess work
+  while a save holds the writer lock. Preserve unchanged article reuse, byte
+  bounds, exact content, authorization, revisions and retry receipts.
+- Add `npm run benchmark:load` for disposable OAuth-authenticated concurrent
+  reads, searches and saves, with latency/error reporting and write correctness
+  checks. See [load testing](docs/load-testing.md).
+
 ## 0.10.0 — 2026-10-22
 
 Breaking runtime requirement: use Node 24.22.1+ or 26.12.1+ within those major

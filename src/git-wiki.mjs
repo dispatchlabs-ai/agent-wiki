@@ -82,6 +82,90 @@ export function parsePage(text, filename, blob) {
   };
 }
 
+// Read changed objects in byte-bounded batches rather than spawning Git once
+// per article. Retain the existing 4 MiB per-article read bound. Frame by bytes,
+// not lines or JavaScript character offsets, so Unicode and trailing newlines
+// survive exactly as they do with `cat-file blob`.
+function readPages(repo, entries) {
+  const pages = new Map();
+  if (!entries.length) return pages;
+  // A single incremental change already needs only one object read.
+  if (entries.length === 1) {
+    const entry = entries[0];
+    pages.set(
+      entry.filename,
+      parsePage(
+        execFileSync("git", ["-C", repo, "cat-file", "blob", entry.blob], {
+          encoding: "utf8",
+          maxBuffer: 4 * 1024 * 1024,
+          stdio: lifecycleStdio(["pipe", "pipe", "pipe"]),
+        }),
+        entry.filename,
+        entry.blob,
+      ),
+    );
+    return pages;
+  }
+  // Query sizes only for changed objects; ls-tree --long would also touch
+  // every unchanged object on remote storage after each commit.
+  const headers = git(repo, ["cat-file", "--batch-check"], {
+    input: entries.map((entry) => entry.blob).join("\n") + "\n",
+  }).split("\n");
+  if (headers.length !== entries.length)
+    throw Error("Incomplete Git object metadata");
+  entries = entries.map((entry, i) => {
+    const [blob, type, rawSize] = headers[i].split(" ");
+    const size = Number(rawSize);
+    if (
+      blob !== entry.blob ||
+      type !== "blob" ||
+      !Number.isSafeInteger(size) ||
+      size < 0
+    )
+      throw Error(`Invalid Git object metadata: ${entry.filename}`);
+    if (size > 4 * 1024 * 1024)
+      throw Error(`Article exceeds the 4 MiB read bound: ${entry.filename}`);
+    return { ...entry, size };
+  });
+  for (let start = 0; start < entries.length;) {
+    let end = start + 1,
+      bytes = entries[start].size;
+    while (end < entries.length && bytes + entries[end].size <= 4 * 1024 * 1024)
+      bytes += entries[end++].size;
+    const batch = entries.slice(start, end);
+    const output = execFileSync("git", ["-C", repo, "cat-file", "--batch"], {
+      input: batch.map((entry) => entry.blob).join("\n") + "\n",
+      maxBuffer: bytes + batch.length * 128,
+      stdio: lifecycleStdio(["pipe", "pipe", "pipe"]),
+    });
+    let offset = 0;
+    for (const entry of batch) {
+      const newline = output.indexOf(10, offset);
+      const bodyStart = newline + 1,
+        bodyEnd = bodyStart + entry.size;
+      if (
+        newline < offset ||
+        output.toString("utf8", offset, newline) !==
+          `${entry.blob} blob ${entry.size}` ||
+        output[bodyEnd] !== 10
+      )
+        throw Error(`Invalid Git object response: ${entry.filename}`);
+      pages.set(
+        entry.filename,
+        parsePage(
+          output.toString("utf8", bodyStart, bodyEnd),
+          entry.filename,
+          entry.blob,
+        ),
+      );
+      offset = bodyEnd + 1;
+    }
+    if (offset !== output.length) throw Error("Unexpected Git batch output");
+    start = end;
+  }
+  return pages;
+}
+
 export class GitWiki {
   constructor(repo = wikiRepo()) {
     this.repo = repo;
@@ -107,17 +191,16 @@ export class GitWiki {
       .filter(Boolean);
     const entries = files
       .map((line) => {
-        const [mode, type, rest] = line.split(" ");
-        const tab = rest.indexOf("\t");
+        const tab = line.indexOf("\t");
+        const [mode, type, blob] = line.slice(0, tab).split(" ");
         return {
           mode,
           type,
-          blob: rest.slice(0, tab),
-          filename: rest.slice(tab + 1),
+          blob,
+          filename: line.slice(tab + 1),
         };
       })
       .filter((e) => e.filename.endsWith(".md"));
-    const pages = new Map();
     for (const entry of entries) {
       if (
         entry.type !== "blob" ||
@@ -127,19 +210,18 @@ export class GitWiki {
         throw Error(
           `Only regular Markdown files are allowed: ${entry.filename}`,
         );
+    }
+    const changed = readPages(
+      this.repo,
+      entries.filter((entry) => {
+        const prior = this.pages.get(path.basename(entry.filename, ".md"));
+        return prior?.blob !== entry.blob || prior.filename !== entry.filename;
+      }),
+    );
+    const pages = new Map();
+    for (const entry of entries) {
       const prior = this.pages.get(path.basename(entry.filename, ".md"));
-      const page =
-        prior?.blob === entry.blob && prior.filename === entry.filename
-          ? prior
-          : parsePage(
-              execFileSync(
-                "git",
-                ["-C", this.repo, "cat-file", "blob", entry.blob],
-                { encoding: "utf8", maxBuffer: 4 * 1024 * 1024 },
-              ),
-              entry.filename,
-              entry.blob,
-            );
+      const page = changed.get(entry.filename) || prior;
       if (pages.has(page.id)) throw Error(`Duplicate article: ${page.id}`);
       pages.set(page.id, page);
     }

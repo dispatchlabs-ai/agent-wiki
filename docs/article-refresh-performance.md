@@ -149,3 +149,58 @@ same operation to succeed. Revoking a human session during the same asynchronous
 read also denied the response. No read transaction remained open across the wait.
 Independent review checked nested snapshots, exception cleanup, synchronous-only
 callbacks, cross-origin rejection and preservation of the publication fence.
+
+## Concurrent load runner and Git object batching — October 22, 2026
+
+The opt-in [load runner](load-testing.md) keeps authenticated OAuth/MCP readers,
+searches and writers active together in separate client/server processes. It
+records errors as well as latency and verifies every acknowledged revision,
+idempotent receipt retries and conflicting saves. It uses only temporary synthetic
+state and is separate from the static contributor checks.
+
+The first run exposed another cost inside the writer lock: a fresh `GitWiki`
+launched one Git process per article. The source correction batches changed-object
+metadata and content reads, retains the existing per-article byte bound, and
+preserves the one-object incremental path. It neither changes writer serialization
+nor introduces a request concurrency limit. This is an unreleased source change;
+it does not update an installed wiki.
+
+The comparison used Node 24.22.1 on macOS arm64, local temporary storage, 200 read
+articles, eight writer articles, one conflict article and approximately 2 KiB of
+body filler per article. Forty-eight readers and eight one-article writers admitted
+work for ten seconds. Baseline engine source was `1708414`; the candidate loader
+fingerprint and full results are in the [measurement JSON](benchmarks/concurrent-load-2026-10-22.json).
+These are individual observations, not production capacity or repeatability claims.
+
+| Observation                              | Baseline | Batched source |
+| ---------------------------------------- | -------: | -------------: |
+| Successful saves, including drain        |        6 |             29 |
+| Successful saves/second, including drain |    0.336 |          2.245 |
+| Save p50                                 |   5.82 s |         2.74 s |
+| Save p95                                 |  11.55 s |         5.12 s |
+| Writer-lock timeouts                     |        5 |              0 |
+| Article read p95                         |   145 ms |         154 ms |
+| Health maximum                           |   792 ms |         889 ms |
+| Measured interval, including drain       |  17.86 s |        12.92 s |
+
+The observed successful-save rate increased about 6.7 times. The server completed
+more writes, while read latency and health tails did not improve. Every acknowledged
+save, exact historical readback, retry and conflict check passed. All 127 candidate
+health probes succeeded. A preceding run of the batched algorithm also had no
+request failures, but it is not a statistical repeatability study.
+
+A separate ten-article batch run completed 18 saves and verified all 180 articles
+in 15.28 seconds including drain, with one `WRITER_BUSY` failure. Its corpus had
+281 articles because each writer owned ten articles. All 151 health probes passed.
+Larger batches amortize commit work, but this observation still shows contention;
+it is not evidence that saturation has been eliminated. Direct authenticated HTTP
+also passed a smaller eight-reader/two-writer functional run.
+
+Focused disposable Git checks passed byte batching across multiple groups,
+Unicode, embedded header-like text, trailing and absent final newlines, unchanged
+object reuse, the single-object path, the existing exact 4 MiB bound, oversized
+rejection, invalid-tree snapshot retention/recovery, duplicate IDs, symlinks,
+invalid filenames, packed objects and historical revisions. No operator content
+or authentication data was used. Contract, formatting and static type checks
+passed. Hosted storage, Linux container resource quotas, releases and deployment
+remain separate qualification work.
