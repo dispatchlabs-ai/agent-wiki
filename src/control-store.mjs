@@ -18,6 +18,8 @@ export const digest = (value) =>
   createHash("sha256").update(value).digest("hex");
 export const secret = () => randomBytes(32).toString("base64url");
 export class ControlStore {
+  #statements = new Map();
+
   constructor(filename) {
     if (!filename) throw Error("A control database is required");
     filename = filename === ":memory:" ? filename : path.resolve(filename);
@@ -47,6 +49,15 @@ export class ControlStore {
       CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, actor TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL);
     `);
     installMfaSchema(this.db);
+  }
+  /** Reuse fixed parameterized SQL, never authorization results or bound values. */
+  prepare(sql) {
+    let statement = this.#statements.get(sql);
+    if (!statement) {
+      statement = this.db.prepare(sql);
+      this.#statements.set(sql, statement);
+    }
+    return statement;
   }
   transaction(fn) {
     this.db.exec("BEGIN IMMEDIATE");
@@ -373,11 +384,9 @@ export class ControlStore {
   authenticate(token) {
     if (!token) return null;
     return (
-      this.db
-        .prepare(
-          "SELECT p.*,s.csrf,s.expires,ms.primary_at,ms.mfa_at FROM sessions s JOIN principals p ON p.id=s.principal LEFT JOIN mfa_sessions ms ON ms.hash=s.hash AND ms.principal=s.principal WHERE s.hash=? AND s.expires>? AND p.active=1 AND p.kind='human' AND (NOT EXISTS(SELECT 1 FROM mfa_factors f WHERE f.principal=p.id) OR ms.mfa_at>0)",
-        )
-        .get(digest(token), Date.now()) || null
+      this.prepare(
+        "SELECT p.*,s.csrf,s.expires,ms.primary_at,ms.mfa_at FROM sessions s JOIN principals p ON p.id=s.principal LEFT JOIN mfa_sessions ms ON ms.hash=s.hash AND ms.principal=s.principal WHERE s.hash=? AND s.expires>? AND p.active=1 AND p.kind='human' AND (NOT EXISTS(SELECT 1 FROM mfa_factors f WHERE f.principal=p.id) OR ms.mfa_at>0)",
+      ).get(digest(token), Date.now()) || null
     );
   }
   logout(token) {
@@ -386,11 +395,9 @@ export class ControlStore {
   }
   role(principal, space = "default") {
     return (
-      this.db
-        .prepare(
-          "SELECT g.role FROM grants g JOIN principals p ON p.id=g.principal WHERE g.space=? AND g.principal=? AND p.active=1",
-        )
-        .get(space, principal)?.role || null
+      this.prepare(
+        "SELECT g.role FROM grants g JOIN principals p ON p.id=g.principal WHERE g.space=? AND g.principal=? AND p.active=1",
+      ).get(space, principal)?.role || null
     );
   }
   require(principal, role = "reader") {
@@ -485,5 +492,6 @@ export class ControlStore {
   }
   close() {
     this.db.close();
+    this.#statements.clear();
   }
 }

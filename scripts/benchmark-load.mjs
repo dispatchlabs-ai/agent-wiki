@@ -573,6 +573,10 @@ async function run() {
           "writer-lock",
           "writer",
           "writer-worker",
+          "control-store",
+          "agent-store",
+          "wiki-search",
+          "mcp-response",
           "server",
         ]
           .filter((name) =>

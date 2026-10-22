@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reduce read and health latency under concurrent load by reusing compiled
+  authorization queries and extracting search snippets only for returned results.
+  Keep live permission checks, ranking, pagination and consistent search snapshots.
+  See [read/health measurements](docs/article-refresh-performance.md#read-and-health-latency--october-22-2026).
 - Reuse one background writer per server, serving saves in arrival order and
   refreshing its parsed snapshot under the existing Git lock. Keep fresh
   authorization checks, the ten-second wait budget, atomic batches and retry

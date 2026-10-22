@@ -1818,7 +1818,7 @@ export function createWiki({
         return control.read(() => {
           const { actor } = agentAuth.bearer(header);
           const agent = agentAuth.agents.get(actor.id);
-          const definition = control.db
+          const definition = control
             .prepare("SELECT config FROM agent_definitions WHERE id=?")
             .get(actor.definition);
           return {

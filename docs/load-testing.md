@@ -138,3 +138,16 @@ compare mixed traffic, ten-article batches and a fixed 32-writer burst against t
 batched-reader baseline. Longer runs and isolated hosted-storage qualification
 remain useful next steps. A local successful burst does not establish unlimited
 writer capacity or remove the documented `WRITER_BUSY` retry path.
+
+## Read and health latency
+
+The subsequent October 22 correction reuses compiled authorization statements
+while executing every permission query against current state. Search ranks the
+same 400-section candidate set and groups it by article, then extracts snippets
+only for the requested page. Candidate selection and snippets share one SQLite
+snapshot. There is no new request queue or concurrency cap.
+
+[Read/health measurements and parity checks](article-refresh-performance.md#read-and-health-latency--october-22-2026)
+compare the persistent-writer baseline with the optimized read path, including
+repeated mixed/batch profiles and a longer mixed run. The runner fingerprints the
+authorization, search and MCP bridge source alongside the writer and article loader.

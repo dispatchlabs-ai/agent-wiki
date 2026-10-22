@@ -25,6 +25,10 @@ characters / 30 terms. Results group a bounded 400-section candidate set by arti
 exhaustive count. Empty queries list articles within the same bound. SQL/FTS operators
 are not accepted as executable query syntax.
 
+Ranking and article grouping select the requested page before extracting its
+snippets. Both steps use one index snapshot, preserving the winning section and
+snippet even if an index update publishes concurrently.
+
 ### Selective article reads
 
 Current and historical article reads accept optional `section` and `fields` query

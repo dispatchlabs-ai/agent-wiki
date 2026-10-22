@@ -270,6 +270,9 @@ A temporary timing probe placed the delay before the server's request handler,
 after TCP connection; its instrumentation warnings are disclosed in the raw record.
 The cause of those dispatch tails remains unresolved by this writer change.
 
+The subsequent [read/health correction](#read-and-health-latency--october-22-2026)
+reduces steady request costs and documents the remaining connection-acceptance tail.
+
 Focused disposable checks verified:
 
 - FIFO publication and captured queued inputs; independent worker instances and a
@@ -297,3 +300,92 @@ No operator data, live configuration or deployment was changed by qualification.
 These are local source observations, not release/container or hosted-storage
 acceptance. Long sustained runs, larger histories and isolated hosted CPU/storage
 remain separate qualification work.
+
+## Read and health latency — October 22, 2026
+
+The next correction reduces synchronous read-path work while retaining the writer
+change above. A main-thread profile of the `f75a5e0` baseline attributed 28.1% of
+samples to SQLite statement preparation and 21.0% to result extraction, almost
+all in article search. These percentages include idle samples and are diagnostic
+sample counts, not wall-clock CPU attribution. Connection reuse was already
+working: the profiled baseline handled 7,023 external/internal requests with 119
+new connections. The MCP bridge remains unchanged.
+
+`ControlStore.prepare` retains compiled, fixed parameterized statements for hot
+authorization reads. Each invocation executes again with current inputs and time;
+no identity, scope, grant, query result or permission decision is cached. Admission,
+response and publication checks retain their existing transaction boundaries.
+Each connection owns its statements, which are released when it closes.
+
+Search still selects the same ranked 400-section candidate set, prefers exact
+titles, groups by article and applies the requested offset/limit. It now generates
+snippets only for the returned articles, using each article's original winning
+passage. Both steps share the adopted WAL snapshot; standalone readers open a
+short read transaction when they do not already own one. FTS row IDs are bound as
+SQLite integers because JavaScript numbers bind as REAL. A parity check caught
+the incorrect passage selection caused by a REAL equality binding before the
+final qualification runs. There is no index migration or new concurrency limit.
+
+The [raw record](benchmarks/read-health-latency-2026-10-22.json) retains the baseline,
+five qualified runs with matching engine hashes, profile summaries, a connection
+timing diagnostic and correctness results. All runs used Node 24.22.1 on macOS
+arm64, local disposable storage, OAuth MCP, 48 readers and eight writers. The
+primary profiles used a ten-second admission window, approximately 2 KiB per
+article, and either one-article saves (209 articles) or ten-article saves (281
+articles). Rates include drain. Runs were sequential, with no measured retries.
+
+| Workload / observation                | `f75a5e0` baseline | Optimized source |
+| ------------------------------------- | -----------------: | ---------------: |
+| One-article saves: read p95           |           168.9 ms |          89.4 ms |
+| One-article saves: reads/second       |              253.2 |            659.0 |
+| One-article saves: health p95         |           406.3 ms |          15.4 ms |
+| One-article saves: health maximum     |           770.1 ms |          29.5 ms |
+| One-article saves: event-loop maximum |            63.3 ms |          28.9 ms |
+| One-article saves: saves/second       |              3.747 |            4.215 |
+| Ten-article saves: read p95           |           209.0 ms |         112.0 ms |
+| Ten-article saves: reads/second       |              185.0 |            567.3 |
+| Ten-article saves: health p95         |            70.7 ms |          16.3 ms |
+| Ten-article saves: health maximum     |            93.8 ms |          19.4 ms |
+| Ten-article saves: event-loop maximum |            99.7 ms |          45.3 ms |
+| Ten-article saves: saves/second       |              1.666 |            2.015 |
+
+Read p95 fell about 47% for single-article saves and 46% for batches; read throughput
+increased 2.60× and 3.07× respectively. A repeated mixed run measured 93.3 ms read
+p95 and 15.1 ms health p95; a repeated batch measured 113.8 ms and 17.3 ms. The
+30-second mixed run completed 121 saves with 108.5 ms read p95, 15.6 ms health p95
+and a 36.1 ms health maximum. Across the five runs, all 272 saves, 758 historical
+article readbacks and 819 health probes passed, with no measured request errors.
+Every run also passed receipt retry and four-way revision-conflict checks. A final
+diagnostic profile reduced statement-preparation samples to 1.5% while handling
+17,567 external/internal requests with 111 new connections.
+
+The maximum health delay is **not eliminated**. One repeated batch had a 620.7 ms
+outlier even though its health p99 was 20.2 ms. A separate health-only timing probe
+reproduced a 427.2 ms response: the client connected in 0.49 ms, the server emitted
+its connection event after 403.5 ms, and its request event after 425.9 ms. The
+remaining tail is therefore before request handling, predominantly before socket
+acceptance is delivered to the server. The underlying scheduler/kernel mechanism
+was not established. No platform configuration was changed. These observations
+support lower read/health p95; they do not establish a worst-case latency bound,
+a soak test, or hosted-storage capacity.
+
+Focused disposable verification additionally covered:
+
+- 389 exact search-result comparisons against the old implementation over a
+  480-article fixture, including ordering, scores, snippets, anchors, prefixes,
+  phrases, Unicode, missing/empty queries, topic/task filters, exact-title
+  preference, grouping, truncation and pagination; six invalid-input comparisons.
+- Index publication, deletion and recreation with pinned readers. A standalone
+  read retained matching candidates/snippets when another connection published
+  between the two steps; its next read adopted the update. Invalid standalone
+  input released the temporary read transaction.
+- One hundred warmed OAuth authorization calls still executed 1,200 queries and
+  compiled no additional statements. Changes from another connection were visible
+  to the next check: grants, session logout, remote-grant revocation, stopped runs,
+  runtime-key and delegation revocation, expiry and disabled principals. Existing
+  snapshots remained consistent, outer write transactions stayed open, and
+  asynchronous snapshot callbacks were rejected.
+
+Contract, formatting and static type checks passed. The synthetic fixtures,
+diagnostic scripts and databases were removed. This is unreleased source work;
+hosted-storage, container and deployment qualification remain separate.

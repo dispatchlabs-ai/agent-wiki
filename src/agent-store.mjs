@@ -212,7 +212,7 @@ export class AgentStore {
   }
   principal(id) {
     return (
-      this.db
+      this.control
         .prepare("SELECT * FROM principals WHERE id=? AND active=1")
         .get(id) || fail()
     );
@@ -229,7 +229,7 @@ export class AgentStore {
   }
   get(id) {
     return (
-      this.db
+      this.control
         .prepare(
           "SELECT a.*,p.name FROM agents a JOIN principals p ON p.id=a.id WHERE a.id=? AND p.active=1",
         )
@@ -241,7 +241,7 @@ export class AgentStore {
     const a = this.get(agent);
     return (
       a.owner === actor ||
-      !!this.db
+      !!this.control
         .prepare(
           "SELECT 1 FROM agent_permissions WHERE agent=? AND principal=? AND permission=?",
         )
@@ -395,7 +395,7 @@ export class AgentStore {
     });
   }
   delegation(id, agent) {
-    const d = this.db
+    const d = this.control
       .prepare(
         "SELECT * FROM agent_delegations WHERE id=? AND agent=? AND active=1 AND expires>?",
       )
@@ -481,7 +481,7 @@ export class AgentStore {
   }
   run(id) {
     const r =
-      this.db
+      this.control
         .prepare(
           "SELECT * FROM agent_runs WHERE id=? AND active=1 AND expires>?",
         )
@@ -609,13 +609,13 @@ export class AgentStore {
   key(agent, kid) {
     this.get(agent);
     const k =
-      this.db
+      this.control
         .prepare(
           "SELECT jwk FROM agent_keys WHERE agent=? AND kid=? AND active=1",
         )
         .get(agent, kid) || fail();
     const authorization = JSON.parse(
-      this.db
+      this.control
         .prepare("SELECT authorization FROM agent_keys WHERE agent=? AND kid=?")
         .get(agent, kid).authorization,
     );
@@ -737,7 +737,7 @@ export class AgentStore {
     });
   }
   authenticate(token, audience) {
-    const row = this.db
+    const row = this.control
       .prepare(
         "SELECT * FROM agent_tokens WHERE hash=? AND audience=? AND expires>?",
       )
@@ -746,7 +746,7 @@ export class AgentStore {
     const r = this.run(row.run);
     this.key(r.agent, row.kid);
     const enrollment = JSON.parse(
-      this.db
+      this.control
         .prepare("SELECT authorization FROM agent_keys WHERE agent=? AND kid=?")
         .get(r.agent, row.kid).authorization,
     );
@@ -763,7 +763,7 @@ export class AgentStore {
     };
   }
   authenticateRemote(token, audience) {
-    const row = this.db
+    const row = this.control
       .prepare(
         "SELECT g.*,t.expires token_expires FROM remote_tokens t JOIN remote_grants g ON g.id=t.grant_id WHERE t.hash=? AND t.kind='access' AND t.expires>? AND g.expires>? AND g.active=1",
       )

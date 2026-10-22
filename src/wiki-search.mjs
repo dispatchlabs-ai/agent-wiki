@@ -28,6 +28,9 @@ export class WikiSearch {
       );
       this.db.prepare("INSERT INTO meta VALUES('schema',?)").run(SCHEMA);
     }
+    this.snippets = this.db.prepare(
+      "SELECT snippet(passages,6,'','',' … ',30) AS snippet FROM passages WHERE passages MATCH ? AND rowid=?",
+    );
   }
   // Keep serving queries on the same WAL snapshot as the adopted article tree.
   // The refresh connection may publish a newer index in parallel; it becomes
@@ -128,7 +131,18 @@ export class WikiSearch {
       )
       .all(id);
   }
-  search(query, { topic = "", state = "", limit = 20, offset = 0 } = {}) {
+  search(query, options = {}) {
+    // Hosted readers already pin their adopted index. Standalone readers also
+    // need one snapshot across candidate selection and snippet extraction.
+    if (this.db.isTransaction) return this.#search(query, options);
+    this.db.exec("BEGIN");
+    try {
+      return this.#search(query, options);
+    } finally {
+      this.db.exec("ROLLBACK");
+    }
+  }
+  #search(query, { topic = "", state = "", limit = 20, offset = 0 } = {}) {
     const start = performance.now();
     if (
       typeof query !== "string" ||
@@ -153,19 +167,19 @@ export class WikiSearch {
     if (match) {
       rows = this.db
         .prepare(
-          `SELECT article AS id, anchor, heading, snippet(passages,6,'','',' … ',30) AS snippet,
+          `SELECT article AS id, anchor, heading, passages.rowid AS passage,
           rank AS score, p.title,p.description,p.topic
         FROM passages JOIN pages p ON p.id=passages.article
         WHERE passages MATCH ? AND rank MATCH 'bm25(0,0,0,12,10,5,1)' AND (?='' OR p.topic=?) AND (?='' OR instr(passages.states,?)>0)
         ORDER BY rank LIMIT 400`,
         )
         .all(match, topic, topic, state, state);
+      const title = query.trim().toLowerCase();
       rows.sort(
         (a, b) =>
-          Number(String(b.title).toLowerCase() === query.trim().toLowerCase()) -
-            Number(
-              String(a.title).toLowerCase() === query.trim().toLowerCase(),
-            ) || Number(a.score) - Number(b.score),
+          Number(String(b.title).toLowerCase() === title) -
+            Number(String(a.title).toLowerCase() === title) ||
+          Number(a.score) - Number(b.score),
       );
     } else {
       rows = this.db
@@ -176,18 +190,25 @@ export class WikiSearch {
         .all(topic, topic, state, state);
     }
     const unique = new Map();
-    for (const row of rows)
-      if (!unique.has(row.id))
-        unique.set(row.id, {
-          ...row,
-          url: `/wiki/${row.id}/${row.anchor ? "#" + row.anchor : ""}`,
-        });
+    for (const row of rows) if (!unique.has(row.id)) unique.set(row.id, row);
     const all = [...unique.values()];
+    // Keep the same ranked candidates and winning passage for each article.
+    // Extract snippets only for the requested page, on this same WAL snapshot.
+    const articles = all
+      .slice(offset, offset + limit)
+      .map(({ passage, ...row }) => ({
+        ...row,
+        // Bind the FTS rowid as INTEGER; JavaScript numbers bind as REAL.
+        ...(match
+          ? { snippet: this.snippets.get(match, BigInt(passage)).snippet }
+          : {}),
+        url: `/wiki/${row.id}/${row.anchor ? "#" + row.anchor : ""}`,
+      }));
     return {
       total: all.length,
       truncated: rows.length === 400,
       nextOffset: offset + limit < all.length ? offset + limit : null,
-      articles: all.slice(offset, offset + limit),
+      articles,
       milliseconds: performance.now() - start,
     };
   }

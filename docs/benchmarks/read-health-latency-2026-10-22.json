@@ -1,0 +1,1262 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-22",
+  "baselineCommit": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+  "sourceNote": "All five qualification runs use the same source fingerprints, including the standalone search snapshot and INTEGER FTS rowid binding. Baseline read-path hashes below are reconstructed from the exact baseline commit because the earlier load runner did not fingerprint those files. No production content, proxies, remote pushes, or remote filesystems were used.",
+  "baselineReadPathSha256": {
+    "control-store": "978740375cedf3718dbd8ef17ef21d5a9fb25ac06a526b045549f8a0b17758c7",
+    "agent-store": "548e962141a0fcff61e446c811fe3fe64008ef394603f99fa12164132827d451",
+    "wiki-search": "67db8bbd7e0b0519227a935499b6b11fce3a84dc6e702c020c7b90e083ab85b0",
+    "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+    "server": "c0e97ac10d728960c4050179d4775b6ec8d948f0bf81d58e8068b38abe884ab8"
+  },
+  "baseline": {
+    "mixed": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "server": "c0e97ac10d728960c4050179d4775b6ec8d948f0bf81d58e8068b38abe884ab8"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 1,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 209,
+      "elapsedSeconds": 11.743644084,
+      "drainSeconds": 1.7436440839999996,
+      "operations": {
+        "read": {
+          "count": 2973,
+          "p50Ms": 124.87487499999997,
+          "p95Ms": 168.88991600000008,
+          "p99Ms": 175.17462500000056,
+          "maxMs": 795.5721669999998,
+          "perSecond": 253.15821722241495
+        },
+        "writeRead": {
+          "count": 44,
+          "p50Ms": 110.56933299999992,
+          "p95Ms": 871.6779579999998,
+          "p99Ms": 875.1267909999999,
+          "maxMs": 875.1267909999999,
+          "perSecond": 3.746707553913978
+        },
+        "search": {
+          "count": 742,
+          "p50Ms": 125.22391700000003,
+          "p95Ms": 170.16512499999953,
+          "p99Ms": 175.05458400000043,
+          "maxMs": 609.0438330000002,
+          "perSecond": 63.18311375009481
+        },
+        "health": {
+          "count": 116,
+          "p50Ms": 19.99420900000041,
+          "p95Ms": 406.259583,
+          "p99Ms": 673.5335409999998,
+          "maxMs": 770.137416,
+          "perSecond": 9.877683551227761
+        },
+        "save": {
+          "count": 44,
+          "p50Ms": 1925.8554170000002,
+          "p95Ms": 1998.7795419999993,
+          "p99Ms": 2002.7868749999989,
+          "maxMs": 2002.7868749999989,
+          "perSecond": 3.746707553913978
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 60.751871,
+        "eventLoopMaxMs": 63.307775,
+        "sampledPeakRssMiB": 641.234375,
+        "cpuCorePercent": 96.08958461970936
+      },
+      "correctness": {
+        "acknowledgedSaves": 44,
+        "verifiedArticles": 44,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    },
+    "batch": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "server": "c0e97ac10d728960c4050179d4775b6ec8d948f0bf81d58e8068b38abe884ab8"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 10,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 281,
+      "elapsedSeconds": 13.8057045,
+      "drainSeconds": 3.805704499999999,
+      "operations": {
+        "read": {
+          "count": 2554,
+          "p50Ms": 144.35512500000004,
+          "p95Ms": 209.04050000000007,
+          "p99Ms": 230.8184170000004,
+          "maxMs": 1105.1257079999998,
+          "perSecond": 184.99599205531308
+        },
+        "writeRead": {
+          "count": 230,
+          "p50Ms": 155.30408399999942,
+          "p95Ms": 2402.355,
+          "p99Ms": 2402.8772499999995,
+          "maxMs": 2402.996792,
+          "perSecond": 16.659780020642916
+        },
+        "health": {
+          "count": 136,
+          "p50Ms": 19.99016599999959,
+          "p95Ms": 70.72520799999984,
+          "p99Ms": 83.72083299999986,
+          "maxMs": 93.83245800000077,
+          "perSecond": 9.851000360032334
+        },
+        "search": {
+          "count": 638,
+          "p50Ms": 144.7016249999997,
+          "p95Ms": 209.14900000000034,
+          "p99Ms": 230.76508300000023,
+          "maxMs": 712.3389160000002,
+          "perSecond": 46.21278110073992
+        },
+        "save": {
+          "count": 23,
+          "p50Ms": 3889.043416999999,
+          "p95Ms": 4103.322832999999,
+          "p99Ms": 4111.503500000001,
+          "maxMs": 4111.503500000001,
+          "perSecond": 1.6659780020642918
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 77.332479,
+        "eventLoopMaxMs": 99.745791,
+        "sampledPeakRssMiB": 728.515625,
+        "cpuCorePercent": 90.60271990032449
+      },
+      "correctness": {
+        "acknowledgedSaves": 23,
+        "verifiedArticles": 230,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    }
+  },
+  "qualified": {
+    "mixed": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "control-store": "7bd87135ea1f9617b50310d25d8fa722911c198636e2782516b374e15c9918bf",
+        "agent-store": "99e4bb5229bff471f51a93c61297225f4472f399ee3f0f48c7bcd07229e3f79d",
+        "wiki-search": "7a8f07f2caa6c003dc1e7e8a07780de131a457f1d64e8fa1a970746a8d6d59fd",
+        "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+        "server": "586c7849dcab676b92383b8c7cb576eaa2591d72585bee88cb538ce30c9bb9e4"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 1,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 209,
+      "elapsedSeconds": 11.861361375,
+      "drainSeconds": 1.8613613749999995,
+      "operations": {
+        "read": {
+          "count": 7817,
+          "p50Ms": 40.22975000000042,
+          "p95Ms": 89.39987500000097,
+          "p99Ms": 106.5916670000006,
+          "maxMs": 108.09879099999989,
+          "perSecond": 659.0305912503235
+        },
+        "search": {
+          "count": 1956,
+          "p50Ms": 40.61795799999982,
+          "p95Ms": 91.7358750000003,
+          "p99Ms": 106.57775000000038,
+          "maxMs": 108.10054200000013,
+          "perSecond": 164.90518568320746
+        },
+        "writeRead": {
+          "count": 50,
+          "p50Ms": 35.428750000000036,
+          "p95Ms": 108.04049999999984,
+          "p99Ms": 113.07404199999996,
+          "maxMs": 113.07404199999996,
+          "perSecond": 4.21536773218833
+        },
+        "health": {
+          "count": 117,
+          "p50Ms": 4.217749999999796,
+          "p95Ms": 15.391375000000153,
+          "p99Ms": 22.267749999999978,
+          "maxMs": 29.515791000000036,
+          "perSecond": 9.863960493320691
+        },
+        "save": {
+          "count": 50,
+          "p50Ms": 1772.5779590000002,
+          "p95Ms": 1866.2794580000004,
+          "p99Ms": 2214.87175,
+          "maxMs": 2214.87175,
+          "perSecond": 4.21536773218833
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 25.411583,
+        "eventLoopMaxMs": 28.884991,
+        "sampledPeakRssMiB": 611.875,
+        "cpuCorePercent": 84.57652540944721
+      },
+      "correctness": {
+        "acknowledgedSaves": 50,
+        "verifiedArticles": 50,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    },
+    "batch": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "control-store": "7bd87135ea1f9617b50310d25d8fa722911c198636e2782516b374e15c9918bf",
+        "agent-store": "99e4bb5229bff471f51a93c61297225f4472f399ee3f0f48c7bcd07229e3f79d",
+        "wiki-search": "7a8f07f2caa6c003dc1e7e8a07780de131a457f1d64e8fa1a970746a8d6d59fd",
+        "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+        "server": "586c7849dcab676b92383b8c7cb576eaa2591d72585bee88cb538ce30c9bb9e4"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 10,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 281,
+      "elapsedSeconds": 13.397589875,
+      "drainSeconds": 3.3975898749999995,
+      "operations": {
+        "read": {
+          "count": 7600,
+          "p50Ms": 42.81354199999987,
+          "p95Ms": 111.96858400000019,
+          "p99Ms": 126.84445899999992,
+          "maxMs": 318.47683400000005,
+          "perSecond": 567.2662076469184
+        },
+        "writeRead": {
+          "count": 270,
+          "p50Ms": 45.89862500000072,
+          "p95Ms": 537.2029580000001,
+          "p99Ms": 653.54575,
+          "maxMs": 653.6162920000002,
+          "perSecond": 20.15287842956157
+        },
+        "search": {
+          "count": 1899,
+          "p50Ms": 42.891791999999896,
+          "p95Ms": 111.98350000000028,
+          "p99Ms": 127.82637499999964,
+          "maxMs": 136.41504200000054,
+          "perSecond": 141.74191162124973
+        },
+        "health": {
+          "count": 132,
+          "p50Ms": 2.9969579999997222,
+          "p95Ms": 16.28262500000028,
+          "p99Ms": 18.89495900000111,
+          "maxMs": 19.40045899999859,
+          "perSecond": 9.852518343341213
+        },
+        "save": {
+          "count": 27,
+          "p50Ms": 3732.2453749999995,
+          "p95Ms": 3771.121,
+          "p99Ms": 3786.5039579999993,
+          "maxMs": 3786.5039579999993,
+          "perSecond": 2.015287842956157
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 28.606463,
+        "eventLoopMaxMs": 45.285375,
+        "sampledPeakRssMiB": 770.875,
+        "cpuCorePercent": 88.5945722769765
+      },
+      "correctness": {
+        "acknowledgedSaves": 27,
+        "verifiedArticles": 270,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    },
+    "mixed-repeat": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "control-store": "7bd87135ea1f9617b50310d25d8fa722911c198636e2782516b374e15c9918bf",
+        "agent-store": "99e4bb5229bff471f51a93c61297225f4472f399ee3f0f48c7bcd07229e3f79d",
+        "wiki-search": "7a8f07f2caa6c003dc1e7e8a07780de131a457f1d64e8fa1a970746a8d6d59fd",
+        "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+        "server": "586c7849dcab676b92383b8c7cb576eaa2591d72585bee88cb538ce30c9bb9e4"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 1,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 209,
+      "elapsedSeconds": 11.705637792000001,
+      "drainSeconds": 1.705637792000001,
+      "operations": {
+        "read": {
+          "count": 7708,
+          "p50Ms": 39.742707999999766,
+          "p95Ms": 93.31049999999959,
+          "p99Ms": 109.43908399999964,
+          "maxMs": 113.3819999999996,
+          "perSecond": 658.4861189936945
+        },
+        "writeRead": {
+          "count": 47,
+          "p50Ms": 34.324125000000095,
+          "p95Ms": 72.6488330000002,
+          "p99Ms": 72.80508299999997,
+          "maxMs": 72.80508299999997,
+          "perSecond": 4.015159262156674
+        },
+        "search": {
+          "count": 1926,
+          "p50Ms": 40.02708299999995,
+          "p95Ms": 94.09541699999863,
+          "p99Ms": 109.43675000000007,
+          "maxMs": 113.35224999999991,
+          "perSecond": 164.5361008279522
+        },
+        "health": {
+          "count": 116,
+          "p50Ms": 4.49487500000032,
+          "p95Ms": 15.12079100000119,
+          "p99Ms": 20.503917,
+          "maxMs": 21.151874999999563,
+          "perSecond": 9.909754774684556
+        },
+        "save": {
+          "count": 47,
+          "p50Ms": 1868.157542,
+          "p95Ms": 1953.6017080000001,
+          "p99Ms": 2260.840708,
+          "maxMs": 2260.840708,
+          "perSecond": 4.015159262156674
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 25.165823,
+        "eventLoopMaxMs": 27.983871,
+        "sampledPeakRssMiB": 615.71875,
+        "cpuCorePercent": 83.86377067732711
+      },
+      "correctness": {
+        "acknowledgedSaves": 47,
+        "verifiedArticles": 47,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    },
+    "batch-repeat": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "control-store": "7bd87135ea1f9617b50310d25d8fa722911c198636e2782516b374e15c9918bf",
+        "agent-store": "99e4bb5229bff471f51a93c61297225f4472f399ee3f0f48c7bcd07229e3f79d",
+        "wiki-search": "7a8f07f2caa6c003dc1e7e8a07780de131a457f1d64e8fa1a970746a8d6d59fd",
+        "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+        "server": "586c7849dcab676b92383b8c7cb576eaa2591d72585bee88cb538ce30c9bb9e4"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 10,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 281,
+      "elapsedSeconds": 13.856502125,
+      "drainSeconds": 3.8565021250000004,
+      "operations": {
+        "read": {
+          "count": 7518,
+          "p50Ms": 42.80216599999994,
+          "p95Ms": 113.78095899999971,
+          "p99Ms": 134.1890840000001,
+          "maxMs": 590.351459,
+          "perSecond": 542.5611696357315
+        },
+        "writeRead": {
+          "count": 270,
+          "p50Ms": 41.522249999999985,
+          "p95Ms": 625.421875,
+          "p99Ms": 750.6903749999999,
+          "maxMs": 750.8115,
+          "perSecond": 19.485437057947262
+        },
+        "search": {
+          "count": 1878,
+          "p50Ms": 42.85129099999904,
+          "p95Ms": 113.77987500000017,
+          "p99Ms": 134.22591600000032,
+          "maxMs": 139.84087499999987,
+          "perSecond": 135.5320399808332
+        },
+        "health": {
+          "count": 137,
+          "p50Ms": 3.2210000000000036,
+          "p95Ms": 17.303625000000466,
+          "p99Ms": 20.20445799999925,
+          "maxMs": 620.7302909999999,
+          "perSecond": 9.88705509977324
+        },
+        "save": {
+          "count": 27,
+          "p50Ms": 3830.389083,
+          "p95Ms": 3915.7393329999995,
+          "p99Ms": 3938.1717499999995,
+          "maxMs": 3938.1717499999995,
+          "perSecond": 1.9485437057947264
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 28.540927,
+        "eventLoopMaxMs": 59.473919,
+        "sampledPeakRssMiB": 757.390625,
+        "cpuCorePercent": 85.4923155534968
+      },
+      "correctness": {
+        "acknowledgedSaves": 27,
+        "verifiedArticles": 270,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    },
+    "mixed-sustained": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "control-store": "7bd87135ea1f9617b50310d25d8fa722911c198636e2782516b374e15c9918bf",
+        "agent-store": "99e4bb5229bff471f51a93c61297225f4472f399ee3f0f48c7bcd07229e3f79d",
+        "wiki-search": "7a8f07f2caa6c003dc1e7e8a07780de131a457f1d64e8fa1a970746a8d6d59fd",
+        "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+        "server": "586c7849dcab676b92383b8c7cb576eaa2591d72585bee88cb538ce30c9bb9e4"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 30,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 1,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 209,
+      "elapsedSeconds": 32.005887125,
+      "drainSeconds": 2.005887125000001,
+      "operations": {
+        "read": {
+          "count": 21521,
+          "p50Ms": 40.685333000001265,
+          "p95Ms": 108.46929099999943,
+          "p99Ms": 128.27979200000118,
+          "maxMs": 376.2210419999974,
+          "perSecond": 672.4075453977906
+        },
+        "search": {
+          "count": 5379,
+          "p50Ms": 40.790250000000924,
+          "p95Ms": 108.74220799999966,
+          "p99Ms": 128.24733299999934,
+          "maxMs": 376.22991699999693,
+          "perSecond": 168.06283103455766
+        },
+        "writeRead": {
+          "count": 121,
+          "p50Ms": 35.66375000000153,
+          "p95Ms": 70.63550000000009,
+          "p99Ms": 70.96087499999999,
+          "maxMs": 86.32200000000012,
+          "perSecond": 3.7805544813499683
+        },
+        "health": {
+          "count": 317,
+          "p50Ms": 3.8802919999998267,
+          "p95Ms": 15.605665999999928,
+          "p99Ms": 18.226749999997992,
+          "maxMs": 36.0586659999999,
+          "perSecond": 9.904427856098676
+        },
+        "save": {
+          "count": 121,
+          "p50Ms": 1993.4131250000028,
+          "p95Ms": 2808.3417500000032,
+          "p99Ms": 3036.4173340000016,
+          "maxMs": 3068.130916000002,
+          "perSecond": 3.7805544813499683
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 25.804799,
+        "eventLoopMaxMs": 67.010559,
+        "sampledPeakRssMiB": 665.765625,
+        "cpuCorePercent": 80.60596704578725
+      },
+      "correctness": {
+        "acknowledgedSaves": 121,
+        "verifiedArticles": 121,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    }
+  },
+  "totals": {
+    "acknowledgedSaves": 272,
+    "verifiedArticles": 758,
+    "healthProbes": 819,
+    "measuredErrors": 0
+  },
+  "diagnostics": {
+    "baselineCpu": {
+      "totalSamples": 9319,
+      "selfSamplePercentByFunction": [
+        {
+          "function": "prepare",
+          "source": "",
+          "line": 0,
+          "samples": 2622,
+          "percent": 28.136066101513038
+        },
+        {
+          "function": "all",
+          "source": "",
+          "line": 0,
+          "samples": 1956,
+          "percent": 20.989376542547483
+        },
+        {
+          "function": "(idle)",
+          "source": "",
+          "line": 0,
+          "samples": 1578,
+          "percent": 16.93314733340487
+        },
+        {
+          "function": "get",
+          "source": "",
+          "line": 0,
+          "samples": 513,
+          "percent": 5.504882498122116
+        },
+        {
+          "function": "(garbage collector)",
+          "source": "",
+          "line": 0,
+          "samples": 467,
+          "percent": 5.011267303358729
+        },
+        {
+          "function": "run",
+          "source": "src/agent-store.mjs",
+          "line": 482,
+          "samples": 207,
+          "percent": 2.2212683764352397
+        },
+        {
+          "function": "search",
+          "source": "src/wiki-search.mjs",
+          "line": 131,
+          "samples": 170,
+          "percent": 1.8242300676038201
+        },
+        {
+          "function": "WikiError",
+          "source": "src/errors.mjs",
+          "line": 3,
+          "samples": 92,
+          "percent": 0.9872303895267732
+        },
+        {
+          "function": "writev",
+          "source": "",
+          "line": 0,
+          "samples": 79,
+          "percent": 0.8477304431805988
+        },
+        {
+          "function": "(program)",
+          "source": "",
+          "line": 0,
+          "samples": 76,
+          "percent": 0.8155381478699432
+        },
+        {
+          "function": "authenticateRemote",
+          "source": "src/agent-store.mjs",
+          "line": 765,
+          "samples": 73,
+          "percent": 0.7833458525592875
+        },
+        {
+          "function": "exec",
+          "source": "",
+          "line": 0,
+          "samples": 50,
+          "percent": 0.5365382551775941
+        },
+        {
+          "function": "writeLatin1String",
+          "source": "",
+          "line": 0,
+          "samples": 43,
+          "percent": 0.46142289945273096
+        },
+        {
+          "function": "handleRequest",
+          "source": "src/server.mjs",
+          "line": 219,
+          "samples": 42,
+          "percent": 0.4506921343491791
+        },
+        {
+          "function": "get",
+          "source": "src/agent-store.mjs",
+          "line": 230,
+          "samples": 42,
+          "percent": 0.4506921343491791
+        },
+        {
+          "function": "principal",
+          "source": "src/agent-store.mjs",
+          "line": 213,
+          "samples": 37,
+          "percent": 0.39703830883141966
+        },
+        {
+          "function": "runMicrotasks",
+          "source": "",
+          "line": 0,
+          "samples": 27,
+          "percent": 0.28973065779590085
+        },
+        {
+          "function": "Hash",
+          "source": "",
+          "line": 0,
+          "samples": 23,
+          "percent": 0.2468075973816933
+        },
+        {
+          "function": "setHeader",
+          "source": "node:_http_outgoing",
+          "line": 700,
+          "samples": 21,
+          "percent": 0.22534606717458955
+        },
+        {
+          "function": "Hash",
+          "source": "node:internal/crypto/hash",
+          "line": 112,
+          "samples": 21,
+          "percent": 0.22534606717458955
+        }
+      ],
+      "preparePercent": 28.136066101513038,
+      "note": "Main-thread inspector sample counts, including idle; not wall-clock CPU attribution. Diagnostic instrumentation is excluded from the five qualification runs."
+    },
+    "finalCpu": {
+      "totalSamples": 9360,
+      "selfSamplePercentByFunction": [
+        {
+          "function": "(idle)",
+          "source": "",
+          "line": 0,
+          "samples": 3542,
+          "percent": 37.84188034188034
+        },
+        {
+          "function": "get",
+          "source": "",
+          "line": 0,
+          "samples": 1214,
+          "percent": 12.97008547008547
+        },
+        {
+          "function": "all",
+          "source": "",
+          "line": 0,
+          "samples": 988,
+          "percent": 10.555555555555555
+        },
+        {
+          "function": "run",
+          "source": "src/agent-store.mjs",
+          "line": 482,
+          "samples": 365,
+          "percent": 3.8995726495726495
+        },
+        {
+          "function": "(garbage collector)",
+          "source": "",
+          "line": 0,
+          "samples": 214,
+          "percent": 2.286324786324786
+        },
+        {
+          "function": "(program)",
+          "source": "",
+          "line": 0,
+          "samples": 159,
+          "percent": 1.6987179487179487
+        },
+        {
+          "function": "#search",
+          "source": "src/wiki-search.mjs",
+          "line": 145,
+          "samples": 146,
+          "percent": 1.5598290598290598
+        },
+        {
+          "function": "WikiError",
+          "source": "src/errors.mjs",
+          "line": 3,
+          "samples": 135,
+          "percent": 1.4423076923076923
+        },
+        {
+          "function": "prepare",
+          "source": "",
+          "line": 0,
+          "samples": 129,
+          "percent": 1.3782051282051282
+        },
+        {
+          "function": "writev",
+          "source": "",
+          "line": 0,
+          "samples": 116,
+          "percent": 1.2393162393162394
+        },
+        {
+          "function": "authenticateRemote",
+          "source": "src/agent-store.mjs",
+          "line": 765,
+          "samples": 102,
+          "percent": 1.0897435897435896
+        },
+        {
+          "function": "exec",
+          "source": "",
+          "line": 0,
+          "samples": 86,
+          "percent": 0.9188034188034188
+        },
+        {
+          "function": "get",
+          "source": "src/agent-store.mjs",
+          "line": 230,
+          "samples": 68,
+          "percent": 0.7264957264957265
+        },
+        {
+          "function": "SdkError",
+          "source": "node_modules/@modelcontextprotocol/server/dist/src-Cqbh3MYc.mjs",
+          "line": 382,
+          "samples": 55,
+          "percent": 0.5876068376068376
+        },
+        {
+          "function": "handleRequest",
+          "source": "src/server.mjs",
+          "line": 219,
+          "samples": 50,
+          "percent": 0.5341880341880342
+        },
+        {
+          "function": "",
+          "source": "src/wiki-search.mjs",
+          "line": 199,
+          "samples": 46,
+          "percent": 0.49145299145299143
+        },
+        {
+          "function": "",
+          "source": "src/mcp-response.mjs",
+          "line": 115,
+          "samples": 43,
+          "percent": 0.4594017094017094
+        },
+        {
+          "function": "writeLatin1String",
+          "source": "",
+          "line": 0,
+          "samples": 41,
+          "percent": 0.43803418803418803
+        },
+        {
+          "function": "principal",
+          "source": "src/agent-store.mjs",
+          "line": 213,
+          "samples": 40,
+          "percent": 0.42735042735042733
+        },
+        {
+          "function": "",
+          "source": "src/wiki-search.mjs",
+          "line": 179,
+          "samples": 40,
+          "percent": 0.42735042735042733
+        }
+      ],
+      "preparePercent": 1.485042735042735,
+      "note": "Main-thread inspector sample counts, including idle; not wall-clock CPU attribution. Diagnostic instrumentation is excluded from the five qualification runs."
+    },
+    "profiledBaseline": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "server": "c0e97ac10d728960c4050179d4775b6ec8d948f0bf81d58e8068b38abe884ab8"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 1,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 209,
+      "elapsedSeconds": 11.833820874999999,
+      "drainSeconds": 1.833820874999999,
+      "operations": {
+        "read": {
+          "count": 2700,
+          "p50Ms": 138.61200000000008,
+          "p95Ms": 183.48174999999992,
+          "p99Ms": 204.8768339999997,
+          "maxMs": 966.044375,
+          "perSecond": 228.15961374774488
+        },
+        "search": {
+          "count": 675,
+          "p50Ms": 139.79179100000147,
+          "p95Ms": 185.8961250000002,
+          "p99Ms": 213.20974999999999,
+          "maxMs": 874.166041,
+          "perSecond": 57.03990343693622
+        },
+        "writeRead": {
+          "count": 39,
+          "p50Ms": 138.75654200000008,
+          "p95Ms": 1199.2194160000001,
+          "p99Ms": 1267.338583,
+          "maxMs": 1267.338583,
+          "perSecond": 3.2956388652452038
+        },
+        "health": {
+          "count": 117,
+          "p50Ms": 30.96754200000032,
+          "p95Ms": 749.6351659999998,
+          "p99Ms": 963.380042,
+          "maxMs": 1010.5689999999997,
+          "perSecond": 9.886916595735611
+        },
+        "save": {
+          "count": 39,
+          "p50Ms": 1997.3882080000003,
+          "p95Ms": 2277.0720410000004,
+          "p99Ms": 2290.204750000001,
+          "maxMs": 2290.204750000001,
+          "perSecond": 3.2956388652452038
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 68.812799,
+        "eventLoopMaxMs": 82.968575,
+        "sampledPeakRssMiB": 650.875,
+        "cpuCorePercent": 97.67031003823452
+      },
+      "correctness": {
+        "acknowledgedSaves": 39,
+        "verifiedArticles": 39,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    },
+    "profiledFinal": {
+      "node": "v24.22.1",
+      "platform": "darwin-arm64",
+      "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+      "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+      "engineSha256": {
+        "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+        "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+        "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+        "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+        "control-store": "7bd87135ea1f9617b50310d25d8fa722911c198636e2782516b374e15c9918bf",
+        "agent-store": "99e4bb5229bff471f51a93c61297225f4472f399ee3f0f48c7bcd07229e3f79d",
+        "wiki-search": "7a8f07f2caa6c003dc1e7e8a07780de131a457f1d64e8fa1a970746a8d6d59fd",
+        "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+        "server": "586c7849dcab676b92383b8c7cb576eaa2591d72585bee88cb538ce30c9bb9e4"
+      },
+      "config": {
+        "readers": 48,
+        "writers": 8,
+        "writesPerWriter": 0,
+        "seconds": 10,
+        "articles": 200,
+        "bodyBytes": 2048,
+        "batch": 1,
+        "timeoutMs": 30000,
+        "transport": "mcp"
+      },
+      "fixtureArticles": 209,
+      "elapsedSeconds": 11.790618875,
+      "drainSeconds": 1.7906188749999998,
+      "operations": {
+        "read": {
+          "count": 6905,
+          "p50Ms": 45.332790999998906,
+          "p95Ms": 98.77254100000027,
+          "p99Ms": 110.05775000000176,
+          "maxMs": 113.4047499999997,
+          "perSecond": 585.6350776158898
+        },
+        "writeRead": {
+          "count": 47,
+          "p50Ms": 38.684291999999914,
+          "p95Ms": 85.61687499999994,
+          "p99Ms": 85.74062500000014,
+          "maxMs": 85.74062500000014,
+          "perSecond": 3.9862199345324867
+        },
+        "search": {
+          "count": 1726,
+          "p50Ms": 45.69300000000021,
+          "p95Ms": 98.89833299999918,
+          "p99Ms": 110.08649999999943,
+          "maxMs": 113.40758300000016,
+          "perSecond": 146.38756610644833
+        },
+        "health": {
+          "count": 117,
+          "p50Ms": 4.088166999999885,
+          "p95Ms": 15.45062499999949,
+          "p99Ms": 20.154209000000264,
+          "maxMs": 24.54358300000058,
+          "perSecond": 9.923143241282999
+        },
+        "save": {
+          "count": 47,
+          "p50Ms": 1872.3311669999994,
+          "p95Ms": 1969.184000000001,
+          "p99Ms": 2327.6272500000005,
+          "maxMs": 2327.6272500000005,
+          "perSecond": 3.9862199345324867
+        }
+      },
+      "errors": {},
+      "server": {
+        "eventLoopP99Ms": 29.425663,
+        "eventLoopMaxMs": 32.505855,
+        "sampledPeakRssMiB": 611.171875,
+        "cpuCorePercent": 87.64419813856806
+      },
+      "correctness": {
+        "acknowledgedSaves": 47,
+        "verifiedArticles": 47,
+        "retryVerified": true,
+        "conflictWinners": 1,
+        "rejectedStaleWrites": 3
+      },
+      "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+    },
+    "connectionCounts": {
+      "baseline": {
+        "connections": 119,
+        "requests": 7023
+      },
+      "final": {
+        "connections": 111,
+        "requests": 17567
+      },
+      "note": "Counts include both external and internal loopback traffic during profiling. Reuse was already functioning; the MCP bridge was not changed."
+    },
+    "healthAcceptance": {
+      "run": {
+        "node": "v24.22.1",
+        "platform": "darwin-arm64",
+        "source": "f75a5e05a86aec8ad9d881880a5faa36547f3229",
+        "articleLoaderSha256": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+        "engineSha256": {
+          "git-wiki": "a774cc2ab83d101eae0d731078ef1a896ece3ec528d8abec9303c687356bf31c",
+          "editor": "6d0c2869b00f659085ddd57cedef6d99b70d3f9485b4319a87dfc43b0cfbb972",
+          "writer-lock": "413c1801d6684d62246feaa649bc3df151fea48d48145125f9015426c36af362",
+          "writer": "24b1dfebd3c9194fa0617905ef7c4b6ad0aaa73acfe07ac93b540b1fe7222542",
+          "writer-worker": "425bf551f082f407113c1f3355448fb9c2be00fbf2d3d2a134237c76a0471ffc",
+          "control-store": "7bd87135ea1f9617b50310d25d8fa722911c198636e2782516b374e15c9918bf",
+          "agent-store": "99e4bb5229bff471f51a93c61297225f4472f399ee3f0f48c7bcd07229e3f79d",
+          "wiki-search": "7a8f07f2caa6c003dc1e7e8a07780de131a457f1d64e8fa1a970746a8d6d59fd",
+          "mcp-response": "40731ff0c34957a6845ef468481a314d7001d90cd32d7b1984527ddfbf6b3799",
+          "server": "586c7849dcab676b92383b8c7cb576eaa2591d72585bee88cb538ce30c9bb9e4"
+        },
+        "config": {
+          "readers": 48,
+          "writers": 8,
+          "writesPerWriter": 0,
+          "seconds": 10,
+          "articles": 200,
+          "bodyBytes": 2048,
+          "batch": 10,
+          "timeoutMs": 30000,
+          "transport": "mcp"
+        },
+        "fixtureArticles": 281,
+        "elapsedSeconds": 13.691708917,
+        "drainSeconds": 3.6917089169999997,
+        "operations": {
+          "read": {
+            "count": 7361,
+            "p50Ms": 43.88416699999971,
+            "p95Ms": 116.83033299999988,
+            "p99Ms": 130.6401249999999,
+            "maxMs": 134.68312500000138,
+            "perSecond": 537.6246343405958
+          },
+          "search": {
+            "count": 1839,
+            "p50Ms": 43.96654099999978,
+            "p95Ms": 116.64174999999886,
+            "p99Ms": 129.85249999999996,
+            "maxMs": 134.70637499999975,
+            "perSecond": 134.31486245786655
+          },
+          "writeRead": {
+            "count": 270,
+            "p50Ms": 43.062582999999904,
+            "p95Ms": 394.7499579999999,
+            "p99Ms": 524.7123750000003,
+            "maxMs": 562.97875,
+            "perSecond": 19.719963492998353
+          },
+          "health": {
+            "count": 135,
+            "p50Ms": 3.1155000000003383,
+            "p95Ms": 17.298999999999978,
+            "p99Ms": 18.91891600000008,
+            "maxMs": 427.370625,
+            "perSecond": 9.859981746499177
+          },
+          "save": {
+            "count": 27,
+            "p50Ms": 3729.1589170000007,
+            "p95Ms": 3947.0267089999998,
+            "p99Ms": 4102.109166,
+            "maxMs": 4102.109166,
+            "perSecond": 1.9719963492998351
+          }
+        },
+        "errors": {},
+        "server": {
+          "eventLoopP99Ms": 27.901951,
+          "eventLoopMaxMs": 62.324735,
+          "sampledPeakRssMiB": 746.375,
+          "cpuCorePercent": 85.70968302403445
+        },
+        "correctness": {
+          "acknowledgedSaves": 27,
+          "verifiedArticles": 270,
+          "retryVerified": true,
+          "conflictWinners": 1,
+          "rejectedStaleWrites": 3
+        },
+        "scope": "Synthetic OAuth-authenticated article traffic; independent client/server processes on one host. Fixed clients (closed loop), no measured retries. Throughput includes drain time; successful and failed latencies are separate. Server CPU/RSS includes worker threads but excludes subprocesses. No proxy, remote pushes, conversations, or external evidence. Not a production capacity guarantee."
+      },
+      "slowResponsesOver80Ms": [
+        {
+          "reused": false,
+          "millisecondsFromClientStart": {
+            "socket": 0.1590418815612793,
+            "connect": 0.4899590015411377,
+            "sent": 0.5085420608520508,
+            "response": 427.2208340167999,
+            "accepted": 403.5213749408722,
+            "handler": 425.8515419960022,
+            "end": 427.24554204940796
+          }
+        }
+      ],
+      "note": "Health-only monotonic timestamps on client socket assignment/connect/write/response/end and server connection/request events. One probe spent about 403 ms after client start before the server connection event, then 22 ms to the request event. This local connection-acceptance tail is not eliminated; its scheduler/kernel mechanism was not established. No platform configuration was changed."
+    }
+  },
+  "verification": {
+    "search": {
+      "resultComparisons": 389,
+      "invalidInputComparisons": 6,
+      "corpusArticles": 480,
+      "snippetCalls": 1797,
+      "checks": [
+        "exact ordered results, scores, snippets and anchors against baseline",
+        "literal prefixes, phrases, Unicode, missing and empty queries",
+        "topic/state filters, exact-title preference, grouping, truncation and pagination",
+        "pinned WAL snapshot before/after publication, deletions and recreation",
+        "standalone reader snapshot survives a concurrent publication between candidate selection and snippets",
+        "standalone invalid input releases its owned snapshot",
+        "INTEGER rowid binding selects the correct passage"
+      ]
+    },
+    "authorization": {
+      "steadyCalls": 100,
+      "steadyQueryExecutions": 1200,
+      "steadyStatementCompilations": 0,
+      "denialChecks": 10,
+      "checks": [
+        "external grant downgrade, revocation and regrant",
+        "human-session logout",
+        "remote grant revocation and run stop",
+        "runtime-key revocation",
+        "delegation revocation",
+        "token expiry",
+        "principal disablement",
+        "fresh next snapshot and consistent current read snapshot",
+        "outer publication transaction remains open",
+        "asynchronous read callbacks rejected"
+      ]
+    },
+    "load": "Every acknowledged historical article revision was verified; identical receipt retry and four-way stale revision conflict checks passed in every qualification run."
+  },
+  "limits": "Local macOS arm64 / Node 24.22.1 observations from sequential closed-loop loads. Health outlier 621 ms in one batch repeat; all health deadlines passed. A 30-second run is useful repetition, not a soak or hosted-storage capacity qualification. Source only; no release or deployment."
+}
