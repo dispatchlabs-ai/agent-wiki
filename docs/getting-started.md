@@ -10,7 +10,7 @@ instead of the unauthenticated loopback connection below.
 
 ## Start the example
 
-Use Linux or macOS with Node 24.19+ and Git. These commands use public `main`, which
+Use Linux or macOS with Node 24.22.1+ (24.x) or 26.12.1+ (26.x) and Git. These commands use public `main`, which
 may be newer than the latest tagged release. For an exact released version, see
 [releases](https://github.com/dispatchlabs-ai/agent-wiki/releases).
 
@@ -30,7 +30,7 @@ local editing and never pushes. Your example edits survive a restart.
 
 Set up [WSL2 with Ubuntu](https://learn.microsoft.com/en-us/windows/wsl/install)
 first; `wsl --list --verbose` in PowerShell should report version **2** for the
-distribution. Install Git and Node 24.19+ inside Ubuntu, then run the commands
+distribution. Install Git and Node 24.22.1+ (24.x) or 26.12.1+ (26.x) inside Ubuntu, then run the commands
 above from your Linux home directory. Keep the checkout in the Linux filesystem,
 such as `~/agent-wiki`, rather than `/mnt/c`; see Microsoft's
 [file storage guidance](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems).
@@ -227,7 +227,7 @@ back up that complete store with the repository and control database. See
 
 | Symptom                   | Next step                                                                                                                                      |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node:sqlite` cannot load | Check `node --version`; use a supported runtime (Node 24.19+).                                                                                 |
+| `node:sqlite` cannot load | Check `node --version`; use a supported runtime (Node 24.22.1+ (24.x) or 26.12.1+ (26.x)).                                                     |
 | `EADDRINUSE`              | Stop your other example, or run `PORT=4318 npm run example` and use port 4318 in both browser and MCP URL.                                     |
 | `Invalid host`            | Use `127.0.0.1`, not `localhost`, for the default example; clear an inherited `WIKI_ORIGIN` or use its exact configured host.                  |
 | MCP cannot connect        | Keep the server running on the client's machine; check its URL ends with `/mcp` and inspect `/mcp` in Codex.                                   |

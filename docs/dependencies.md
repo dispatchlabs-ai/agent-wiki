@@ -95,9 +95,10 @@ used: `nix/runtime.nix` selects the patched 3.6 branch for runtime consumers whi
 leaving unrelated build tools on the pinned package set. Node remains 24.21.0.
 Release qualification must inspect the actual runtime closure for older OpenSSL
 copies and record the loaded Node/Python OpenSSL and SQLite versions.
-The package CI check enforces those versions and rejects older OpenSSL copies or
-an unused Perl interpreter anywhere in the built runtime closure, including
-dependencies retained by helper shebangs and embedded compiler configuration.
+The October 6 package check enforced those versions and rejected older OpenSSL
+copies or an unused Perl interpreter throughout the runtime closure. Those
+automated assertions were removed on October 16; current release qualification
+must inspect the loaded libraries and closure explicitly.
 
 Primary sources: [OpenSSL 3.6 advisories](https://openssl-library.org/news/vulnerabilities-3.6/),
 [SQLite CVEs](https://www.sqlite.org/cves.html),

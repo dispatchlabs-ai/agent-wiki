@@ -64,8 +64,8 @@ let
   };
 in
 
-assert lib.assertMsg (lib.versionAtLeast nodeVersion "24.19.0")
-  "Agent Wiki requires Node 24.19.0 or newer; pinned nixpkgs provides ${nodeVersion}";
+assert lib.assertMsg (lib.versions.major nodeVersion == "24" && lib.versionAtLeast nodeVersion "24.22.1")
+  "Agent Wiki packages require Node 24.22.1+ within 24.x; selected runtime is ${nodeVersion}";
 
 buildNpmPackage {
   pname = manifest.name;

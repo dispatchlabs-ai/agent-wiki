@@ -104,7 +104,7 @@ here still does not identify the person typing.
 ## Choose the runtime, then follow the shared steps
 
 Complete steps 1–3 once for **each named wiki identity**, then choose one runtime
-in step 4 and complete step 5. Use Node 24.19+ and Git; commands in steps 1–3 run
+in step 4 and complete step 5. Use Node 24.22.1+ (24.x) or 26.12.1+ (26.x) and Git; commands in steps 1–3 run
 from the engine checkout on the machine named in each step. Replace every example
 path and ID with your own values. The Node executable used by the runtime must
 also meet that version requirement; `/usr/bin/node` below is only an example.
@@ -399,7 +399,7 @@ that is not isolation between agents.
 
 | Symptom                                           | Check next                                                                                                                                                  |
 | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Adapter will not start                            | Use absolute paths, Node 24.19+, and `npm ci` in the installed engine checkout. Run `--check` directly to see its error.                                    |
+| Adapter will not start                            | Use absolute paths, Node 24.22.1+ (24.x) or 26.12.1+ (26.x), and `npm ci` in the installed engine checkout. Run `--check` directly to see its error.        |
 | Key-file permission error                         | The private key must be a regular file owned by the runtime user with mode 0600. Confirm the connection points to the intended key.                         |
 | Authentication fails                              | Confirm the public file was registered in the correct control database, the canonical HTTPS origin matches, and the key/delegation is active and unexpired. |
 | Authentication works but an operation is denied   | Check the registered role, requested scopes, and current grants or delegation. Ownership alone does not grant access.                                       |

@@ -2,7 +2,7 @@
 
 Run a synthetic local wiki, obtain an answer backed by its original conversation,
 and preview a note without modifying any articles. You need terminal/process access,
-Git, Node 24.19+ and npm on Linux or macOS. Use your existing model account; the wiki
+Git, Node 24.22.1+ (24.x) or 26.12.1+ (26.x) and npm on Linux or macOS. Use your existing model account; the wiki
 contains no model. This downloads public dependencies and creates only a new local
 checkout and its disposable example state. Do not read private content or change
 persistent client settings. Do not publish the editable example to a network.

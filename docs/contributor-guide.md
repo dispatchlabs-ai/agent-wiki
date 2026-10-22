@@ -21,9 +21,10 @@ never introduce a second authoritative conversation representation.
 
 ## Compatibility and examples
 
-Linux and macOS are supported through the portable directory writer lock. Node
-24.19.0 is the minimum for the built-in SQLite implementation. An engines lower
-bound is not proof that every later runtime works. For Windows, follow the
+Linux and macOS are supported through the portable directory writer lock. Use
+Node 24.22.1+ (24.x) or 26.12.1+ (26.x), including the required security fixes
+and built-in SQLite implementation. An engines range is not proof that every
+matching runtime has been qualified. For Windows, follow the
 [Ubuntu under WSL2 walkthrough](getting-started.md#windows-with-wsl2); native
 Windows server support remains unverified.
 
