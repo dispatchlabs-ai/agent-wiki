@@ -476,10 +476,15 @@ comes from the run's scopes and current grants; the list is not an extra HTTP AC
   not reuse another run's receipt. Caller-supplied identity fields grant nothing.
 - Agent tokens do not authorize human account controls, sign-in, or access
   management. Invalid bearer credentials never fall back to a valid browser cookie.
-- Limits: 100 active tokens and 100 active runs per agent, 10,000 active tokens
-  overall, 1,000 token-endpoint requests per socket source per 15 minutes, and
-  16 KiB token request bodies. Expired token/assertion rows are cleaned during
-  issuance. Run and lifecycle audit records are retained.
+- Machine authentication has no fixed active-run count, active-token count or
+  token-request rate limit. `client_credentials` requests are not charged to the
+  interactive OAuth source counter, including behind a trusted proxy. The
+  16 KiB request-body boundary, assertion replay checks, credential validation,
+  expiry and current authorization still apply. Expired token/assertion rows
+  are cleaned during issuance; run and lifecycle audit records are retained.
+  Human sign-in and interactive OAuth protections are unchanged. Operators own
+  deployment capacity and ingress protection; removing these counters is not an
+  unlimited-throughput guarantee.
 
 Back up the authoritative control database consistently along with content and
 traces. On disaster recovery, revoke restored agent keys/runs before reopening if

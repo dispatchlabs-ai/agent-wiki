@@ -670,19 +670,6 @@ export class AgentStore {
           .get(agent, jti)
       )
         fail();
-      if (
-        Number(
-          this.db.prepare("SELECT count(*) n FROM agent_tokens").get().n,
-        ) >= 10000 ||
-        Number(
-          this.db
-            .prepare(
-              "SELECT count(*) n FROM agent_tokens t JOIN agent_runs r ON r.id=t.run WHERE r.agent=?",
-            )
-            .get(agent).n,
-        ) >= 100
-      )
-        throw new WikiError("AUTH_BUSY", "Too many active agent tokens", 429);
       let r;
       if (runId) r = this.run(text(runId));
       else {
@@ -693,16 +680,6 @@ export class AgentStore {
             )
             .get(agent, kid).authorization,
         );
-        if (
-          Number(
-            this.db
-              .prepare(
-                "SELECT count(*) n FROM agent_runs WHERE agent=? AND active=1 AND expires>?",
-              )
-              .get(agent, this.now()).n,
-          ) >= 100
-        )
-          throw new WikiError("AUTH_BUSY", "Too many active agent runs", 429);
         r = this.startRecord(authorization.initiator, agent, {
           ...authorization,
           expires: Math.min(

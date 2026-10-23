@@ -412,9 +412,9 @@ export function createWiki({
             req.headers["sec-fetch-site"] === "cross-site"
           )
             return send(403, { error: "invalid_request" });
-          control.limitLogin("remote-oauth:" + clientAddress(req), 1000);
           try {
             if (url.pathname === "/oauth/register") {
+              control.limitLogin("remote-oauth:" + clientAddress(req), 1000);
               control.limitLogin("remote-register:" + clientAddress(req), 100);
               if (
                 req.headers["content-type"]?.split(";")[0] !==
@@ -437,16 +437,17 @@ export function createWiki({
               );
             }
             const form = await readOAuthForm(req);
+            if (
+              url.pathname === "/oauth/token" &&
+              form.get("grant_type") === "client_credentials"
+            )
+              return send(200, await agentAuth.token(req, form));
+            control.limitLogin("remote-oauth:" + clientAddress(req), 1000);
             if (url.pathname === "/oauth/revoke") {
               remoteAgents.revokeToken(form);
               return send(200, {});
             }
-            return send(
-              200,
-              form.get("grant_type") === "client_credentials"
-                ? await agentAuth.token(req, form)
-                : remoteAgents.exchange(form),
-            );
+            return send(200, remoteAgents.exchange(form));
           } catch (error) {
             return send(
               [401, 413, 429].includes(error.status) ? error.status : 400,

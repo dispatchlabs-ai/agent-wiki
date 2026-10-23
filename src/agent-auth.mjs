@@ -59,10 +59,6 @@ export class AgentAuth {
       req.headers["sec-fetch-site"] === "cross-site"
     )
       throw new WikiError("INVALID_REQUEST", "Invalid origin", 403);
-    this.agents.control.limitLogin(
-      "agent-source:" + req.socket.remoteAddress,
-      1000,
-    );
     const chunks = [];
     let size = 0;
     for await (const chunk of suppliedForm ? [] : req) {

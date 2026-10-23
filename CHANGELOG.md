@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.10.2 — 2026-10-23
+
+Compatible fix; no persisted-data migration or minimum-runtime change. Existing
+identities, signing keys, runs, grants and revocations remain intact.
+
+- Remove fixed active-run and active-token count caps from machine authentication.
+  Valid registered agents can start and renew runs without an arbitrary per-agent
+  or global token-count admission limit.
+- Remove the socket-source machine-token rate counter and exempt the
+  `client_credentials` flow from the generic OAuth source counter. This also
+  removes the per-proxy machine-token bucket left behind by 0.10.1. Preserve
+  signature verification, assertion replay prevention, expiry, current grants,
+  revocation, origin/resource validation and the 16 KiB request-body boundary.
+  Human sign-in and interactive OAuth protections are unchanged.
+
 ## 0.10.1 — 2026-10-23
 
 No persisted-data migration. Configure `WIKI_TRUSTED_PROXY` for the deployment's
