@@ -78,6 +78,14 @@ The allowed-signers identity above is a local verification label, not a contact
 address. Compare the resolved commit with the release notes. Local signature
 verification and GitHub's recognition of a signing key are separate checks.
 
+For `v0.10.1`, the existing immutable tag uses the maintainer key with fingerprint
+`SHA256:sS2F6m5DSdXpyIVknQ0mpR3Sv3l7rc7kyCW041/rEY0`, rather than the package
+release key above. Its release includes `tag-signing-key.pub`, authenticated by
+`SHA256SUMS` signed with the established package release key. Verify that index
+and the key's checksum first, then use the tag key in the allowed-signers file.
+The release notes and signed checks record both fingerprints; the published tag
+was not moved or replaced.
+
 ## Public history reset
 
 Version 0.5.0 replaces the old public history. Earlier release references in the

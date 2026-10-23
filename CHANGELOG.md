@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.10.1 — 2026-10-23
+
+No persisted-data migration. Configure `WIKI_TRUSTED_PROXY` for the deployment's
+actual proxy peers to enable per-client source buckets.
+
 - Restore per-client login rate limiting behind a reverse proxy: set
   `WIKI_TRUSTED_PROXY` to the proxy's addresses or CIDRs and the server honors
   `X-Forwarded-For` from those peers when keying the per-source login and OAuth
