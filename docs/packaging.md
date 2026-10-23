@@ -47,6 +47,31 @@ certificate installation. An explicit `NODE_EXTRA_CA_CERTS` overrides this defau
 provide a readable CA bundle at that path when an installation needs private trust.
 TLS verification remains enabled.
 
+## Runtime inventory and vulnerability scanning
+
+The 0.10.2 release includes signed `runtime-inventory.json`: the exact OCI
+contents roots and their transitive Nix runtime store paths. Scan those roots on
+a native builder retaining their derivations, rather than assuming a conventional
+OS package database exists inside the image. The image contents include the
+application package, CA certificates and timezone data; a host-package-only
+inventory must not be presented as the complete container inventory.
+
+For example, `nix-store --query --requisites ROOT...` enumerates those paths, and
+Nix-aware `vulnix --closure --json --show-whitelisted ROOT...` uses their package
+metadata for vulnerability matching. Enable the Nix CLI features documented below
+for the scanner's child commands too. Record scanner/toolchain versions, exact
+roots, vulnerability-feed freshness, raw results and applicability decisions.
+Matching names/versions and recognizing patch filenames are heuristic; review
+findings and missing coverage. Run the production npm audit separately for the
+JavaScript dependency graph.
+
+ECR reports `UnsupportedImageError` for this Nix layout. That is neither a clean
+scan nor a vulnerability finding. A Nix-native scan was attempted for 0.10.2,
+but NVD feed retrieval timed out or returned incomplete bodies; no complete fresh
+runtime scan is claimed. Inventory/signature verification and successful runtime
+checks do not substitute for vulnerability-feed coverage. The release records
+that all 101 dependency store paths are unchanged from 0.10.1.
+
 ## Build and inspect
 
 Nix flakes and the `nix-command` interface are currently experimental upstream.
