@@ -68,7 +68,7 @@ article-only wiki with `WIKI_CONVERSATIONS=0`; the optional conversation archive
 UI and evidence tools are disabled without deleting stored data. Existing
 installations remain enabled by default. See [the setting and its scope](docs/traces.md#enable-or-disable-conversations).
 
-**Version 0.10.0 — pre-1.0 release.** Linux and macOS are
+**Version 0.10.1 — pre-1.0 release.** Linux and macOS are
 supported; native Windows is not verified. The quickstart uses `main`, which may
 include unreleased work. See [verification](docs/onboarding-verification.md),
 [changelog](CHANGELOG.md), and [release policy](docs/releases.md).
