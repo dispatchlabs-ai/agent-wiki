@@ -26,6 +26,7 @@ import {
   returnPath,
 } from "./authn.mjs";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { BlockList, isIP } from "node:net";
 import { createWikiMcp } from "./mcp.mjs";
 import { McpApiClient } from "./mcp-response.mjs";
 import { PreviewRenderer } from "./preview.mjs";
@@ -69,6 +70,60 @@ import { traceSearchHealth, traceProvenance } from "./trace-search.mjs";
 import { lifecycleLockFd } from "./lifecycle-lock.mjs";
 import { prepareTraceProjection } from "./trace-projection.mjs";
 const assetRoot = fileURLToPath(new URL("../public/", import.meta.url));
+/**
+ * A candidate address counts as a trusted proxy hop only when it parses as an
+ * IP address and falls inside the configured trusted set. IPv4-mapped IPv6
+ * peers match their IPv4 entries.
+ * @param {string|undefined} address
+ * @param {import("node:net").BlockList|null} trusted
+ * @returns {boolean}
+ */
+function isTrustedAddress(address, trusted) {
+  if (!trusted || !address) return false;
+  const mapped = address.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+  const candidate = mapped ? mapped[1] : address;
+  try {
+    return trusted.check(candidate);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse the WIKI_TRUSTED_PROXY specification: comma-separated IP addresses or
+ * CIDRs whose X-Forwarded-For chains may name the originating client. Returns
+ * a BlockList, or null when no trusted proxy is declared.
+ * @param {string|null} spec
+ * @returns {import("node:net").BlockList|null}
+ */
+export function parseTrustedProxy(spec) {
+  if (spec === null || spec === undefined) return null;
+  if (typeof spec !== "string")
+    throw Error("trustedProxy must be null or a comma-separated string");
+  const list = new BlockList();
+  for (const entry of spec.split(",")) {
+    const candidate = entry.trim();
+    if (!candidate) continue;
+    if (candidate.includes("/")) {
+      const [base, prefix] = candidate.split("/");
+      const kind = isIP(base);
+      if (!kind || !/^\d{1,3}$/.test(prefix))
+        throw Error(
+          "WIKI_TRUSTED_PROXY entries must be valid IP addresses or CIDRs",
+        );
+      list.addSubnet(base, Number(prefix), kind === 4 ? "ipv4" : "ipv6");
+    } else {
+      const kind = isIP(candidate);
+      if (!kind)
+        throw Error(
+          "WIKI_TRUSTED_PROXY entries must be valid IP addresses or CIDRs",
+        );
+      list.addAddress(candidate, kind === 4 ? "ipv4" : "ipv6");
+    }
+  }
+  return list;
+}
+
 export function createWiki({
   repo = wikiRepo(),
   database = ":memory:",
@@ -86,6 +141,7 @@ export function createWiki({
   localLogin = false,
   development = false,
   traceSearchPool = null,
+  trustedProxy = process.env.WIKI_TRUSTED_PROXY || null,
 } = {}) {
   if (typeof conversations !== "boolean")
     throw Error("conversations must be boolean");
@@ -109,6 +165,19 @@ export function createWiki({
     throw Error(
       "Local login requires HTTPS, except explicit loopback development",
     );
+  const trusted = parseTrustedProxy(trustedProxy);
+  function clientAddress(req) {
+    const peer = req.socket.remoteAddress;
+    if (!trusted || !peer || !isTrustedAddress(peer, trusted)) return peer;
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded !== "string") return peer;
+    const entries = forwarded.split(",").map((h) => h.trim());
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (isTrustedAddress(entries[i], trusted)) continue;
+      return isIP(entries[i]) ? entries[i] : peer;
+    }
+    return peer;
+  }
   const mcpIdentity = new AsyncLocalStorage();
   const mfa = control ? new Mfa(control, origin) : null;
   const agentAuth = control
@@ -343,13 +412,10 @@ export function createWiki({
             req.headers["sec-fetch-site"] === "cross-site"
           )
             return send(403, { error: "invalid_request" });
-          control.limitLogin("remote-oauth:" + req.socket.remoteAddress, 1000);
+          control.limitLogin("remote-oauth:" + clientAddress(req), 1000);
           try {
             if (url.pathname === "/oauth/register") {
-              control.limitLogin(
-                "remote-register:" + req.socket.remoteAddress,
-                100,
-              );
+              control.limitLogin("remote-register:" + clientAddress(req), 100);
               if (
                 req.headers["content-type"]?.split(";")[0] !==
                 "application/json"
@@ -516,7 +582,7 @@ export function createWiki({
           const body = await readJSON();
           if (!body || typeof body !== "object")
             return send(400, { error: "Invalid request" });
-          control.limitLogin("source:" + req.socket.remoteAddress, 200);
+          control.limitLogin("source:" + clientAddress(req), 200);
           let result;
           if (url.pathname === "/auth/local/setup") {
             if (
@@ -1892,6 +1958,17 @@ if (
   const settings = oidcSettings(process.env);
   const localLogin = process.env.WIKI_LOCAL_LOGIN !== "0";
   const autoLogin = process.env.WIKI_OIDC_AUTO_LOGIN === "1";
+  const trustedProxy = process.env.WIKI_TRUSTED_PROXY?.trim() || null;
+  parseTrustedProxy(trustedProxy); // Validate WIKI_TRUSTED_PROXY before listening.
+  if (
+    trustedProxy === null &&
+    !["127.0.0.1", "::1", "localhost"].includes(host)
+  )
+    console.error(
+      "Warning: WIKI_LISTEN_HOST is not loopback and no trusted proxy is configured. " +
+        "Behind a reverse proxy every client shares one login rate-limit bucket; " +
+        "set WIKI_TRUSTED_PROXY to the proxy addresses or CIDRs to honor X-Forwarded-For.",
+    );
   if (!settings && !localLogin)
     throw Error("Enable Google/OIDC or local login");
   const auth = settings ? configuredOIDC(settings, origin) : null;
@@ -1902,6 +1979,7 @@ if (
     auth,
     autoLogin,
     localLogin,
+    trustedProxy,
     database: process.env.WIKI_DATABASE || ":memory:",
     origin: process.env.WIKI_ORIGIN || `http://127.0.0.1:${port}`,
     write: process.env.WIKI_WRITE === "1",

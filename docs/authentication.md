@@ -165,6 +165,10 @@ r=8, p=1. At most two derivations run concurrently; excess work receives 429.
 Unknown accounts perform a dummy derivation. Durable limits allow ten attempts per
 email or password-change account per 15 minutes and 200 per socket source address.
 Behind a proxy, that source limit is shared: forwarded headers are not trusted.
+Set `WIKI_TRUSTED_PROXY` to a comma-separated list of the proxy's addresses or
+CIDRs to honor `X-Forwarded-For` from those peers and restore one bucket per
+client; addresses are honored only from listed proxies, and an unparseable chain
+falls back to the socket address.
 There is no public signup, email delivery, or self-service password recovery.
 Optional [two-factor authentication](two-factor-authentication.md) protects both
 local and Google/OIDC identities. **Your account** allows password changes with the current password;

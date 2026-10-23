@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Restore per-client login rate limiting behind a reverse proxy: set
+  `WIKI_TRUSTED_PROXY` to the proxy's addresses or CIDRs and the server honors
+  `X-Forwarded-For` from those peers when keying the per-source login and OAuth
+  token limits. Without it, behavior is unchanged: every client behind one proxy
+  shares a single source bucket, and startup warns when binding a non-loopback
+  host without a trusted proxy configured.
+
 ## 0.10.0 — 2026-10-22
 
 Breaking runtime requirement: use Node 24.22.1+ or 26.12.1+ within those major
