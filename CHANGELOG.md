@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Clarify the supported single-update AWS path for compatible image upgrades and
+  retain exclusive maintenance for actual data changes. Reuse initialization
+  evidence without treating old operation targets as release dependencies.
+
 ## 0.10.2 — 2026-10-23
 
 Compatible fix; no persisted-data migration or minimum-runtime change. Existing

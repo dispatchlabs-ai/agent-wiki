@@ -133,7 +133,7 @@ variable "desired_count" {
 }
 
 variable "activation_receipt_sha256" {
-  description = "Digest of the non-secret operator receipt proving initialization or stop/quiescence checks for the selected image. Required before desired_count becomes one."
+  description = "Digest of the non-secret receipt proving initialization or completed exclusive maintenance of this data root. Retain for compatible image-only updates; required before desired_count becomes one."
   type        = string
   default     = null
   nullable    = true

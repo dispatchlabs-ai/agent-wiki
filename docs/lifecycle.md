@@ -244,11 +244,18 @@ and exercise a new write after recovery.
 
 ## Upgrade, rollback, and recovery are different operations
 
-An application upgrade replaces immutable program bytes while the data owner is
-stopped. Read the target release's upgrade notes, take and retain a verified
-backup when its risk warrants one, run any real documented state transition under
-`maintenance`, then start the new binary. This lifecycle version introduces no
-fake schema migration.
+A compatible application upgrade replaces immutable program bytes through the
+platform's service restart/replacement, preserving one data owner. Read the
+release notes between the deployed and requested versions; go directly to the
+target unless a documented migration requires an intermediate release. Routine
+binary replacement needs no new state backup, restore rehearsal or lifecycle
+command. The [AWS service runbook](../infra/aws/modules/wiki-service/README.md#routine-compatible-upgrades)
+describes its single-update path.
+
+For an actual persisted-data transition, take and retain a verified backup when
+its risk warrants one, stop the serving owner and run the documented transition
+under `maintenance`, then start the target binary. This lifecycle version
+introduces no fake schema migration.
 
 Binary rollback means starting an older compatible program against unchanged
 state. It is safe only when that version supports every persisted format now in

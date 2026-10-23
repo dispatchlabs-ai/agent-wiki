@@ -151,40 +151,64 @@ configuration would persist bootstrap stdout, which contains the one-time setup
 URL. A partial bootstrap remains a failed initialization: preserve it for
 diagnosis or restore a fresh root; do not rerun bootstrap over it.
 
-## Singleton upgrades and exclusive work
+## Routine compatible upgrades
 
-The ECS service sets deployment minimum healthy percent to `0` and maximum to
-`100`, so normal ECS replacement has no capacity for two serving tasks. Those
-percentages are only a scheduler guard. They do not prove that an old or
-one-off writer has stopped, and an ordinary rolling update is not the supported
-upgrade operation.
+An initialized installation can move directly to the requested compatible image.
+Read all intervening release notes for persisted-format and runtime requirements;
+intermediate releases are needed only for a documented migration dependency.
+A routine binary replacement does not require a new backup, restore rehearsal,
+lifecycle command or external installation journal.
 
-For backup, import, upgrade, recovery, or other exclusive work:
+1. Prepare and verify the target image before changing the service. Reconcile the
+   live task definition with the root's inputs, preserving capacity, storage,
+   roles, secrets and network settings. Resolve any active maintenance operation
+   and account for one-off writers before updating.
+2. Change `image_uri` and `application_version`. Preserve the existing
+   `activation_receipt_sha256` as evidence of the initialized, unchanged data root;
+   it is not a fresh claim of target-image testing. Keep `desired_count = 1`.
+3. Review and apply one root plan. The existing ECS minimum healthy percentage
+   `0` and maximum `100` provide a stop/start replacement for one task. The
+   product's exclusive owner lock remains the writer guard. Do not raise the
+   maximum to overlap writers or insert a separate count-zero apply for this path.
+   Expect a service interruption while the replacement starts, not zero downtime.
+4. Verify the requested version/image and stable service, `/healthz`, authenticated
+   `/api/articles/health.json`, and an authorized read/write through canonical HTTPS.
+   Record the deployment result separately from the retained initialization receipt.
 
-1. Create and apply a root plan with `desired_count = 0` using the currently
-   selected task definition.
-2. Wait until ECS reports zero running and zero pending service tasks. List and
-   account for every one-off task using the access point. Confirm the managed
-   owner has released `.lifecycle/owner.lock`; PID or age is not ownership proof.
-3. Run the documented product lifecycle command with one owner. Preserve a
-   retained `.git/wiki-write.lock.d` and inspect it through the recovery flow;
-   never delete it only because it is old.
-4. Record the stop observations and completed operation in a new sanitized
-   activation receipt. When changing releases, include both previous and next
-   image identities and any real state-transition or backup receipts.
-5. Update `image_uri`, `application_version`, and
-   `activation_receipt_sha256`, then create and apply a separate root plan with
-   `desired_count = 1`. The two plans/applies belong to one serialized
-   installation operation; an OpenTofu backend lock on either apply does not
-   cover the stop, lifecycle, receipt, and activation sequence between them.
-6. Verify `/healthz` through the target group, authenticated
-   `/api/articles/health.json` through the canonical HTTPS origin, and an actual
-   authorized read and write. A liveness response alone is not readiness.
+Task definitions use `skip_destroy`, retaining earlier revisions for inspected
+binary rollback. A compatible rollback can use the same service-update path;
+verify that the previous binary supports every persisted format now present.
+Restoring older data is a separate recovery operation.
 
-Task definitions use `skip_destroy`, leaving older revisions registered for an
-inspected binary rollback. Rollback still requires the same stop/quiescence
-procedure and is safe only if the old application understands the current data
-format. Restoring older data is a separate recovery operation.
+See [AWS service deployment parameters](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html)
+for scheduler behavior. Scheduler percentages do not prove exclusive ownership
+for offline work or account for tasks outside the service.
+
+## Exclusive data maintenance
+
+Bootstrap, import, restore, repair and documented data migrations require a stopped
+serving owner. Choose backups and recovery qualification for the actual change;
+an image version alone does not establish that a data transition exists.
+
+1. Apply a root plan with `desired_count = 0` using the current task definition.
+2. Wait for all service and one-off writers using the data root to stop. Confirm
+   the managed owner released `.lifecycle/owner.lock`; PID, age and desired count
+   alone are not ownership proof.
+3. Run the documented [product lifecycle command](../../../../docs/lifecycle.md)
+   with one owner. Preserve a retained `.git/wiki-write.lock.d` and use its recovery
+   flow; do not delete it merely because it is old.
+4. Record completed maintenance, stop observations and any state-transition or
+   backup evidence in a new sanitized receipt. Update `activation_receipt_sha256`
+   and any selected release inputs, then apply the activation plan with count one.
+   Serialize the full maintenance interval; a backend lock on one apply does not
+   cover time between applies.
+5. Verify version, liveness, authenticated readiness and read/write behavior.
+
+An interrupted controller journal is recovery evidence, not a release dependency.
+Reconcile ownership and durable changes before continuing. If the retained tool
+cannot cancel or supersede its immutable target, report that limitation and
+resolve the operation explicitly; do not activate an unwanted intermediate
+release solely to satisfy its completion state machine.
 
 ## Security and storage contract
 
