@@ -1,5 +1,5 @@
 // Adapted from shadcn/ui's Mode Toggle and Base UI dropdown-menu patterns (MIT).
-// See docs/shadcn-license.txt. Semantic tokens preserve the wiki's pre-paint theme.
+// See licenses/shadcn.txt. Semantic tokens preserve the wiki's pre-paint theme.
 import React, { useEffect, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 const choices = { light: "Light", dark: "Dark", system: "System" };

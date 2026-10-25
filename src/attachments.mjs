@@ -1,4 +1,4 @@
-import { escape as e, renderMarkdown, link } from "./render.mjs";
+import { escape as e, renderMarkdown } from "./render.mjs";
 import { mediaPattern } from "./markdown-enhancements.mjs";
 export async function attachmentsHTML(files = []) {
   const cards = [];

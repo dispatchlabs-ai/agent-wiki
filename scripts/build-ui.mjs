@@ -22,7 +22,7 @@ const { default: path } = await import("node:path");
 const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
 const notices = [
   "Browser dependency license notices\n",
-  fs.readFileSync("docs/shadcn-license.txt", "utf8"),
+  fs.readFileSync("licenses/shadcn.txt", "utf8"),
 ];
 for (const directory of Object.keys(lock.packages)
   .filter((p) => p.startsWith("node_modules/"))

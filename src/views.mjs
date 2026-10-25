@@ -21,12 +21,6 @@ const option = (value, label, selected) =>
 const empty = (text) => `<p class="empty">${e(text)}</p>`;
 const topicNames = (wiki) =>
   [...new Set(wiki.catalog().map((p) => p.topic))].sort();
-const topicSelect = (wiki, selected) =>
-  `<label>Topic<select name="topic" aria-label="Topic">${option("", "All topics", selected)}${topicNames(
-    wiki,
-  )
-    .map((t) => option(t, t, selected))
-    .join("")}</select></label>`;
 export function home(wiki, params, conversations = true) {
   const range = ["today", "week"].includes(params.get("range"))
     ? params.get("range")
@@ -205,7 +199,7 @@ export async function compareView(wiki, id, params) {
     await Promise.all(
       groups
         .filter((g) => g.before.join("\n").trim() || g.after.join("\n").trim())
-        .map(async (g, i) => {
+        .map(async (g) => {
           const cells = await Promise.all(
             /** @type {[string[],string,number][]} */ ([
               [g.before, "removed", from],

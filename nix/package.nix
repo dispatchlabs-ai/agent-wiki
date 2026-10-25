@@ -50,6 +50,13 @@ let
     agent-wiki-lifecycle = "scripts/lifecycle.py";
   };
   entrypoints = directEntrypoints // managedEntrypoints;
+  runtimeScripts = lib.unique (
+    builtins.filter (lib.hasPrefix "scripts/") (builtins.attrValues entrypoints)
+    ++ [
+      "scripts/agent-headers.mjs"
+      "scripts/pi-extension.mjs"
+    ]
+  );
   identity = builtins.toJSON {
     schemaVersion = 1;
     name = manifest.name;
@@ -88,12 +95,13 @@ buildNpmPackage {
     npm prune --omit=dev --ignore-scripts --no-audit --no-fund
 
     app=${applicationRoot}
-    mkdir -p "$app" "$out/bin" "$out/share/doc/agent-wiki" "$out/share/agent-wiki"
-    cp -R bin public scripts src ui "$app/"
+    mkdir -p "$app/scripts" "$out/bin" "$out/share/doc/agent-wiki" "$out/share/agent-wiki"
+    cp -R bin public src ui licenses "$app/"
+    cp ${lib.escapeShellArgs runtimeScripts} "$app/scripts/"
     cp package.json package-lock.json LICENSE THIRD_PARTY_NOTICES.md "$app/"
     cp -R node_modules "$app/"
-    cp -R docs/. "$out/share/doc/agent-wiki/"
-    cp LICENSE THIRD_PARTY_NOTICES.md "$out/share/doc/agent-wiki/"
+    cp -R licenses/. "$out/share/doc/agent-wiki/"
+    cp LICENSE THIRD_PARTY_NOTICES.md release-signing-key.pub "$out/share/doc/agent-wiki/"
 
     cat > "$out/share/agent-wiki/package-identity.json" <<'EOF'
     ${identity}

@@ -1,5 +1,5 @@
 // Adapted from shadcn/ui Base UI button, card, badge, native-select and tabs
-// patterns (MIT); see docs/shadcn-license.txt. Uses the wiki's semantic tokens.
+// patterns (MIT); see licenses/shadcn.txt. Uses the wiki's semantic tokens.
 import React, { useState } from "react";
 import { Button, Badge, Field } from "./primitives.mjs";
 import { Tabs } from "@base-ui/react/tabs";

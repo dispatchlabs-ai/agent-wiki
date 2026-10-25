@@ -13,7 +13,6 @@
  * @property {{conversation:string,event:string,quote:string}[]} [evidence]
  * @typedef {{operation_id: string, updates: ArticleUpdate[]}} EditDraft
  * @typedef {{id: string, number: number, url: string, revision_id: string}} ArticleReceipt
- * @typedef {{id:string, number:number, url:string, revision_id?:string}} LegacyArticleReceipt
  * @typedef {{operation_id:string,state:"saved",articles:ArticleReceipt[]}} StoredReceipt
  * @typedef {{operation_id: string, state: "saved"|"already-saved", articles: ArticleReceipt[], commit: string, remote?:"not-requested"|"pushed"|"push-failed"}} SaveReceipt
  */

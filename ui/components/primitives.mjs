@@ -1,5 +1,5 @@
 // Shared shadcn adaptations (MIT): semantic native HTML for server pages and islands.
-// See docs/shadcn-license.txt. Interactive focus management belongs to Base UI wrappers.
+// See licenses/shadcn.txt. Interactive focus management belongs to Base UI wrappers.
 import { createElement as h, cloneElement, useId } from "react";
 export function Button({
   variant = "outline",

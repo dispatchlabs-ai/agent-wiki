@@ -22,7 +22,7 @@ export async function withWriterLock(repo, action, { timeout = 10000 } = {}) {
       if (performance.now() >= deadline)
         throw new WikiError(
           "WRITER_BUSY",
-          `Writer lock timeout: ${lock}. If a writer crashed, stop all writers, inspect the repository, then remove this lock directory. See docs/api.md.`,
+          `Writer lock timeout: ${lock}. If a writer crashed, stop all writers, inspect the repository, then remove this lock directory.`,
           503,
         );
       await delay(Math.min(50, Math.max(1, deadline - performance.now())));

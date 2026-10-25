@@ -20,8 +20,6 @@ const kinds = [
   ["context", "Context"],
   ["analysis", "Analysis"],
 ];
-const choice = (value, label, selected) =>
-  `<option value="${e(value)}"${value === selected ? " selected" : ""}>${e(label)}</option>`;
 export function evidenceCatalog(params, result) {
   return shell(
     "Conversations",

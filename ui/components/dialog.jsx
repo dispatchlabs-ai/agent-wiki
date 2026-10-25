@@ -1,4 +1,4 @@
-// Adapted from shadcn/ui base-nova dialog (MIT); see docs/shadcn-license.txt.
+// Adapted from shadcn/ui base-nova dialog (MIT); see licenses/shadcn.txt.
 // Semantic CSS replaces Tailwind utilities; Base UI retains focus and dismissal.
 import React from "react";
 import { Dialog as Primitive } from "@base-ui/react/dialog";
