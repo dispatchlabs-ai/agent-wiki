@@ -699,9 +699,7 @@ export function openAPI() {
     if (id === "evidence.proxy")
       spec.responses["200"].content = {
         "application/json": { schema: {} },
-        "application/octet-stream": {
-          schema: { type: "string", format: "binary" },
-        },
+        "*/*": { schema: { type: "string", format: "binary" } },
       };
     if (permission === "bearer") spec.security = [{ bearerAuth: [] }];
     if (method === "post")
@@ -1607,9 +1605,7 @@ function completeContract(paths) {
       "Upstream provider status, body and content type are forwarded after authorization; only allowlisted response headers pass through.",
     content: {
       "application/json": { schema: {} },
-      "application/octet-stream": {
-        schema: { type: "string", format: "binary" },
-      },
+      "*/*": { schema: { type: "string", format: "binary" } },
     },
   };
   for (const path of ["/media/{asset}", "/article-media/{asset}"])
