@@ -155,9 +155,7 @@ export function createWikiTools(request, writable, config = {}) {
         properties: {
           format: {
             type: "string",
-            enum: config.externalEvidence
-              ? ["codex", "pi", "claude"]
-              : ["codex", "pi", "claude"],
+            enum: ["codex", "pi", "claude"],
           },
           ...(config.externalEvidence
             ? {

@@ -1,0 +1,13 @@
+{
+  "name": "Agent Wiki",
+  "build": { "dockerfile": "Dockerfile" },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/agent-wiki,type=bind",
+  "workspaceFolder": "/workspaces/agent-wiki",
+  "mounts": [
+    "source=agent-wiki-${devcontainerId}-modules,target=/workspaces/agent-wiki/node_modules,type=volume",
+    "source=agent-wiki-${devcontainerId}-assets,target=/workspaces/agent-wiki/public/vendor,type=volume"
+  ],
+  "containerUser": "node",
+  "remoteUser": "node",
+  "postCreateCommand": "npm ci"
+}

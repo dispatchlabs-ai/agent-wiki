@@ -57,10 +57,3 @@ export function sessions(catalog, options = {}) {
   }
   return [...groups.values()];
 }
-export function catalogPage(items, { limit, offset }, key) {
-  return {
-    [key]: items.slice(offset, offset + limit),
-    total: items.length,
-    nextOffset: offset + limit < items.length ? offset + limit : null,
-  };
-}
