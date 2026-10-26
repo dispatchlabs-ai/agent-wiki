@@ -3,7 +3,7 @@
 import { WikiError } from "./errors.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import matter from "gray-matter";
 import { references } from "./wiki.mjs";
@@ -166,6 +166,189 @@ function readPages(repo, entries) {
   return pages;
 }
 
+// History is lazy: constructors and writer snapshots do not parse receipts.
+// The reader worker batches immutable commit/object reads. Async subprocesses
+// also let that worker refresh articles while a cold history read is in flight.
+function historyGit(
+  repo,
+  args,
+  { input = "", maxBuffer = 64 * 1024 * 1024 } = {},
+) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", ["-C", repo, ...args], {
+      stdio: lifecycleStdio(["pipe", "pipe", "pipe"]),
+    });
+    const output = [];
+    let bytes = 0;
+    child.on("error", reject);
+    child.stdout.on("data", (chunk) => {
+      bytes += chunk.length;
+      if (bytes > maxBuffer) {
+        child.kill();
+        reject(Error("History Git output exceeds its read bound"));
+      } else output.push(chunk);
+    });
+    child.stderr.resume();
+    child.on("close", (code) => {
+      if (code !== 0) reject(Error(`History Git read failed: ${args[0]}`));
+      else resolve(Buffer.concat(output));
+    });
+    child.stdin.on("error", (error) => {
+      if (!("code" in error) || error.code !== "EPIPE") reject(error);
+    });
+    child.stdin.end(input);
+  });
+}
+async function historyReceipts(repo, refs) {
+  const commits = new Map(
+    refs.map((ref) => [ref.commit, { blobs: new Map(), receipts: [] }]),
+  );
+  const changes = (
+    await historyGit(
+      repo,
+      [
+        "diff-tree",
+        "--stdin",
+        "--root",
+        "--first-parent",
+        "--diff-merges=first-parent",
+        "--no-renames",
+        "-r",
+        "--raw",
+        "--no-abbrev",
+        "-z",
+        "--",
+        "wiki",
+        ".wiki/operations",
+      ],
+      { input: [...commits.keys()].join("\n") + "\n" },
+    )
+  )
+    .toString("utf8")
+    .split("\0");
+  const objects = new Map();
+  let commit;
+  for (let i = 0; i < changes.length; i++) {
+    const change = changes[i];
+    if (commits.has(change)) {
+      commit = commits.get(change);
+      continue;
+    }
+    if (!change.startsWith(":")) continue;
+    const [, , , blob, status] = change.split(" ");
+    const filename = changes[++i];
+    if (!commit) throw Error("Invalid history diff response");
+    commit.blobs.set(filename, blob);
+    // Only newly added receipts in this exact commit can identify its changer.
+    if (
+      status !== "A" ||
+      !/^\.wiki\/operations\/[a-z0-9-]+\.json$/.test(filename)
+    )
+      continue;
+    if (!objects.has(blob)) objects.set(blob, []);
+    objects.get(blob).push(commit.receipts);
+  }
+  if (!objects.size) return commits;
+  const blobs = [...objects.keys()];
+  const headers = (
+    await historyGit(repo, ["cat-file", "--batch-check"], {
+      input: blobs.join("\n") + "\n",
+    })
+  )
+    .toString("utf8")
+    .trimEnd()
+    .split("\n");
+  if (headers.length !== blobs.length)
+    throw Error("Incomplete receipt metadata");
+  const entries = headers.flatMap((header, i) => {
+    const [blob, type, rawSize] = header.split(" ");
+    const size = Number(rawSize);
+    // Unreadable legacy/operator receipts do not supply authenticated identity.
+    if (
+      blob !== blobs[i] ||
+      type !== "blob" ||
+      !Number.isSafeInteger(size) ||
+      size < 0 ||
+      size > 64 * 1024 * 1024
+    )
+      return [];
+    return [{ blob, size }];
+  });
+  for (let start = 0; start < entries.length;) {
+    let end = start + 1,
+      bytes = entries[start].size;
+    while (end < entries.length && bytes + entries[end].size <= 4 * 1024 * 1024)
+      bytes += entries[end++].size;
+    const batch = entries.slice(start, end);
+    const output = await historyGit(repo, ["cat-file", "--batch"], {
+      input: batch.map((entry) => entry.blob).join("\n") + "\n",
+      maxBuffer: bytes + batch.length * 128,
+    });
+    let offset = 0;
+    for (const { blob, size } of batch) {
+      const newline = output.indexOf(10, offset),
+        bodyStart = newline + 1,
+        bodyEnd = bodyStart + size;
+      if (
+        newline < offset ||
+        output.toString("utf8", offset, newline) !== `${blob} blob ${size}` ||
+        output[bodyEnd] !== 10
+      )
+        throw Error("Invalid receipt object response");
+      try {
+        const receipt = JSON.parse(
+          output.toString("utf8", bodyStart, bodyEnd),
+        ).receipt;
+        for (const receipts of objects.get(blob)) receipts.push(receipt);
+      } catch {
+        // Malformed receipts remain unknown, never Git-author attribution.
+      }
+      offset = bodyEnd + 1;
+    }
+    if (offset !== output.length)
+      throw Error("Unexpected receipt batch output");
+    start = end;
+  }
+  return commits;
+}
+function attribution(id, ref, receipts, blob) {
+  const matches = receipts.filter(
+    (receipt) =>
+      receipt?.state === "saved" &&
+      Array.isArray(receipt.articles) &&
+      receipt.articles.some(
+        (article) =>
+          article?.id === id &&
+          article.number === ref.number &&
+          (!article.revision_id || article.revision_id === blob),
+      ),
+  );
+  const unknown = { kind: "unknown", actor: null, authority: null };
+  if (matches.length !== 1) return unknown;
+  const receipt = matches[0];
+  if (!receipt.actor) return { kind: "operator", actor: null, authority: null };
+  if (typeof receipt.actor !== "string") return unknown;
+  if (!receipt.authority)
+    return { kind: "human", actor: receipt.actor, authority: null };
+  const { mode, subject } = receipt.authority;
+  if (
+    !["independent", "delegated"].includes(mode) ||
+    (subject !== null && typeof subject !== "string")
+  )
+    return unknown;
+  return {
+    kind: "agent",
+    actor: receipt.actor,
+    // Only this allowlisted projection is cached or sent to the serving thread.
+    authority: {
+      mode,
+      subject,
+      initiator:
+        typeof receipt.initiator === "string" ? receipt.initiator : null,
+    },
+  };
+}
+
 export class GitWiki {
   constructor(repo = wikiRepo()) {
     this.repo = repo;
@@ -276,92 +459,29 @@ export class GitWiki {
     this.head = head;
     return true;
   }
-  /** @returns {import("./contracts.mjs").HistoryRevision[]} */
-  history(id) {
-    return (this.histories.get(id) || []).map((ref) => ({
-      ...ref,
-      attribution: this.attribution(id, ref),
-    }));
+  attributionKey(id, ref) {
+    // Number and path belong to the requested history, not the current HEAD.
+    return `${ref.commit}:${id}:${ref.filename}:${ref.number}`;
   }
-  attribution(id, ref) {
-    // Only receipts added with this exact revision can identify its changer.
-    // Git's configured author is not an authenticated application identity.
-    if (!this.attributions.has(ref.commit)) {
-      const receipts = [];
-      const names = git(this.repo, [
-        "diff-tree",
-        "--root",
-        "--first-parent",
-        "--no-commit-id",
-        "-r",
-        "--diff-filter=A",
-        "--name-only",
-        ref.commit,
-        "--",
-        ".wiki/operations",
-      ]).split("\n");
-      for (const name of names) {
-        if (!/^\.wiki\/operations\/[a-z0-9-]+\.json$/.test(name)) continue;
-        try {
-          receipts.push(
-            JSON.parse(git(this.repo, ["show", `${ref.commit}:${name}`]))
-              .receipt,
-          );
-        } catch {
-          // Older/operator history may not have a readable receipt.
-        }
+  /** @returns {Promise<import("./contracts.mjs").HistoryRevision[]>} */
+  async history(id, refs = this.histories.get(id) || []) {
+    const missing = refs.filter(
+      (ref) => !this.attributions.has(this.attributionKey(id, ref)),
+    );
+    if (missing.length) {
+      const commits = await historyReceipts(this.repo, missing);
+      for (const ref of missing) {
+        const { receipts, blobs } = commits.get(ref.commit);
+        this.attributions.set(
+          this.attributionKey(id, ref),
+          attribution(id, ref, receipts, blobs.get(ref.filename)),
+        );
       }
-      this.attributions.set(ref.commit, receipts);
     }
-    const key = `${ref.commit}:${id}`;
-    if (this.attributions.has(key)) return this.attributions.get(key);
-    const remember = (value) => {
-      this.attributions.set(key, value);
-      return value;
-    };
-    const matches = this.attributions
-      .get(ref.commit)
-      .filter(
-        (receipt) =>
-          receipt?.state === "saved" &&
-          Array.isArray(receipt.articles) &&
-          receipt.articles.some(
-            (article) =>
-              article?.id === id &&
-              article.number === ref.number &&
-              (!article.revision_id ||
-                article.revision_id ===
-                  git(this.repo, [
-                    "rev-parse",
-                    `${ref.commit}:${ref.filename}`,
-                  ])),
-          ),
-      );
-    const unknown = { kind: "unknown", actor: null, authority: null };
-    if (matches.length !== 1) return remember(unknown);
-    const receipt = matches[0];
-    if (!receipt.actor)
-      return remember({ kind: "operator", actor: null, authority: null });
-    if (typeof receipt.actor !== "string") return remember(unknown);
-    if (!receipt.authority)
-      return remember({ kind: "human", actor: receipt.actor, authority: null });
-    const { mode, subject } = receipt.authority;
-    if (
-      !["independent", "delegated"].includes(mode) ||
-      (subject !== null && typeof subject !== "string")
-    )
-      return remember(unknown);
-    return remember({
-      kind: "agent",
-      actor: receipt.actor,
-      // Deliberately exclude credential, token, run and internal scope fields.
-      authority: {
-        mode,
-        subject,
-        initiator:
-          typeof receipt.initiator === "string" ? receipt.initiator : null,
-      },
-    });
+    return refs.map((ref) => ({
+      ...ref,
+      attribution: this.attributions.get(this.attributionKey(id, ref)),
+    }));
   }
   /** @returns {import("./contracts.mjs").ArticleRevision|null} */
   revision(id, number) {

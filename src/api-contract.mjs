@@ -1043,6 +1043,25 @@ const schemas = {
     },
     additionalProperties: false,
   },
+  JsonRpcError: {
+    type: "object",
+    required: ["jsonrpc", "id", "error"],
+    properties: {
+      jsonrpc: { const: "2.0" },
+      id: { type: ["string", "integer", "null"] },
+      error: record({ code: { type: "integer" }, message: string, data: {} }, [
+        "code",
+        "message",
+      ]),
+      code: {
+        type: "string",
+        pattern: "^HTTP_[0-9]{3}$",
+        description:
+          "HTTP error code added by the application transport, when applicable.",
+      },
+    },
+    additionalProperties: false,
+  },
 };
 const header = (name, description, required = false) => ({
   name,
@@ -1368,7 +1387,7 @@ function completeContract(paths) {
   ])
     paths["/api/traces/sessions.json"].get.parameters.push(p);
   const navigation = [
-    ["/", "home", "read", [query("range", { enum: ["today", "week"] })]],
+    ["/", "home", "read", [query("range", { enum: ["today", "week", "all"] })]],
     [
       "/wiki/",
       "topics",
@@ -1394,7 +1413,7 @@ function completeContract(paths) {
       "read",
       [
         ...paths["/api/articles/search"].get.parameters,
-        query("type", { const: "articles" }),
+        query("type", { enum: ["all", "articles", "traces"] }),
         query("traceOffset", integer),
         query("format"),
         query("machine"),
@@ -1549,9 +1568,9 @@ function completeContract(paths) {
         delete spec.responses["200"];
         delete spec.responses["202"];
       }
-      for (const code of [400, 405, 406])
+      for (const code of [400, 405, 406, 415])
         spec.responses[code] = response(
-          { anyOf: [ref("Error"), ref("JsonRpc")] },
+          { anyOf: [ref("Error"), ref("JsonRpcError")] },
           "Transport or JSON-RPC error",
         );
     }

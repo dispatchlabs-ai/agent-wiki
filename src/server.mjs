@@ -1839,10 +1839,12 @@ export function createWiki({
         const [, id, view] = api;
         const selection =
           view === "history" ? null : articleReadOptions(url.searchParams);
+        const revisions =
+          view === "history" ? await articleRefresh.history(id) : null;
         const result =
           view === "history"
-            ? wiki.history(id).length
-              ? { id, revisions: wiki.history(id) }
+            ? revisions.length
+              ? { id, revisions }
               : null
             : view === "current"
               ? wiki.current(id)
@@ -1880,10 +1882,17 @@ export function createWiki({
       );
       if (route) {
         const [, id, view, rev] = route;
-        if (view === "history") html = historyView(wiki, id);
-        else if (view === "compare")
-          html = await compareView(wiki, id, url.searchParams);
-        else if (view === "sources")
+        if (view === "history" || view === "compare") {
+          const snapshot = Object.assign(
+            Object.create(GitWiki.prototype),
+            wiki,
+          );
+          const history = await articleRefresh.history(id, snapshot);
+          html =
+            view === "history"
+              ? historyView(snapshot, id, history)
+              : await compareView(snapshot, id, url.searchParams, history);
+        } else if (view === "sources")
           html = sourcesView(wiki, id, url.searchParams);
         else if (view === "edit" && wiki.current(id))
           html = editorView(wiki.current(id), canWrite);

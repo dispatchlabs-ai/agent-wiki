@@ -99,7 +99,7 @@ function comparisonForm(id, history, from, to) {
   return `<form class="toolbar" action="/wiki/${id}/compare/"><label>From revision<select name="from">${history.map((h) => option(String(h.number), `Revision ${h.number} · ${date(h.created_at)}`, String(from))).join("")}</select></label><label>To revision<select name="to">${history.map((h) => option(String(h.number), `Revision ${h.number} · ${date(h.created_at)}`, String(to))).join("")}</select></label><button>Compare</button></form>`;
 }
 function latestKnown(wiki, id) {
-  return wiki.current(id) || wiki.revision(id, wiki.history(id).at(-1)?.number);
+  return wiki.current(id) || wiki.revision(id, wiki.fileInfo.get(id)?.number);
 }
 function changer(attribution) {
   const { kind, actor, authority } = attribution;
@@ -109,11 +109,10 @@ function changer(attribution) {
   if (kind === "human") return `Person · ${e(actor)}`;
   return `Agent · ${e(actor)}<br><span class="meta">${authority.mode === "delegated" ? `Delegated by · ${e(authority.subject)}` : "Independent authority"}<br>Initiator · ${authority.initiator ? e(authority.initiator) : "not recorded"}</span>`;
 }
-export function historyView(wiki, id) {
+export function historyView(wiki, id, history) {
   const p = latestKnown(wiki, id);
   if (!p) return null;
-  const history = wiki.history(id),
-    from = Math.max(1, p.number - 1);
+  const from = Math.max(1, p.number - 1);
   return shell(
     `${p.title} history`,
     `${articleHeader(p, "History")}<div class="layout"><div><h2>Article history</h2>${comparisonForm(id, history, from, p.number)}<table class="revision-table"><thead><tr><th>Revision</th><th>What changed</th><th>Changed by</th><th>Date</th><th>Actions</th></tr></thead><tbody>${history
@@ -186,7 +185,7 @@ export function diffLines(before, after) {
   }
   return groups;
 }
-export async function compareView(wiki, id, params) {
+export async function compareView(wiki, id, params, history) {
   const p = latestKnown(wiki, id);
   if (!p) return null;
   const from = Number(params.get("from") || Math.max(1, p.number - 1)),
@@ -233,12 +232,11 @@ export async function compareView(wiki, id, params) {
     .join("");
   return shell(
     `${p.title} comparison`,
-    `${articleHeader(p, "History")}<h2>Compare revisions</h2>${comparisonForm(id, wiki.history(id), from, to)}<p>${link(`/wiki/${id}/history/`, "Back to history")}</p>${metadata.length ? `<h3>Article details changed</h3>${metadata.map((k) => `<p><strong>${e(k)}</strong>: ${e(a[k])} → ${e(b[k])}</p>`).join("")}` : ""}<p class="meta">Removed and added text is labeled in reading order.</p><div class="diff-heading"><span>Revision ${from}</span><span>Revision ${to}</span></div>${rows}<details><summary>View Markdown comparison</summary>${raw}</details><section class="entry"><h2>Recorded change summaries</h2>${
+    `${articleHeader(p, "History")}<h2>Compare revisions</h2>${comparisonForm(id, history, from, to)}<p>${link(`/wiki/${id}/history/`, "Back to history")}</p>${metadata.length ? `<h3>Article details changed</h3>${metadata.map((k) => `<p><strong>${e(k)}</strong>: ${e(a[k])} → ${e(b[k])}</p>`).join("")}` : ""}<p class="meta">Removed and added text is labeled in reading order.</p><div class="diff-heading"><span>Revision ${from}</span><span>Revision ${to}</span></div>${rows}<details><summary>View Markdown comparison</summary>${raw}</details><section class="entry"><h2>Recorded change summaries</h2>${
       from === to
         ? empty("The same revision is selected on both sides.")
         : list(
-            wiki
-              .history(id)
+            history
               .filter(
                 (h) =>
                   h.number > Math.min(from, to) &&
