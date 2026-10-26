@@ -718,7 +718,7 @@ export function openAPI() {
       title: "Agent Wiki HTTP API",
       version: packageInfo.version,
       description:
-        "Single-space Git-backed wiki. Reader permits published articles, history and citations; editor/manager permits original evidence independently of WIKI_WRITE. Bearer callers additionally need matching read/write/trace run scope. All clients use the same server and writer. Human-only account/agent administration is intentionally excluded from machine credentials. Browser navigation, OAuth callbacks and MCP transport are included; JSON-RPC tool inputs are shared with the HTTP operations. No inbound webhooks are implemented.",
+        "Single-space Git-backed wiki. Reader permits published articles, history and citations; editor/manager permits original evidence independently of WIKI_WRITE. Bearer callers additionally need matching read/write/trace run scope. All clients use the same server and writer. Human-only account/agent administration is intentionally excluded from machine credentials. Browser navigation, OAuth callbacks and MCP transport are included; JSON-RPC tool inputs are shared with the HTTP operations. The CLI /callback operation uses its own temporary loopback server, not the wiki origin. No inbound webhooks are implemented.",
     },
     servers: [{ url: "/" }],
     tags: [
@@ -731,6 +731,7 @@ export function openAPI() {
       "Service",
       "Browser",
       "MCP",
+      "CLI",
     ].map((name) => ({ name })),
     paths,
     components: {
@@ -1584,6 +1585,60 @@ function completeContract(paths) {
         spec.description +=
           " Requires Conversations enabled and editorial evidence authority. CONVERSATIONS_DISABLED returns 404; unavailable archives return 503. An article link never grants access to original evidence.";
     }
+  // The CLI owns a separate, short-lived HTTP listener, not a wiki-server route.
+  paths["/callback"] = {
+    servers: [
+      {
+        url: "http://127.0.0.1:{port}",
+        description:
+          "CLI browser-login listener on an OS-assigned loopback port; never the wiki origin. Available only while login is pending. Port 49152 is illustrative; use the exact redirect_uri registered by this CLI login attempt.",
+        variables: { port: { default: "49152" } },
+      },
+    ],
+    get: {
+      operationId: "cli.oauthCallback",
+      summary: "Complete pending CLI browser authorization",
+      tags: ["CLI"],
+      description:
+        "Accepts only GET /callback with the exact registered Host and random pending state. Invalid requests do not finish login. A matching callback tells the browser to return to the terminal; HTTP 200 is not proof of successful authorization. The CLI then rejects provider errors or a missing code and uses the SDK to verify issuer and exchange the code with PKCE. The listener closes after completion or timeout (five minutes by default). No credentials are returned to the browser.",
+      security: [],
+      parameters: [
+        header("Host", "Exact 127.0.0.1:<assigned-port> authority", true),
+        query(
+          "state",
+          { type: "string", pattern: "^[A-Za-z0-9_-]{43}$" },
+          true,
+        ),
+        query("code"),
+        query("iss", { type: "string", format: "uri" }),
+        query("error"),
+      ],
+      responses: {
+        200: {
+          description:
+            "Matching callback received; inspect the terminal for the eventual login result.",
+          content: {
+            "text/plain": {
+              schema: {
+                const: "Return to the terminal to check login completion.",
+              },
+            },
+          },
+          headers: {
+            "Cache-Control": { schema: { const: "no-store" } },
+            "Referrer-Policy": { schema: { const: "no-referrer" } },
+          },
+        },
+        400: {
+          description:
+            "Invalid method, path, Host or state; login remains pending.",
+          content: {
+            "text/plain": { schema: { const: "Invalid login callback" } },
+          },
+        },
+      },
+    },
+  };
   const save = paths["/api/articles/edits"].post;
   save.responses["200"].content = content(ref("SaveReceipt"));
   save.responses["200"].description =
