@@ -1403,7 +1403,13 @@ function completeContract(paths) {
       "/conversations/{id}/",
       "conversation",
       "trace",
-      evidenceAlias.parameters.filter((p) => p.in === "query"),
+      [
+        ...evidenceAlias.parameters.filter((p) => p.in === "query"),
+        query(
+          "kind",
+          evidenceAlias.parameters.find((p) => p.name === "kind").schema,
+        ),
+      ],
     ],
     ["/files/{asset}/", "file", "trace", []],
     ["/account/", "account", "human", []],
@@ -1561,7 +1567,7 @@ function completeContract(paths) {
       }
       for (const [status, result] of Object.entries(spec.responses)) {
         if (result.content?.["application/json"]?.schema === error)
-          result.content = content(ref("Error"));
+          result.content["application/json"] = { schema: ref("Error") };
         result.headers = {
           "Cache-Control": { schema: { const: "no-store" } },
           "X-Content-Type-Options": { schema: { const: "nosniff" } },
@@ -1593,6 +1599,9 @@ function completeContract(paths) {
     " JSON requests are limited to 512000 bytes. Revision or operation-input conflicts return 409; writer unavailability returns 503. A committed save can return publication=refresh-failed and remains recoverable.";
   paths["/api/articles/preview"].post.description +=
     " JSON requests are limited to 512000 bytes. No Git write or model call occurs.";
+  paths["/api/evidence/v1/{route}"].get.parameters.push(
+    header("Range", "Optional byte range forwarded to the evidence provider"),
+  );
   paths["/api/evidence/v1/{route}"].get.responses.default = {
     description:
       "Upstream provider status, body and content type are forwarded after authorization; only allowlisted response headers pass through.",
