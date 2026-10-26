@@ -847,6 +847,21 @@ const schemas = {
     session_id: nullableString,
     imported_at: string,
   }),
+  EvidenceCatalog: {
+    ...record(
+      {
+        items: array(),
+        results: array(),
+        total: integer,
+        nextOffset,
+        indexed: boolean,
+      },
+      [],
+    ),
+    anyOf: [{ required: ["items"] }, { required: ["results"] }],
+    description:
+      "External catalog/search passthrough: catalogs use items or results; searches use results. Counts, pagination and indexing metadata are provider-dependent.",
+  },
   TracePage: record({
     id: string,
     format: string,
@@ -1133,11 +1148,11 @@ function completeContract(paths) {
       anyOf: [
         array(ref("TraceMetadata")),
         schemaPage("snapshots", ref("TraceMetadata")),
-        schemaPage("results"),
+        ref("EvidenceCatalog"),
       ],
     },
     "wiki.traceSessions": {
-      anyOf: [schemaPage("sessions"), schemaPage("results")],
+      anyOf: [schemaPage("sessions"), ref("EvidenceCatalog")],
     },
     "wiki.trace": { anyOf: [ref("TracePage"), ref("Conversation")] },
     "wiki.traceLines": ref("TraceLines"),
@@ -1363,6 +1378,8 @@ function completeContract(paths) {
   ]) {
     for (const p of paths[path].get.parameters) {
       p.required = false;
+      if (p.name === "format")
+        p.schema = { ...p.schema, enum: ["", "codex", "pi", "claude"] };
       if (p.name === "limit")
         p.schema = {
           type: "integer",
@@ -1426,7 +1443,7 @@ function completeContract(paths) {
       "trace",
       [
         ...paths["/api/traces/catalog.json"].get.parameters,
-        query("view", { const: "snapshots" }),
+        query("view", { enum: ["sessions", "snapshots"] }),
       ],
     ],
     [
@@ -1510,6 +1527,7 @@ function completeContract(paths) {
     "trace",
     "External archive catalog alias; preserves query string.",
   );
+  alias.parameters = paths["/traces/"].get.parameters;
   alias.responses = { ...alias.responses, 302: redirectResponse };
   delete alias.responses["200"];
   for (const [status, result] of Object.entries(alias.responses))

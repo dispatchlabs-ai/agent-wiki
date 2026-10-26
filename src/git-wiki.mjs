@@ -169,42 +169,62 @@ function readPages(repo, entries) {
 // History is lazy: constructors and writer snapshots do not parse receipts.
 // The reader worker batches immutable commit/object reads. Async subprocesses
 // also let that worker refresh articles while a cold history read is in flight.
-function historyGit(
+export function historyGit(
   repo,
   args,
-  { input = "", maxBuffer = 64 * 1024 * 1024 } = {},
+  { input = "", maxBuffer = 64 * 1024 * 1024, signal = undefined } = {},
 ) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
     const child = spawn("git", ["-C", repo, ...args], {
       stdio: lifecycleStdio(["pipe", "pipe", "pipe"]),
     });
     const output = [];
-    let bytes = 0;
-    child.on("error", reject);
+    let bytes = 0,
+      failure;
+    // These read-only children need no graceful shutdown. Keep the process
+    // handle and inherited lifecycle fence until close has reaped the child,
+    // including spawn, stream and output-limit failures.
+    const fail = (error) => {
+      if (failure) return;
+      failure = error;
+      child.kill("SIGKILL");
+    };
+    const abort = () => fail(signal.reason);
+    signal?.addEventListener("abort", abort, { once: true });
+    child.on("error", fail);
+    child.stdout.on("error", fail);
+    child.stderr.on("error", fail);
     child.stdout.on("data", (chunk) => {
+      if (failure) return;
       bytes += chunk.length;
-      if (bytes > maxBuffer) {
-        child.kill();
-        reject(Error("History Git output exceeds its read bound"));
-      } else output.push(chunk);
+      if (bytes > maxBuffer)
+        fail(Error("History Git output exceeds its read bound"));
+      else output.push(chunk);
     });
     child.stderr.resume();
     child.on("close", (code) => {
-      if (code !== 0) reject(Error(`History Git read failed: ${args[0]}`));
+      signal?.removeEventListener("abort", abort);
+      if (failure) reject(failure);
+      else if (code !== 0) reject(Error(`History Git read failed: ${args[0]}`));
       else resolve(Buffer.concat(output));
     });
     child.stdin.on("error", (error) => {
-      if (!("code" in error) || error.code !== "EPIPE") reject(error);
+      if (!("code" in error) || error.code !== "EPIPE") fail(error);
     });
-    child.stdin.end(input);
+    try {
+      child.stdin.end(input);
+    } catch (error) {
+      fail(error);
+    }
   });
 }
-async function historyReceipts(repo, refs) {
+async function historyReceipts(repo, refs, read) {
   const commits = new Map(
     refs.map((ref) => [ref.commit, { blobs: new Map(), receipts: [] }]),
   );
   const changes = (
-    await historyGit(
+    await read(
       repo,
       [
         "diff-tree",
@@ -251,7 +271,7 @@ async function historyReceipts(repo, refs) {
   if (!objects.size) return commits;
   const blobs = [...objects.keys()];
   const headers = (
-    await historyGit(repo, ["cat-file", "--batch-check"], {
+    await read(repo, ["cat-file", "--batch-check"], {
       input: blobs.join("\n") + "\n",
     })
   )
@@ -280,7 +300,7 @@ async function historyReceipts(repo, refs) {
     while (end < entries.length && bytes + entries[end].size <= 4 * 1024 * 1024)
       bytes += entries[end++].size;
     const batch = entries.slice(start, end);
-    const output = await historyGit(repo, ["cat-file", "--batch"], {
+    const output = await read(repo, ["cat-file", "--batch"], {
       input: batch.map((entry) => entry.blob).join("\n") + "\n",
       maxBuffer: bytes + batch.length * 128,
     });
@@ -464,12 +484,12 @@ export class GitWiki {
     return `${ref.commit}:${id}:${ref.filename}:${ref.number}`;
   }
   /** @returns {Promise<import("./contracts.mjs").HistoryRevision[]>} */
-  async history(id, refs = this.histories.get(id) || []) {
+  async history(id, refs = this.histories.get(id) || [], read = historyGit) {
     const missing = refs.filter(
       (ref) => !this.attributions.has(this.attributionKey(id, ref)),
     );
     if (missing.length) {
-      const commits = await historyReceipts(this.repo, missing);
+      const commits = await historyReceipts(this.repo, missing, read);
       for (const ref of missing) {
         const { receipts, blobs } = commits.get(ref.commit);
         this.attributions.set(

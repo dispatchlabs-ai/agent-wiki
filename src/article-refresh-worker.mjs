@@ -7,11 +7,28 @@ const wiki = Object.assign(
   workerData.snapshot,
 );
 const index = new WikiSearch(workerData.database);
-parentPort.on("message", async ({ kind, key, head, id, refs }) => {
+const reads = new Map();
+let nextRead = 0;
+function historyGit(repo, args, options) {
+  return new Promise((resolve, reject) => {
+    const requestId = ++nextRead;
+    reads.set(requestId, { resolve, reject });
+    parentPort.postMessage({ kind: "historyGit", requestId, args, options });
+  });
+}
+parentPort.on("message", async (message) => {
+  const { kind, key, head, id, refs } = message;
+  if (kind === "historyGit") {
+    const pending = reads.get(message.requestId);
+    reads.delete(message.requestId);
+    if (message.error) pending?.reject(Error(message.error));
+    else pending?.resolve(Buffer.from(message.output));
+    return;
+  }
   const reply = (result) => parentPort.postMessage({ key, result });
   if (kind === "history") {
     try {
-      reply({ revisions: await wiki.history(id, refs) });
+      reply({ revisions: await wiki.history(id, refs, historyGit) });
     } catch (error) {
       reply({ error: error.message });
     }
