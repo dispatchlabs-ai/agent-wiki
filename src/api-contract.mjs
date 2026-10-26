@@ -696,11 +696,6 @@ export function openAPI() {
       };
       spec.responses["416"] = { description: "Unsatisfiable byte range" };
     }
-    if (id === "evidence.proxy")
-      spec.responses["200"].content = {
-        "application/json": { schema: {} },
-        "*/*": { schema: { type: "string", format: "binary" } },
-      };
     if (permission === "bearer") spec.security = [{ bearerAuth: [] }];
     if (method === "post")
       spec.requestBody = {
@@ -1600,14 +1595,19 @@ function completeContract(paths) {
   paths["/api/evidence/v1/{route}"].get.parameters.push(
     header("Range", "Optional byte range forwarded to the evidence provider"),
   );
-  paths["/api/evidence/v1/{route}"].get.responses.default = {
+  const providerResponse = {
     description:
-      "Upstream provider status, body and content type are forwarded after authorization; only allowlisted response headers pass through.",
+      "Upstream provider status, body and content type are forwarded after authorization; only allowlisted response headers pass through. Engine failures use the Error schema; provider errors retain their original format.",
     content: {
       "application/json": { schema: {} },
       "*/*": { schema: { type: "string", format: "binary" } },
     },
   };
+  for (const path of ["/api/evidence/v1/{route}", "/media/{asset}"]) {
+    paths[path].get.responses.default = providerResponse;
+    for (const result of Object.values(paths[path].get.responses))
+      result.content = providerResponse.content;
+  }
   for (const path of ["/media/{asset}", "/article-media/{asset}"])
     for (const status of ["200", "206", "416"]) {
       const result = paths[path].get.responses[status];
