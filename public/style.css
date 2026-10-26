@@ -1051,3 +1051,11 @@ footer select {
   display: block;
   overflow-wrap: anywhere;
 }
+
+/* Long recorded principal IDs and comparison source stay inside each cell. */
+.revision-table td {
+  overflow-wrap: anywhere;
+}
+#editor-conflict {
+  margin-block: 1.5rem;
+}

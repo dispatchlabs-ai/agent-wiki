@@ -3,6 +3,8 @@
 /**
  * @typedef {"codex"|"pi"|"claude"} Harness
  * @typedef {{commit:string,created_at:string,summary:string,filename:string,number:number,url:string}} RevisionRef
+ * @typedef {{kind:string,actor:string|null,authority:{mode:string,subject:string|null,initiator:string|null}|null}} Attribution
+ * @typedef {RevisionRef & {attribution:Attribution}} HistoryRevision
  * @typedef {RevisionRef & {id:string,title:string,description:string,body:string,revision_id:string,revisionCount:number,topic:string,related:string[],questions:string[],sources:object[]}} ArticleRevision
  * @typedef {{id:string,format:Harness,title:string,bytes:number,records:number,session_id:string|null,imported_at:string,url?:string}} TraceMetadata
  * @typedef {{line:number,value:Record<string,any>}} SourceRecord

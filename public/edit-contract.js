@@ -13,8 +13,8 @@
  * @property {{conversation:string,event:string,quote:string}[]} [evidence]
  * @typedef {{operation_id: string, updates: ArticleUpdate[]}} EditDraft
  * @typedef {{id: string, number: number, url: string, revision_id: string}} ArticleReceipt
- * @typedef {{operation_id:string,state:"saved",articles:ArticleReceipt[]}} StoredReceipt
- * @typedef {{operation_id: string, state: "saved"|"already-saved", articles: ArticleReceipt[], commit: string, remote?:"not-requested"|"pushed"|"push-failed"}} SaveReceipt
+ * @typedef {{operation_id:string,state:"saved",articles:ArticleReceipt[],actor?:string,authority?:object,initiator?:string}} StoredReceipt
+ * @typedef {{operation_id: string, state: "saved"|"already-saved", articles: ArticleReceipt[], commit: string, actor?:string,authority?:object,initiator?:string, remote?:"not-requested"|"pushed"|"push-failed"}} SaveReceipt
  */
 const id = {
   type: "string",

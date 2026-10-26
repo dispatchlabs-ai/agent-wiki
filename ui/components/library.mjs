@@ -17,7 +17,14 @@ const select = (label, name, value, entries) =>
     h("select", { name, defaultValue: value }, ...options(entries)),
   );
 const hidden = (name, value) => h("input", { type: "hidden", name, value });
-export function ArticlesCatalog({ pages, topics, topic, sort }) {
+export function ArticlesCatalog({
+  pages,
+  total,
+  canWrite,
+  topics,
+  topic,
+  sort,
+}) {
   return h(
     "div",
     { className: "library-page" },
@@ -25,6 +32,12 @@ export function ArticlesCatalog({ pages, topics, topic, sort }) {
       title: "Articles",
       description: "Browse the people, organizations, and ideas in your wiki.",
     }),
+    canWrite &&
+      h(
+        "p",
+        { className: "actions" },
+        h("a", { className: "ui-button", href: "/new/" }, "Create article"),
+      ),
     h(
       "div",
       { className: "catalog-layout" },
@@ -104,8 +117,20 @@ export function ArticlesCatalog({ pages, topics, topic, sort }) {
             )
           : h(
               EmptyState,
-              { title: "No articles match this topic" },
-              "Choose another topic or clear the filters.",
+              {
+                title: total
+                  ? "No articles match this topic"
+                  : "No articles yet",
+              },
+              total
+                ? h(
+                    "a",
+                    { href: "/wiki/" },
+                    "Clear filters to see all articles.",
+                  )
+                : canWrite
+                  ? "Create the first article to start this collection."
+                  : "An editor can add articles when writing is enabled.",
             ),
       ),
     ),
@@ -170,6 +195,7 @@ export function SearchPage({
       hidden: { type, state, topic, format, machine },
       live: true,
       label: "Search query",
+      evidenceAccess,
     }),
     h(
       "nav",

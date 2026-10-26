@@ -350,7 +350,15 @@ try {
     else if (result.revisions)
       process.stdout.write(
         result.revisions
-          .map((r) => `${r.number}  ${r.revision_id || r.commit}  ${r.summary}`)
+          .map((r) => {
+            const a = r.attribution;
+            const changer = a?.actor
+              ? `${a.kind}: ${a.actor}${a.authority ? ` (${a.authority.mode}${a.authority.subject ? `; subject: ${a.authority.subject}` : ""}; initiator: ${a.authority.initiator || "not recorded"})` : ""}`
+              : a?.kind === "operator"
+                ? "operator (no authenticated actor)"
+                : "unknown (no authenticated attribution)";
+            return `${r.number}  ${r.revision_id || r.commit}  ${r.summary}  — ${changer}`;
+          })
           .join("\n") + "\n",
       );
     else process.stdout.write(JSON.stringify(result, null, 2) + "\n");

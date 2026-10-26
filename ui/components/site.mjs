@@ -58,7 +58,8 @@ export function SiteHeader({
     h(
       "div",
       { className: "header-actions" },
-      !signedOut && h(SearchForm, { compact: true }),
+      !signedOut &&
+        h(SearchForm, { compact: true, evidenceAccess: conversations }),
       !signedOut && h("span", { id: "quick-search" }),
       !signedOut &&
         h(

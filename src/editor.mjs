@@ -47,6 +47,7 @@ export function saveGitEdits(
   authority = null,
   publish = (fn) => fn(),
   snapshot = null,
+  initiator = null,
 ) {
   if (
     !draft ||
@@ -106,8 +107,9 @@ export function saveGitEdits(
               filename,
             ]);
             number =
-              wiki.history(a.id).find((ref) => ref.commit === changed)
-                ?.number || number;
+              (wiki.histories.get(a.id) || []).find(
+                (ref) => ref.commit === changed,
+              )?.number || number;
           } else revision_id = wiki.revision(a.id, a.number)?.revision_id;
         }
         if (typeof revision_id !== "string")
@@ -206,7 +208,7 @@ export function saveGitEdits(
     results.push({
       id: u.id,
       number:
-        (wiki.history(u.id).at(-1)?.number || 0) +
+        ((wiki.histories.get(u.id) || []).at(-1)?.number || 0) +
         Number(!current || revision_id !== current.revision_id),
       revision_id,
       url: `/wiki/${u.id}/`,
@@ -227,6 +229,7 @@ export function saveGitEdits(
     operation_id: publicOperation,
     ...(actor ? { actor } : {}),
     ...(authority ? { authority } : {}),
+    ...(initiator ? { initiator } : {}),
     state: "saved",
     articles: results,
   };
@@ -285,6 +288,7 @@ export class GitEditor {
               );
             return {
               actor: actor.id,
+              initiator: this.agents.run(actor.run).initiator,
               authority: {
                 run: actor.run,
                 ...("credential" in actor
@@ -334,6 +338,7 @@ export class GitEditor {
           initial.authority,
           publish,
           snapshot,
+          initial.initiator,
         );
         // Retry also retries a previously failed push. A failed remote never makes
         // the local durable commit disappear or creates a duplicate revision.

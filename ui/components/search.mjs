@@ -28,6 +28,7 @@ export function SearchForm({
   live = false,
   required = false,
   label = "Search the wiki",
+  evidenceAccess = true,
 }) {
   return h(
     "form",
@@ -51,7 +52,9 @@ export function SearchForm({
       name: "q",
       type: "search",
       maxLength: 300,
-      placeholder: "Articles and conversations…",
+      placeholder: evidenceAccess
+        ? "Articles and conversations…"
+        : "Search articles…",
       required,
       defaultValue: query,
     }),

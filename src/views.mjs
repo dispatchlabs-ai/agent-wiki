@@ -69,7 +69,7 @@ export function home(wiki, params, conversations = true) {
     { active: "Home", className: "home-page" },
   );
 }
-export function topics(wiki, params) {
+export function topics(wiki, params, canWrite = false) {
   const topic = params.get("topic") || "",
     sort = params.get("sort") === "updated" ? "updated" : "title";
   const pages = wiki
@@ -85,6 +85,8 @@ export function topics(wiki, params) {
     renderToStaticMarkup(
       createElement(ArticlesCatalog, {
         pages,
+        total: wiki.pages.size,
+        canWrite,
         topics: topicNames(wiki),
         topic,
         sort,
@@ -99,6 +101,14 @@ function comparisonForm(id, history, from, to) {
 function latestKnown(wiki, id) {
   return wiki.current(id) || wiki.revision(id, wiki.history(id).at(-1)?.number);
 }
+function changer(attribution) {
+  const { kind, actor, authority } = attribution;
+  if (kind === "operator") return "Operator · no authenticated actor recorded";
+  if (kind === "unknown")
+    return "Unknown · no authenticated attribution recorded";
+  if (kind === "human") return `Person · ${e(actor)}`;
+  return `Agent · ${e(actor)}<br><span class="meta">${authority.mode === "delegated" ? `Delegated by · ${e(authority.subject)}` : "Independent authority"}<br>Initiator · ${authority.initiator ? e(authority.initiator) : "not recorded"}</span>`;
+}
 export function historyView(wiki, id) {
   const p = latestKnown(wiki, id);
   if (!p) return null;
@@ -106,16 +116,16 @@ export function historyView(wiki, id) {
     from = Math.max(1, p.number - 1);
   return shell(
     `${p.title} history`,
-    `${articleHeader(p, "History")}<div class="layout"><div><h2>Article history</h2>${comparisonForm(id, history, from, p.number)}<table class="revision-table"><thead><tr><th>Revision</th><th>What changed</th><th>Date</th><th>Actions</th></tr></thead><tbody>${history
+    `${articleHeader(p, "History")}<div class="layout"><div><h2>Article history</h2>${comparisonForm(id, history, from, p.number)}<table class="revision-table"><thead><tr><th>Revision</th><th>What changed</th><th>Changed by</th><th>Date</th><th>Actions</th></tr></thead><tbody>${history
       .slice()
       .reverse()
       .map(
         (h) =>
-          `<tr${h.number === p.number ? ' class="latest"' : ""}><td data-label="Revision">${h.number}</td><td data-label="What changed">${e(h.summary)}</td><td data-label="Date">${date(h.created_at)}</td><td data-label="Actions"><div class="actions">${link(h.url, "View")}${link(queryLink(`/wiki/${id}/compare/`, { from: Math.max(1, h.number - 1), to: h.number }), "Compare")}</div></td></tr>`,
+          `<tr${h.number === p.number ? ' class="latest"' : ""}><td data-label="Revision">${h.number}</td><td data-label="What changed">${e(h.summary)}</td><td data-label="Changed by">${changer(h.attribution)}</td><td data-label="Date">${date(h.created_at)}</td><td data-label="Actions"><div class="actions">${link(h.url, "View")}${link(queryLink(`/wiki/${id}/compare/`, { from: Math.max(1, h.number - 1), to: h.number }), "Compare")}</div></td></tr>`,
       )
       .join(
         "",
-      )}</tbody></table></div><aside class="sidebar"><h2>About this history</h2><p>Each revision is preserved in Git. Compare two revisions to see the recorded changes.</p>${link(p.url, "Current article")}</aside></div>`,
+      )}</tbody></table></div><aside class="sidebar"><h2>About this history</h2><p>Each revision is preserved in Git. Changers are recorded principal IDs, not the configured Git author. Older changes may have no authenticated attribution. Compare two revisions to see the recorded changes.</p>${link(p.url, "Current article")}</aside></div>`,
     { active: "Articles" },
   );
 }
@@ -254,15 +264,17 @@ export function sourcesView(wiki, id, params) {
   );
 }
 export function editorView(p, write) {
+  const creating = !p,
+    url = p?.url || "/wiki/";
   if (!write)
     return shell(
       "Read-only",
-      `<h1>This wiki is read-only</h1><p>${link(p.url, "Return to article")}</p>`,
+      `<h1>This wiki is read-only</h1><p>${link(url, creating ? "Browse articles" : "Return to article")}</p>`,
       { active: "Articles" },
     );
   return shell(
-    `Edit ${p.title}`,
-    `<p class="breadcrumb">${link("/wiki/", "Articles")} / ${link(p.url, p.title)} / Edit</p><h1>Edit article</h1><p class="meta" id="editing-revision">Editing revision ${p.number}</p><form id="editor" data-id="${p.id}"><label>Title<input name="title" required maxlength="200"></label><label>Description<input name="description" required maxlength="600"></label><label>Topic<input name="topic" required maxlength="100"></label><div class="tabs" role="tablist" aria-label="Editor view"><button type="button" role="tab" aria-selected="true" data-editor-mode="write">Write</button><button type="button" role="tab" aria-selected="false" data-editor-mode="preview">Preview</button><button type="button" role="tab" aria-selected="false" class="split-control" data-editor-mode="split">Split</button></div><div class="editor-panes" data-mode="write"><div class="write-pane"><label>Markdown<textarea name="body" required maxlength="100000" rows="24"></textarea></label></div><div class="preview-pane"><h2 id="preview-title"></h2><p id="preview-description" class="muted"></p><article id="preview-body" class="typeset typeset-docs"></article><p id="preview-status" aria-live="polite"></p></div></div><label>Change summary<input name="summary" required maxlength="1000"></label><p class="muted">If someone saves a newer revision, you’ll need to review it before saving your draft.</p><div class="actions editor-actions"><button type="submit" disabled>Save revision</button><a class="button secondary" href="${p.url}">Cancel</a></div><p role="status" id="status">Loading current revision…</p></form>`,
+    creating ? "Create article" : `Edit ${p.title}`,
+    `<p class="breadcrumb">${link("/wiki/", "Articles")} / ${creating ? "Create" : `${link(p.url, p.title)} / Edit`}</p><h1>${creating ? "Create article" : "Edit article"}</h1><p class="meta" id="editing-revision">${creating ? "New article" : `Editing revision ${p.number}`}</p><form id="editor" data-id="${p?.id || ""}">${creating ? `<label>Article ID<input name="id" required maxlength="100" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" aria-describedby="article-id-help"></label><p class="muted" id="article-id-help">Use lowercase letters, numbers and single hyphens. This becomes the article’s address.</p>` : ""}<label>Title<input name="title" required maxlength="200"></label><label>Description<input name="description" required maxlength="600"></label><label>Topic<input name="topic" required maxlength="100"></label><div class="tabs" role="tablist" aria-label="Editor view"><button type="button" role="tab" aria-selected="true" data-editor-mode="write">Write</button><button type="button" role="tab" aria-selected="false" data-editor-mode="preview">Preview</button><button type="button" role="tab" aria-selected="false" class="split-control" data-editor-mode="split">Split</button></div><div class="editor-panes" data-mode="write"><div class="write-pane"><label>Markdown<textarea name="body" required maxlength="100000" rows="24"></textarea></label></div><div class="preview-pane"><h2 id="preview-title"></h2><p id="preview-description" class="muted"></p><article id="preview-body" class="typeset typeset-docs"></article><p id="preview-status" aria-live="polite"></p></div></div><label>Change summary<input name="summary" required maxlength="1000"></label><p class="muted">If someone saves a newer revision, you’ll need to review it before saving your draft.</p><div class="actions editor-actions"><button type="submit" disabled>${creating ? "Create article" : "Save revision"}</button><a class="button secondary" href="${url}">Cancel</a></div><p role="status" id="status">${creating ? "Preparing editor…" : "Loading current revision…"}</p><button type="button" id="compare-latest" hidden>Compare latest revision</button><section id="editor-conflict" hidden aria-labelledby="conflict-heading"><h2 id="conflict-heading" tabindex="-1">Review intervening changes</h2><p>Your draft remains in the editor. Compare the saved revisions below, edit your draft to reconcile them, then use the reviewed revision as its new base. Nothing is saved until you choose Save revision.</p><div id="conflict-comparison"></div><button type="button" id="use-reviewed">Use reviewed revision</button></section></form>`,
     { active: "Articles" },
   );
 }

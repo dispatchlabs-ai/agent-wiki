@@ -323,6 +323,8 @@ export function createWiki({
       if (status < 400) authorizeResponse();
       return originalWriteHead.call(this, status, ...args);
     };
+    let navigationURL,
+      browserNavigation = false;
     let browserAsset = false,
       securityDocument = false,
       diagramDocument = false;
@@ -343,6 +345,7 @@ export function createWiki({
             authorizeResponse();
           } catch {
             protectedResponse = false;
+            renderContext.getStore().evidenceAccess = false;
             return send(404, { error: "Not found", code: "NOT_FOUND" });
           }
         }
@@ -353,6 +356,19 @@ export function createWiki({
           !value.code
         )
           value = { ...value, code: `HTTP_${status}` };
+        if (browserNavigation && status >= 400 && type === "application/json") {
+          const unavailable = status >= 500;
+          const title = unavailable
+            ? "Page temporarily unavailable"
+            : status === 404
+              ? "Page not found"
+              : "Unable to open this page";
+          value = shell(
+            title,
+            `<h1>${title}</h1><p>${unavailable ? "Please try again. Your articles remain available from the catalog." : "This page is unavailable or you may not have access to it."}</p><div class="actions">${unavailable ? link(navigationURL.pathname + navigationURL.search, "Try again") : ""}${link("/wiki/", "Browse articles")}${link("/", "Home")}</div>`,
+          );
+          type = "text/html";
+        }
         res.writeHead(status, responseHeaders(type));
         res.end(type === "application/json" ? JSON.stringify(value) : value);
       };
@@ -382,6 +398,17 @@ export function createWiki({
     };
     try {
       const url = new URL(req.url, origin);
+      navigationURL = url;
+      browserNavigation =
+        req.method === "GET" &&
+        !req.headers.authorization &&
+        req.headers.accept?.includes("text/html") &&
+        (!req.headers["sec-fetch-dest"] ||
+          req.headers["sec-fetch-dest"] === "document") &&
+        /^(?:\/|\/new\/|\/wiki\/|\/wiki\/[a-z0-9-]+\/(?:(?:history|edit|compare|sources)\/|revision\/(?:[1-9][0-9]*|[a-f0-9]{40})\/)?|\/search\/|\/traces\/(?:[a-z0-9-]+\/)?|\/conversations\/(?:chat-[a-f0-9]{24}\/)?|\/files\/[a-f0-9]{64}\.(?:png|jpg|gif|webp|pdf|bin)\/)$/.test(
+          navigationURL.pathname,
+        );
+
       if (req.method === "GET" && url.pathname === "/healthz")
         return send(200, { status: "ok" });
       if (req.headers.host !== new URL(origin).host)
@@ -482,6 +509,7 @@ export function createWiki({
             return false;
           protectedResponse = true;
           canTrace = conversations && identity.permissions.trace;
+          renderContext.getStore().evidenceAccess = canTrace;
           canWrite = write && identity.permissions.write;
           if (url.pathname === "/mcp" || url.pathname === "/mcp/") {
             // The run pins an immutable definition. Capture display/tool metadata
@@ -787,6 +815,8 @@ export function createWiki({
           );
         token = cookieValue(req, "wiki_session");
         actor = control.authenticate(token);
+        renderContext.getStore().evidenceAccess =
+          !!actor && conversations && permits(control.role(actor.id), "trace");
         if (!actor) res.setHeader("WWW-Authenticate", agentAuth.challenge());
         if (!actor) {
           if (
@@ -1841,9 +1871,10 @@ export function createWiki({
         url.search;
       if (cache.has(key)) return send(200, cache.get(key), "text/html");
       let html;
-      if (url.pathname === "/")
-        html = home(wiki, url.searchParams, conversations);
-      if (url.pathname === "/wiki/") html = topics(wiki, url.searchParams);
+      if (url.pathname === "/") html = home(wiki, url.searchParams, canTrace);
+      if (url.pathname === "/wiki/")
+        html = topics(wiki, url.searchParams, canWrite);
+      if (url.pathname === "/new/") html = editorView(null, canWrite);
       const route = url.pathname.match(
         /^\/wiki\/([a-z0-9-]+)\/(?:(history|edit|compare|sources)\/|revision\/([1-9][0-9]*|[a-f0-9]{40})\/)?$/,
       );
@@ -1886,7 +1917,9 @@ export function createWiki({
     }
   };
   const server = http.createServer((req, res) =>
-    renderContext.run({ conversations }, () => handleRequest(req, res)),
+    renderContext.run({ conversations, evidenceAccess: !control }, () =>
+      handleRequest(req, res),
+    ),
   );
   const mcpApi = new McpApiClient(server, origin);
   const makeMcp = (writable, evidenceAccess) =>

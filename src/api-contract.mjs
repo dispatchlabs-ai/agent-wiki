@@ -84,6 +84,20 @@ const receipt = {
   required: ["operation_id", "state", "articles", "commit"],
   properties: {
     operation_id: string,
+    actor: {
+      ...string,
+      description: "Recorded authenticated principal ID, when available.",
+    },
+    authority: {
+      ...object,
+      description:
+        "Original agent authority recorded for this caller's save; absent for human and operator writes.",
+    },
+    initiator: {
+      ...string,
+      description:
+        "Recorded human initiator of an agent save, when available. Older receipts may omit this field.",
+    },
     state: { enum: ["saved", "already-saved"] },
     commit: string,
     articles: {
@@ -809,6 +823,20 @@ const schemas = {
     summary: string,
     filename: string,
     url: string,
+    attribution: record({
+      kind: { enum: ["human", "agent", "operator", "unknown"] },
+      actor: nullableString,
+      authority: {
+        anyOf: [
+          { type: "null" },
+          record({
+            mode: { enum: ["independent", "delegated"] },
+            subject: nullableString,
+            initiator: nullableString,
+          }),
+        ],
+      },
+    }),
   }),
   TraceMetadata: record({
     id: string,
@@ -1347,6 +1375,7 @@ function completeContract(paths) {
       "read",
       [query("topic"), query("sort", { enum: ["title", "updated"] })],
     ],
+    ["/new/", "create", "read", []],
     ["/wiki/{id}/", "article", "read", []],
     ["/wiki/{id}/revision/{revision}/", "revision", "read", []],
     ...["history", "edit", "compare", "sources"].map((view) => [
@@ -1420,8 +1449,36 @@ function completeContract(paths) {
       "Rendered browser navigation. Signed-out humans receive sign-in HTML or a redirect; machine credentials use the corresponding JSON API, except protected evidence routes.",
     );
     spec.parameters.push(...params);
+    if (id === "create")
+      spec.description +=
+        " Creation requires writes enabled and editor/manager authority; otherwise a read-only page is shown. The form calls POST /api/articles/edits with expected_revision_id null, not a separate writer.";
     spec.responses["200"] = htmlResponse;
     spec.responses["303"] = redirectResponse;
+    if (
+      [
+        "home",
+        "topics",
+        "create",
+        "article",
+        "revision",
+        "history",
+        "edit",
+        "compare",
+        "sources",
+        "search",
+        "traces",
+        "trace",
+        "provenance",
+        "conversation",
+        "file",
+      ].includes(id)
+    ) {
+      spec.description +=
+        " Browser document requests accepting text/html receive non-disclosing HTML recovery pages on errors; JSON clients retain structured errors.";
+      for (const [status, result] of Object.entries(spec.responses))
+        if (Number(status) >= 400)
+          result.content = { ...result.content, ...htmlResponse.content };
+    }
     spec.security =
       permission === "trace"
         ? [{ browserSession: [] }, { bearerAuth: [] }]
@@ -1436,6 +1493,9 @@ function completeContract(paths) {
   );
   alias.responses = { ...alias.responses, 302: redirectResponse };
   delete alias.responses["200"];
+  for (const [status, result] of Object.entries(alias.responses))
+    if (Number(status) >= 400)
+      result.content = { ...result.content, ...htmlResponse.content };
   const asset = add(
     "get",
     "/assets/{asset}",

@@ -172,6 +172,7 @@ export class GitWiki {
     this.head = null;
     this.pages = new Map();
     this.histories = new Map();
+    this.attributions = new Map();
     this.fileInfo = new Map();
     this.linkCache = new Map();
     this.refresh();
@@ -275,13 +276,96 @@ export class GitWiki {
     this.head = head;
     return true;
   }
-  /** @returns {import("./contracts.mjs").RevisionRef[]} */
+  /** @returns {import("./contracts.mjs").HistoryRevision[]} */
   history(id) {
-    return this.histories.get(id) || [];
+    return (this.histories.get(id) || []).map((ref) => ({
+      ...ref,
+      attribution: this.attribution(id, ref),
+    }));
+  }
+  attribution(id, ref) {
+    // Only receipts added with this exact revision can identify its changer.
+    // Git's configured author is not an authenticated application identity.
+    if (!this.attributions.has(ref.commit)) {
+      const receipts = [];
+      const names = git(this.repo, [
+        "diff-tree",
+        "--root",
+        "--first-parent",
+        "--no-commit-id",
+        "-r",
+        "--diff-filter=A",
+        "--name-only",
+        ref.commit,
+        "--",
+        ".wiki/operations",
+      ]).split("\n");
+      for (const name of names) {
+        if (!/^\.wiki\/operations\/[a-z0-9-]+\.json$/.test(name)) continue;
+        try {
+          receipts.push(
+            JSON.parse(git(this.repo, ["show", `${ref.commit}:${name}`]))
+              .receipt,
+          );
+        } catch {
+          // Older/operator history may not have a readable receipt.
+        }
+      }
+      this.attributions.set(ref.commit, receipts);
+    }
+    const key = `${ref.commit}:${id}`;
+    if (this.attributions.has(key)) return this.attributions.get(key);
+    const remember = (value) => {
+      this.attributions.set(key, value);
+      return value;
+    };
+    const matches = this.attributions
+      .get(ref.commit)
+      .filter(
+        (receipt) =>
+          receipt?.state === "saved" &&
+          Array.isArray(receipt.articles) &&
+          receipt.articles.some(
+            (article) =>
+              article?.id === id &&
+              article.number === ref.number &&
+              (!article.revision_id ||
+                article.revision_id ===
+                  git(this.repo, [
+                    "rev-parse",
+                    `${ref.commit}:${ref.filename}`,
+                  ])),
+          ),
+      );
+    const unknown = { kind: "unknown", actor: null, authority: null };
+    if (matches.length !== 1) return remember(unknown);
+    const receipt = matches[0];
+    if (!receipt.actor)
+      return remember({ kind: "operator", actor: null, authority: null });
+    if (typeof receipt.actor !== "string") return remember(unknown);
+    if (!receipt.authority)
+      return remember({ kind: "human", actor: receipt.actor, authority: null });
+    const { mode, subject } = receipt.authority;
+    if (
+      !["independent", "delegated"].includes(mode) ||
+      (subject !== null && typeof subject !== "string")
+    )
+      return remember(unknown);
+    return remember({
+      kind: "agent",
+      actor: receipt.actor,
+      // Deliberately exclude credential, token, run and internal scope fields.
+      authority: {
+        mode,
+        subject,
+        initiator:
+          typeof receipt.initiator === "string" ? receipt.initiator : null,
+      },
+    });
   }
   /** @returns {import("./contracts.mjs").ArticleRevision|null} */
   revision(id, number) {
-    const ref = this.history(id).find(
+    const ref = (this.histories.get(id) || []).find(
       (r) => r.number === number || r.commit === number,
     );
     if (!ref) return null;
