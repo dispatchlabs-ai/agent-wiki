@@ -1,4 +1,5 @@
 import { createElement as h } from "react";
+import { validTraceOffset } from "../../public/search-results.js";
 import {
   Badge,
   Button,
@@ -30,7 +31,8 @@ function safeLink(value) {
 }
 export function ConversationsCatalog({ q, format, machine, offset, result }) {
   const items = result.items || result.results || [];
-  const total = Number(result.total || 0);
+  const hasTotal = Number.isSafeInteger(result.total) && result.total >= 0;
+  const count = hasTotal ? result.total : items.length;
   return h(
     "div",
     { className: "conversation-catalog" },
@@ -116,8 +118,8 @@ export function ConversationsCatalog({ q, format, machine, offset, result }) {
           { className: "catalog-summary" },
           h(
             "p",
-            null,
-            `${total.toLocaleString("en")} ${q ? (total === 1 ? "matching conversation" : "matching conversations") : total === 1 ? "conversation period" : "conversation periods"}`,
+            { role: "status" },
+            `${count.toLocaleString("en")} ${q ? (count === 1 ? "matching conversation" : "matching conversations") : count === 1 ? "conversation period" : "conversation periods"}${hasTotal ? "" : " on this page"}`,
           ),
           h(
             "p",
@@ -175,10 +177,9 @@ export function ConversationsCatalog({ q, format, machine, offset, result }) {
                   offset: Math.max(0, offset - 20),
                 })
               : null,
-          next:
-            result.nextOffset != null
-              ? pageLink({ q, format, machine, offset: result.nextOffset })
-              : null,
+          next: validTraceOffset(result.nextOffset)
+            ? pageLink({ q, format, machine, offset: result.nextOffset })
+            : null,
         }),
       ),
     ),

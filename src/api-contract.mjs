@@ -158,15 +158,6 @@ const responseSchemas = {
       nextOffset: { type: ["integer", "null"] },
     },
   },
-  "wiki.traceSearch": {
-    type: "object",
-    required: ["indexed", "results"],
-    properties: {
-      indexed: { type: "boolean" },
-      results: { type: "array", items: object },
-      nextOffset: { type: ["integer", "null"] },
-    },
-  },
 };
 /** @returns {Record<string, {schema: any}>} */
 function content(schema) {
@@ -805,6 +796,12 @@ const record = (properties, required = Object.keys(properties)) => ({
 /** @param {string} key @param {Record<string, any>} [item] */
 const schemaPage = (key, item = object) =>
   record({ [key]: array(item), total: integer, nextOffset });
+const evidenceSearchProperties = {
+  results: array(),
+  total: integer,
+  nextOffset: { ...nextOffset, maximum: 1000000 },
+  indexed: boolean,
+};
 const schemas = {
   ArticleMetadata: record({
     id: string,
@@ -847,17 +844,18 @@ const schemas = {
     session_id: nullableString,
     imported_at: string,
   }),
+  TraceSearch: {
+    ...record(evidenceSearchProperties, ["indexed", "results", "nextOffset"]),
+    description:
+      "Local archive search always reports indexing state and continuation.",
+  },
+  EvidenceSearch: {
+    ...record(evidenceSearchProperties, ["results"]),
+    description:
+      "External search passthrough: results are required; counts, pagination and indexing metadata are optional. Only indexed:false declares search unavailable; absent or null nextOffset means no continuation.",
+  },
   EvidenceCatalog: {
-    ...record(
-      {
-        items: array(),
-        results: array(),
-        total: integer,
-        nextOffset,
-        indexed: boolean,
-      },
-      [],
-    ),
+    ...record({ ...evidenceSearchProperties, items: array() }, []),
     anyOf: [{ required: ["items"] }, { required: ["results"] }],
     description:
       "External catalog/search passthrough: catalogs use items or results; searches use results. Counts, pagination and indexing metadata are provider-dependent.",
@@ -1153,6 +1151,9 @@ function completeContract(paths) {
     },
     "wiki.traceSessions": {
       anyOf: [schemaPage("sessions"), ref("EvidenceCatalog")],
+    },
+    "wiki.traceSearch": {
+      anyOf: [ref("TraceSearch"), ref("EvidenceSearch")],
     },
     "wiki.trace": { anyOf: [ref("TracePage"), ref("Conversation")] },
     "wiki.traceLines": ref("TraceLines"),
