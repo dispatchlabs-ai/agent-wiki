@@ -1232,42 +1232,63 @@ Prerequisites: macOS or Linux, POSIX shell, Git, Python >=3.10, OpenSSL, npm and
   For shared hosting, supply controlled HTTPS ingress instead; this is not deployment
   qualification. Never expose the plain HTTP backend or use TLS verification bypasses.
 
-1. From the repository, choose your own email/name and UNUSED absolute paths outside
-   the source checkout. Stop on any command failure; do not overwrite existing data.
+1. From the repository, choose your own email/name, UNUSED absolute paths outside
+   the source checkout and two distinct unprivileged ports BEFORE bootstrap.
+   Stop on any command failure; do not overwrite existing data.
      umask 077
      export ROOT="$HOME/agent-wiki-data" PRIVATE="$HOME/agent-wiki-private"
-     export ORIGIN=https://localhost:8443 EMAIL=you@example.org
+     export HTTPS_PORT=8443 BACKEND_PORT=4317 EMAIL=you@example.org
+     export ORIGIN="https://localhost:$HTTPS_PORT"
+     python3 - "$HTTPS_PORT" "$BACKEND_PORT" <<'PY'
+import contextlib, socket, sys
+with contextlib.ExitStack() as stack:
+    for port in map(int, sys.argv[1:]):
+        if not 1024 <= port <= 65535:
+            sys.exit("Choose ports from 1024 to 65535")
+        stack.enter_context(socket.socket()).bind(("127.0.0.1", port))
+print("Both TCP ports are free now (not reserved)")
+PY
+   If either port is occupied, choose free ports, re-export ORIGIN and repeat the
+   check before continuing. This check does not reserve ports for later commands.
      mkdir -m 700 "$ROOT" "$PRIVATE"
      python3 scripts/lifecycle.py bootstrap --root "$ROOT" --origin "$ORIGIN" \
        --manager-email "$EMAIL" --manager-name "Your name" > "$PRIVATE/bootstrap.json"
    bootstrap.json contains a private, single-use setup_url (24h); do not log/share it.
    ROOT owns content Git history, identities, evidence and media; PRIVATE holds client
    credentials and TLS state. Keep both private and outside source control.
+   Keep the selected origin/ports for this root: changing shell ORIGIN alone does
+   not reconfigure initialized state or its invitation. Do not rebootstrap to change it.
 
-2. Save this Caddyfile at $PRIVATE/Caddyfile (the ports must be free; if occupied,
-   choose free ports consistently in this file, ORIGIN and the serve command):
+2. Generate the Caddyfile using those same selections:
+     cat > "$PRIVATE/Caddyfile" <<EOF
      {
        admin off
        skip_install_trust
        auto_https disable_redirects
      }
-     https://localhost:8443 {
+     $ORIGIN {
        bind 127.0.0.1
        tls internal
-       reverse_proxy 127.0.0.1:4317
+       reverse_proxy 127.0.0.1:$BACKEND_PORT
      }
-   In two terminals, with the same ROOT/PRIVATE variables and repository directory:
+EOF
+   In two terminals, with the same ROOT/PRIVATE/ORIGIN/HTTPS_PORT/BACKEND_PORT variables
+   and repository directory:
      XDG_DATA_HOME="$PRIVATE/tls" caddy run --config "$PRIVATE/Caddyfile" --adapter caddyfile
-     WIKI_WRITE=1 python3 scripts/lifecycle.py serve --root "$ROOT" --bind 127.0.0.1 --port 4317
+     WIKI_WRITE=1 python3 scripts/lifecycle.py serve --root "$ROOT" --origin "$ORIGIN" \
+       --bind 127.0.0.1 --port "$BACKEND_PORT"
    serve is HTTP behind the HTTPS proxy, NOT a standalone HTTP login shortcut.
    WIKI_WRITE=1 enables authorized edits; omitting it keeps article writes disabled.
+   If a port/ownership conflict appears now, stop your own processes and inspect
+   status (step 5). Resolve the conflict before restarting with the same selections;
+   do not reset data, change the origin or stop a process you do not own.
 
 3. Trust only this local CA for your CLI process:
      export NODE_EXTRA_CA_CERTS="$PRIVATE/tls/caddy/pki/authorities/local/root.crt"
    Open the setup_url privately in your browser; Caddy's local certificate is not
    globally trusted. Verify the local certificate (expect Verification: OK), then
    compare its SHA-256 fingerprint in the browser certificate viewer:
-     openssl s_client -connect localhost:8443 -servername localhost -verify_hostname localhost \
+     openssl s_client -connect "localhost:$HTTPS_PORT" -servername localhost -verify_hostname localhost \
        -verify_return_error -CAfile "$NODE_EXTRA_CA_CERTS" </dev/null > "$PRIVATE/peer.pem"
      openssl x509 -in "$PRIVATE/peer.pem" -noout -fingerprint -sha256
    Only then accept a site-specific exception, or use trusted TLS ingress. Do not disable
@@ -1297,7 +1318,8 @@ Prerequisites: macOS or Linux, POSIX shell, Git, Python >=3.10, OpenSSL, npm and
    For conflicts read latest and reconcile deliberately, then use a new operation ID.
 
 5. Ctrl-C each foreground process to stop. Restart with the same two commands in
-   step 2 (and paths), NOT bootstrap; re-read the note to verify retained access/data.
+   step 2 (and paths/origin/ports), NOT bootstrap; re-read the note to verify retained
+   access/data.
    Keep the private CLI profile (0600); wiki logout revokes it when finished.
    Nonempty/repeated bootstrap and a second server owner are refused, not reset.
    On failure stop and inspect: python3 scripts/lifecycle.py status --root "$ROOT"
