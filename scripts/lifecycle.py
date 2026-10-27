@@ -1214,7 +1214,97 @@ def status(args) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
-    command = argparse.ArgumentParser(description=__doc__)
+    command = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=r"""Set up an owned wiki (source alpha; no hosted service or model provider required)
+  Agent task: follow this help, set up my own instance, then create, read, search
+  and revise a useful setup note through the authenticated CLI. Keep secrets out
+  of transcripts. Report the data location, restart commands and actual results.
+  Requires repository/file/shell access, a browser and permission to own local data.
+
+Prerequisites: macOS or Linux, POSIX shell, Git, Python >=3.10, OpenSSL, npm and Node
+  matching package.json engines. From a public source checkout run npm ci (builds UI assets).
+  This loopback path also requires Caddy 2 on PATH (https://caddyserver.com/docs/install)
+  for HTTPS and a browser on the same machine. No sudo, service installation or
+  global certificate trust is needed. Docker users need these inside the same
+  environment; a browser outside it needs explicitly configured loopback forwarding.
+  For shared hosting, supply controlled HTTPS ingress instead; this is not deployment
+  qualification. Never expose the plain HTTP backend or use TLS verification bypasses.
+
+1. From the repository, choose your own email/name and UNUSED absolute paths outside
+   the source checkout. Stop on any command failure; do not overwrite existing data.
+     umask 077
+     export ROOT="$HOME/agent-wiki-data" PRIVATE="$HOME/agent-wiki-private"
+     export ORIGIN=https://localhost:8443 EMAIL=you@example.org
+     mkdir -m 700 "$ROOT" "$PRIVATE"
+     python3 scripts/lifecycle.py bootstrap --root "$ROOT" --origin "$ORIGIN" \
+       --manager-email "$EMAIL" --manager-name "Your name" > "$PRIVATE/bootstrap.json"
+   bootstrap.json contains a private, single-use setup_url (24h); do not log/share it.
+   ROOT owns content Git history, identities, evidence and media; PRIVATE holds client
+   credentials and TLS state. Keep both private and outside source control.
+
+2. Save this Caddyfile at $PRIVATE/Caddyfile (the ports must be free; if occupied,
+   choose free ports consistently in this file, ORIGIN and the serve command):
+     {
+       admin off
+       skip_install_trust
+       auto_https disable_redirects
+     }
+     https://localhost:8443 {
+       bind 127.0.0.1
+       tls internal
+       reverse_proxy 127.0.0.1:4317
+     }
+   In two terminals, with the same ROOT/PRIVATE variables and repository directory:
+     XDG_DATA_HOME="$PRIVATE/tls" caddy run --config "$PRIVATE/Caddyfile" --adapter caddyfile
+     WIKI_WRITE=1 python3 scripts/lifecycle.py serve --root "$ROOT" --bind 127.0.0.1 --port 4317
+   serve is HTTP behind the HTTPS proxy, NOT a standalone HTTP login shortcut.
+   WIKI_WRITE=1 enables authorized edits; omitting it keeps article writes disabled.
+
+3. Trust only this local CA for your CLI process:
+     export NODE_EXTRA_CA_CERTS="$PRIVATE/tls/caddy/pki/authorities/local/root.crt"
+   Open the setup_url privately in your browser; Caddy's local certificate is not
+   globally trusted. Verify the local certificate (expect Verification: OK), then
+   compare its SHA-256 fingerprint in the browser certificate viewer:
+     openssl s_client -connect localhost:8443 -servername localhost -verify_hostname localhost \
+       -verify_return_error -CAfile "$NODE_EXTRA_CA_CERTS" </dev/null > "$PRIVATE/peer.pem"
+     openssl x509 -in "$PRIVATE/peer.pem" -noout -fingerprint -sha256
+   Only then accept a site-specific exception, or use trusted TLS ingress. Do not disable
+   browser TLS checks globally. Choose a private password of at least 15 characters.
+   Then log in via stdin (Python prompts privately on your terminal):
+     python3 -c 'import getpass; print(getpass.getpass())' | node bin/wiki.mjs login \
+       --url "$ORIGIN" --email "$EMAIL" --password-stdin --config "$PRIVATE/cli.json"
+   Automation must provide the password privately on stdin, not in command arguments.
+   This is your human account, not a separately enrolled agent; check whoami below.
+
+4. Define a convenience function in this shell:
+     wiki() { node bin/wiki.mjs "$@" --config "$PRIVATE/cli.json" --json; }
+     wiki whoami
+   Save $PRIVATE/note.json with title, description, topic, body and summary strings:
+   write your actual setup/restart notes, without passwords, tokens or private keys.
+     wiki create setup-note --file "$PRIVATE/note.json" --operation-id setup-note-1
+     wiki read setup-note > "$PRIVATE/read.json"
+     wiki search 'setup'
+   Expect your article in search and matching Markdown in read.json. Change the note's
+   body/summary, then use read.json's revision_id in place of BLOB:
+     wiki edit setup-note --file "$PRIVATE/note.json" --revision BLOB --operation-id setup-note-2
+     wiki read setup-note
+     wiki history setup-note
+   Expect the revised body and two attributed revisions. Saves report commit, push
+   and publication separately; no content remote is configured by bootstrap.
+   On uncertain saves retry EXACT input/revision/operation ID; retain that input.
+   For conflicts read latest and reconcile deliberately, then use a new operation ID.
+
+5. Ctrl-C each foreground process to stop. Restart with the same two commands in
+   step 2 (and paths), NOT bootstrap; re-read the note to verify retained access/data.
+   Keep the private CLI profile (0600); wiki logout revokes it when finished.
+   Nonempty/repeated bootstrap and a second server owner are refused, not reset.
+   On failure stop and inspect: python3 scripts/lifecycle.py status --root "$ROOT"
+   Do not delete state or locks to force progress. Offline backup/restore and recovery
+   commands have their own --help; backups contain credentials and need private storage.
+""",
+    )
     subcommands = command.add_subparsers(dest="subcommand", required=True)
     boot = subcommands.add_parser("bootstrap", help="initialize one empty managed root")
     boot.add_argument("--root", required=True)

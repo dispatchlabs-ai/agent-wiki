@@ -17,6 +17,7 @@ import { WikiError } from "../src/errors.mjs";
 
 const help = `Agent Wiki — authenticated HTTP client
 Usage: node bin/wiki.mjs <command> [arguments] [--json] [--config FILE]
+New installation: npm run setup:help (Python 3; prints setup steps, changes nothing).
 
   login --url https://wiki.example.org [--scope 'wiki:read wiki:trace wiki:write']
       Prints a browser authorization URL. Choose an explicitly shared agent.

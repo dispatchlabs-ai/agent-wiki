@@ -16,7 +16,7 @@ This document defines 61 high-level intended use cases in 10 groups for Agent Wi
 
 ## 1. Establish shared knowledge
 
-- [ ] **AW-001 — Try the complete workflow.** A prospective user tries a synthetic example, follows its sources, and previews or saves an edit to understand the workflow.
+- [ ] **AW-001 — Set up with an AI agent.** A programmer points an AI agent at this repository to set up an owned working instance and verify a useful first workflow.
 - [ ] **AW-002 — Keep an owned knowledge collection.** A knowledge owner maintains a shared knowledge space of Markdown articles and owns its revision history.
 - [ ] **AW-003 — Recall prior knowledge.** A person or agent finds recorded facts, decisions, and procedures relevant to ongoing work.
 - [ ] **AW-004 — Preserve useful learning.** An authorized agent preserves useful, verified knowledge so later participants can build on it.

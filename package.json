@@ -13,7 +13,8 @@
     "typecheck": "tsc --project tsconfig.json",
     "build:ui": "node scripts/build-ui.mjs",
     "prepare": "npm run build:ui",
-    "wiki": "node bin/wiki.mjs"
+    "wiki": "node bin/wiki.mjs",
+    "setup:help": "python3 scripts/lifecycle.py --help"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
