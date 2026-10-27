@@ -51,12 +51,15 @@ function redirectURI(value) {
 
 /** User-authenticated remote MCP connections. Opaque secrets are stored as hashes. */
 export class RemoteAgents {
-  constructor(agents, origin) {
+  constructor(agents, origin, { defaultAgent = null } = {}) {
     this.agents = agents;
     this.control = agents.control;
     this.db = agents.db;
     this.origin = origin;
     this.resource = origin + "/mcp";
+    this.defaultAgent = defaultAgent;
+    if (defaultAgent && !/^[a-f0-9-]{36}$/.test(defaultAgent))
+      throw Error("WIKI_OAUTH_DEFAULT_AGENT must be an agent ID");
   }
   metadata() {
     return {
@@ -146,7 +149,10 @@ export class RemoteAgents {
       params.get("resource") !== this.resource
     )
       invalid();
-    const scopes = (params.get("scope") || "wiki:read").split(" ");
+    const scopes = (
+      params.get("scope") ||
+      (this.defaultAgent ? "wiki:read wiki:write" : "wiki:read")
+    ).split(" ");
     if (!scopes.length || scopes.some((s) => !Object.hasOwn(scopeActions, s)))
       invalid("invalid_scope");
     const state = params.get("state") || "";
@@ -161,6 +167,13 @@ export class RemoteAgents {
     };
   }
   choices(actor) {
+    if (this.defaultAgent) {
+      this.agents.human(actor);
+      const agent = this.agents.get(this.defaultAgent);
+      return this.canUseDefault(actor) && this.control.role(agent.id)
+        ? [agent]
+        : [];
+    }
     return this.agents
       .list(actor)
       .filter(
@@ -170,6 +183,16 @@ export class RemoteAgents {
           this.control.role(a.id),
       );
   }
+  canUseDefault(actor) {
+    if (!this.agents.hasSpace(actor, "default", "read")) return false;
+    if (this.agents.allowed(actor, this.defaultAgent, "invoke")) return true;
+    // The installation can enroll members, but must not undo an explicit revoke.
+    return !this.db
+      .prepare(
+        "SELECT 1 FROM audit WHERE action='agent:permission:invoke:false' AND target=? LIMIT 1",
+      )
+      .get(this.defaultAgent + ":" + actor);
+  }
   consent(actor, params, csrf) {
     const request = this.request(params);
     const choices = this.choices(actor.id).map((a) => ({
@@ -177,14 +200,24 @@ export class RemoteAgents {
       role: this.control.role(a.id),
     }));
     return shell(
-      "Connect an agent",
+      this.defaultAgent ? "Connect to the wiki" : "Connect an agent",
       renderToStaticMarkup(
-        createElement(AgentConsent, { actor, request, params, csrf, choices }),
+        createElement(AgentConsent, {
+          actor,
+          request,
+          params,
+          csrf,
+          choices,
+          fixedAgent: !!this.defaultAgent,
+        }),
       ),
     );
   }
 
   approve(actor, form) {
+    return this.control.transaction(() => this.approveRecord(actor, form));
+  }
+  approveRecord(actor, form) {
     // Approval parameters are validated again, including client and exact redirect.
     const params = new URLSearchParams(form);
     for (const k of ["agent", "csrf", "decision"]) params.delete(k);
@@ -196,7 +229,22 @@ export class RemoteAgents {
       destination.searchParams.set("error", "access_denied");
       return destination.href;
     }
-    const agent = form.get("agent");
+    // Installation policy, never a hidden browser field, selects this agent.
+    const agent = this.defaultAgent || form.get("agent");
+    if (this.defaultAgent) {
+      this.agents.human(actor);
+      if (!this.canUseDefault(actor)) invalid("access_denied", 403);
+      if (!this.agents.allowed(actor, agent, "invoke")) {
+        this.db
+          .prepare("INSERT INTO agent_permissions VALUES (?,?,'invoke')")
+          .run(agent, actor);
+        this.agents.record(
+          actor,
+          "agent:permission:invoke:automatic",
+          agent + ":" + actor,
+        );
+      }
+    }
     this.agents.require(actor, agent, "invoke");
     const scopes = request.scopes.filter((s) =>
       this.agents.hasSpace(agent, "default", scopeActions[s]),

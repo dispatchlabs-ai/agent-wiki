@@ -175,11 +175,18 @@ export function Account({ local }) {
     script(),
   );
 }
-export function AgentConsent({ actor, request, params, csrf, choices }) {
+export function AgentConsent({
+  actor,
+  request,
+  params,
+  csrf,
+  choices,
+  fixedAgent = false,
+}) {
   return h(
     Frame,
     {
-      title: "Choose an agent",
+      title: fixedAgent ? "Connect to the wiki" : "Choose an agent",
       description: h(
         "span",
         null,
@@ -193,7 +200,9 @@ export function AgentConsent({ actor, request, params, csrf, choices }) {
       { className: "auth-intro" },
       "Allow ",
       h("strong", null, request.name),
-      " to use the selected agent's wiki access.",
+      fixedAgent
+        ? " to access this wiki."
+        : " to use the selected agent's wiki access.",
     ),
     h(
       "p",
@@ -207,40 +216,55 @@ export function AgentConsent({ actor, request, params, csrf, choices }) {
         h("input", { key: name, type: "hidden", name, value }),
       ),
       h("input", { type: "hidden", name: "csrf", value: csrf }),
-      choices.length
+      fixedAgent && choices.length
         ? h(
-            "fieldset",
-            { className: "auth-agent-options" },
-            h("legend", null, "Available agents"),
-            ...choices.map((a) =>
-              h(
-                "label",
-                { key: a.id, className: "auth-agent-choice" },
-                h("input", {
-                  type: "radio",
-                  name: "agent",
-                  value: a.id,
-                  required: true,
-                  "aria-label": `${a.name} — ${a.role === "editor" ? "read and edit" : "read only"}`,
-                }),
+            "p",
+            { className: "auth-help" },
+            request.scopes.includes("wiki:write") &&
+              choices[0].role === "editor"
+              ? "This connection can read and edit wiki articles."
+              : "This connection can read wiki articles.",
+          )
+        : choices.length
+          ? h(
+              "fieldset",
+              { className: "auth-agent-options" },
+              h("legend", null, "Available agents"),
+              ...choices.map((a) =>
                 h(
-                  "span",
-                  null,
-                  h("strong", null, a.name),
+                  "label",
+                  { key: a.id, className: "auth-agent-choice" },
+                  h("input", {
+                    type: "radio",
+                    name: "agent",
+                    value: a.id,
+                    required: true,
+                    "aria-label": `${a.name} — ${a.role === "editor" ? "read and edit" : "read only"}`,
+                  }),
                   h(
-                    Badge,
+                    "span",
                     null,
-                    a.role === "editor" ? "Read and edit" : "Read only",
+                    h("strong", null, a.name),
+                    h(
+                      Badge,
+                      null,
+                      a.role === "editor" ? "Read and edit" : "Read only",
+                    ),
                   ),
                 ),
               ),
+            )
+          : h(
+              EmptyState,
+              {
+                title: fixedAgent
+                  ? "Wiki access is unavailable"
+                  : "No agents are available",
+              },
+              fixedAgent
+                ? "Ask a wiki administrator to enable your connection."
+                : "Ask an agent owner to grant you permission to use one.",
             ),
-          )
-        : h(
-            EmptyState,
-            { title: "No agents are available" },
-            "Ask an agent owner to grant you permission to use one.",
-          ),
       h(
         "p",
         { className: "auth-help" },

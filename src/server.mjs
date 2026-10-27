@@ -142,6 +142,7 @@ export function createWiki({
   development = false,
   traceSearchPool = null,
   trustedProxy = process.env.WIKI_TRUSTED_PROXY || null,
+  defaultOAuthAgent = process.env.WIKI_OAUTH_DEFAULT_AGENT || null,
 } = {}) {
   if (typeof conversations !== "boolean")
     throw Error("conversations must be boolean");
@@ -184,7 +185,9 @@ export function createWiki({
     ? new AgentAuth(new AgentStore(control), origin)
     : null;
   const remoteAgents = agentAuth
-    ? new RemoteAgents(agentAuth.agents, origin)
+    ? new RemoteAgents(agentAuth.agents, origin, {
+        defaultAgent: defaultOAuthAgent,
+      })
     : null;
   if (traces && evidenceUrl)
     throw Error("Configure either WIKI_TRACES or WIKI_EVIDENCE_URL");

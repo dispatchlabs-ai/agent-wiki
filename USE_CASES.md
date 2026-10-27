@@ -81,7 +81,7 @@ This document defines 61 high-level intended use cases in 10 groups for Agent Wi
 - [ ] **AW-042 — Define a named agent.** An agent owner creates a named agent with instructions and tools, then obtains its wiki access separately.
 - [ ] **AW-043 — Revise an agent deliberately.** An agent owner or authorized editor changes its definition while existing connections retain the version they approved.
 - [ ] **AW-044 — Share control of an agent.** An agent owner or access manager gives another person permission to use the agent, edit its definition, or manage its access.
-- [ ] **AW-045 — Authorize a remote client.** A person connects a client through a chosen agent with approved permissions and clear attribution of both identities.
+- [ ] **AW-045 — Authorize a remote client.** A person connects a client with approved permissions and clear attribution, using the installation's assigned agent when configured rather than choosing one.
 - [ ] **AW-046 — Keep a trusted machine connected.** An operator keeps a trusted machine connected under its own agent credential until expiry or revocation.
 - [ ] **AW-047 — Delegate bounded authority.** An operator gives an agent limited authority to act for a named person within that person's current rights.
 - [ ] **AW-048 — Disconnect an agent client.** A person or operator disconnects a selected agent client independently of browser sign-out.
