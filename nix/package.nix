@@ -8,6 +8,7 @@
   cacert,
   git,
   nodejs_24,
+  runtimeNodejs,
   openssh,
   python3,
   src,
@@ -27,7 +28,7 @@ let
   applicationRoot = "$out/libexec/agent-wiki";
   runtimePath = lib.makeBinPath [
     git
-    nodejs_24
+    runtimeNodejs
     openssh
   ];
   directEntrypoints = {
@@ -110,7 +111,7 @@ buildNpmPackage {
     ${lib.concatStringsSep "\n" (
       lib.mapAttrsToList (
         name: script: ''
-          makeWrapper ${nodejs_24}/bin/node "$out/bin/${name}" \
+          makeWrapper ${runtimeNodejs}/bin/node "$out/bin/${name}" \
             --add-flags "$app/${script}" \
             --set-default NODE_EXTRA_CA_CERTS ${cacert}/etc/ssl/certs/ca-bundle.crt \
             --set NODE_ENV production \
@@ -136,7 +137,7 @@ buildNpmPackage {
     # Dependency source helpers can retain Python shebangs after npm pruning.
     # Resolve them to the selected runtime before the generic fixup discovers
     # a build-time interpreter with a different OpenSSL dependency.
-    HOST_PATH="${python3}/bin:${nodejs_24}/bin:$HOST_PATH" patchShebangs --host --update "$out"
+    HOST_PATH="${python3}/bin:${runtimeNodejs}/bin:$HOST_PATH" patchShebangs --host --update "$out"
 
     runHook postInstall
   '';
