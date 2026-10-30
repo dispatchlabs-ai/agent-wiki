@@ -60,5 +60,7 @@ let
   };
 in {
   inherit git openssh python3;
+  # Keep npm for asset builds, but omit its bundled HTTP client from runtime.
+  runtimeNodejs = nodejs-slim;
   nodejs_24 = pkgs.nodejs_24.override { inherit nodejs-slim; };
 }
