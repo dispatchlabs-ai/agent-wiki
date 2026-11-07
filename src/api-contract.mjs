@@ -1,4 +1,5 @@
 import { createWikiTools } from "../public/wiki-tools.js";
+import { appOperations } from "../public/apps-contract.js";
 import { toolAction } from "./authorization.mjs";
 import packageInfo from "../package.json" with { type: "json" };
 
@@ -21,6 +22,8 @@ const routes = {
   "wiki.file": ["get", "/api/files/{asset}.json", "file"],
 };
 const tools = new Map();
+for (const op of appOperations)
+  routes[op.name] = [op.method, op.path, `call ${op.name}`];
 for (const externalEvidence of [false, true])
   for (const tool of createWikiTools(() => Promise.resolve(), true, {
     externalEvidence,
@@ -375,6 +378,9 @@ export function openAPI() {
     if (operation.method === "post") {
       spec.requestBody = { required: true, content: content(operation.input) };
       spec.parameters = [
+        ...parameters(operation.input, operation.path).filter(
+          (p) => p.in === "path",
+        ),
         {
           name: "Origin",
           in: "header",

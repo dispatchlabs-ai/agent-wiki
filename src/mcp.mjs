@@ -6,7 +6,7 @@ import {
   fromJsonSchema,
 } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
-import { createWikiTools } from "../public/wiki-tools.js";
+import { createWikiTools, isWriteTool } from "../public/wiki-tools.js";
 import packageInfo from "../package.json" with { type: "json" };
 
 /** The same catalog and API operations power both MCP transports. */
@@ -33,11 +33,9 @@ export function createWikiMcp({
       const server = new McpServer(
         { name: "agent-wiki", version: packageInfo.version },
         {
-          // A legal ten-article edit, including all 100 related links, 100
-          // questions and 20 evidence records per article, is below 3,000.
-          // Bound malformed input before schema validation; this does not
-          // limit concurrent requests or reduce the writer's accepted sizes.
-          maxToolInputElements: 4000,
+          // Published bundles and backend parameters have no arbitrary file,
+          // byte or element cap. Individual operation schemas still apply.
+          maxToolInputElements: Infinity,
           instructions:
             `Wiki URL: ${origin}. Use absolute links in answers and citations. Resolve site-relative article and source URLs against this Wiki URL, preserving the path, query and fragment.\n\n` +
             (agent
@@ -53,7 +51,7 @@ export function createWikiMcp({
           {
             description: tool.description,
             inputSchema: tool.schema,
-            annotations: { readOnlyHint: tool.name !== "wiki.save" },
+            annotations: { readOnlyHint: !isWriteTool(tool.name) },
           },
           async (args, extra) => {
             try {
@@ -118,7 +116,7 @@ export function createWikiMcp({
       return server;
     },
     // Return JSON normally, while allowing the SDK to stream notifications.
-    { responseMode: "auto", maxRequestBodySize: 512000 },
+    { responseMode: "auto", maxRequestBodySize: Number.MAX_SAFE_INTEGER },
   );
   return {
     handle: toNodeHandler({

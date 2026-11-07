@@ -1,4 +1,9 @@
 import { editSchema } from "./edit-contract.js";
+import { createAppTools, appOperations } from "./apps-contract.js";
+
+export const isWriteTool = (name) =>
+  name === "wiki.save" ||
+  appOperations.some((op) => op.name === name && op.write);
 
 /** @param {(url: string, draft?: any) => Promise<any>} request
  * @param {boolean} writable
@@ -300,6 +305,7 @@ export function createWikiTools(request, writable, config = {}) {
       execute: ({ asset }) =>
         request(`/api/files/${encodeURIComponent(asset)}.json`),
     });
+  tools.push(...createAppTools(request, writable));
   return tools.filter(
     (t) =>
       (config.evidenceAccess !== false ||

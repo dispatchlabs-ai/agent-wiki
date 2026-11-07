@@ -43,6 +43,7 @@ import {
 } from "./evidence-views.mjs";
 import { pipeline } from "node:stream/promises";
 import { ArticleMediaStore } from "./article-media.mjs";
+import { Apps } from "./apps.mjs";
 import { WikiError } from "./errors.mjs";
 import http from "node:http";
 import fs from "node:fs";
@@ -133,6 +134,7 @@ export function createWiki({
   traceIndexRoot = traces,
   evidenceUrl = process.env.WIKI_EVIDENCE_URL || null,
   articleMediaRoot = process.env.WIKI_ARTICLE_MEDIA || null,
+  appsRoot = process.env.WIKI_APPS || null,
   write = false,
   push = false,
   control = null,
@@ -196,6 +198,10 @@ export function createWiki({
   const traceSearches = traceSearchPool || new TraceSearchPool();
   const previews = new PreviewRenderer();
   const articleMedia = new ArticleMediaStore(articleMediaRoot);
+  const apps = new Apps(appsRoot, {
+    origin,
+    excluded: [repo, control?.filename, database, articleMediaRoot],
+  });
   const wiki = new GitWiki(repo);
   // A temporary on-disk projection lets the refresh worker and serving reader
   // share SQLite's WAL, including when an embedding requests an ephemeral index.
@@ -416,6 +422,9 @@ export function createWiki({
         return send(200, { status: "ok" });
       if (req.headers.host !== new URL(origin).host)
         return send(403, { error: "Invalid host" });
+      // Opaque sandbox documents use page-scoped asset capabilities, never wiki
+      // cookies. Every asset rechecks the original viewer's current authority.
+      if (await apps.asset(req, res, url)) return;
       if (!conversations && evidencePath(url.pathname))
         return send(404, {
           error: "Conversations are disabled",
@@ -1151,6 +1160,61 @@ export function createWiki({
         if (req.method === "POST" && !csrf())
           return send(403, { error: "Invalid request" });
       }
+      if (
+        url.pathname.startsWith("/api/backends") ||
+        url.pathname.startsWith("/api/pages") ||
+        url.pathname.startsWith("/apps/")
+      ) {
+        if (!control || !actor)
+          throw new WikiError(
+            "APP_AUTH_REQUIRED",
+            "Applications require authenticated wiki access",
+            401,
+          );
+        const principal =
+          agentToken && actor.mode === "delegated" ? actor.subject : actor.id;
+        const identity = {
+          id: actor.id,
+          principal,
+          authority: {
+            mode: agentToken ? actor.mode : "human",
+            subject: agentToken ? actor.subject : null,
+          },
+          manager: control.role(principal) === "manager",
+        };
+        const authorize = (action) =>
+          control.read(() => {
+            if (action === "write" && !write)
+              throw new WikiError(
+                "APP_READ_ONLY",
+                "Wiki writes are disabled",
+                403,
+              );
+            if (agentToken) agentAuth.require(agentToken, action);
+            else {
+              if (!control.authenticate(token))
+                throw new WikiError("NOT_FOUND", "Not found", 404);
+              control.require(
+                actor.id,
+                action === "write" ? "editor" : "reader",
+              );
+            }
+            if (identity.manager && control.role(principal) !== "manager")
+              throw new WikiError("NOT_FOUND", "Not found", 404);
+          });
+        if (
+          await apps.handle({
+            req,
+            url,
+            actor: identity,
+            authorize,
+            send,
+            signal: requestAbort.signal,
+            csrf: actor.csrf || "",
+          })
+        )
+          return;
+      }
       if (agentToken && url.pathname === "/api/agent/run") {
         if (req.method === "GET")
           return send(200, {
@@ -1195,8 +1259,6 @@ export function createWiki({
           let size = 0;
           for await (const chunk of req) {
             size += chunk.length;
-            if (size > 512000)
-              return send(413, { error: "MCP request exceeds 512 KB" });
             chunks.push(chunk);
           }
           try {
@@ -1358,6 +1420,8 @@ export function createWiki({
         "/assets/diagram.html": ["diagram.html", "text/html"],
         "/assets/edit-contract.js": ["edit-contract.js", "text/javascript"],
         "/assets/wiki-tools.js": ["wiki-tools.js", "text/javascript"],
+        "/assets/apps-contract.js": ["apps-contract.js", "text/javascript"],
+        "/assets/app-host.js": ["app-host.js", "text/javascript"],
         "/assets/client.js": ["client.js", "text/javascript"],
         "/assets/agent-consent.js": ["agent-consent.js", "text/javascript"],
         "/assets/search-results.js": ["search-results.js", "text/javascript"],
@@ -1960,6 +2024,7 @@ export function createWiki({
         makeMcp(writable, evidenceAccess),
       );
   server.on("close", () => {
+    void apps.close().catch(console.error);
     void writer.close().catch(console.error);
     mcpApi.close();
     for (const mcp of mcpVariants.values())

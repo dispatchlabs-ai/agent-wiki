@@ -1,5 +1,5 @@
 import { articleResults, traceResults } from "./search-results.js";
-import { createWikiTools } from "./wiki-tools.js";
+import { createWikiTools, isWriteTool } from "./wiki-tools.js";
 class RequestError extends Error {
   constructor(message, status, code) {
     super(message);
@@ -70,7 +70,7 @@ export async function registerTools(context, writable, config = {}) {
             }
           },
           annotations: {
-            readOnlyHint: tool.name !== "wiki.save",
+            readOnlyHint: !isWriteTool(tool.name),
             untrustedContentHint: true,
           },
         },

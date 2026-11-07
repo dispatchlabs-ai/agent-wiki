@@ -1,4 +1,4 @@
-import { evidencePath } from "./authorization.mjs";
+import { evidencePath, appAction } from "./authorization.mjs";
 import { decodeJwt, importJWK, jwtVerify } from "jose";
 import { WikiError } from "./errors.mjs";
 
@@ -171,6 +171,8 @@ export class AgentAuth {
   }
   /** Only supported machine APIs accept agent tokens, never account controls. */
   action(path) {
+    if (appAction(path)) return appAction(path);
+    if (/^\/apps\/[a-z0-9-]+\/(?:[a-f0-9]{64}\/)?$/.test(path)) return "read";
     if (["/mcp", "/mcp/", "/api/agent/run"].includes(path)) return null;
     if (path.startsWith("/article-media/")) return "read";
     if (path === "/api/articles/edits") return "write";
