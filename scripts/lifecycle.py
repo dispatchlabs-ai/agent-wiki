@@ -301,6 +301,7 @@ def managed_env(
             "WIKI_REPO": str(locations["content"]),
             "WIKI_CONTROL": str(locations["control"]),
             "WIKI_ARTICLE_MEDIA": str(locations["article_media"]),
+            "WIKI_APPS": str(root / "apps"),
         }
     )
     evidence = evidence_config(initialized) if initialized else LOCAL_EVIDENCE
@@ -503,6 +504,9 @@ def validate_ready(root: Path, *, allow_writer_lock=False) -> dict:
             raise LifecycleError("INVALID_LAYOUT", f"Invalid managed {name} path")
     if locations["traces"].exists() and locations["traces"].is_symlink():
         raise LifecycleError("INVALID_LAYOUT", "Invalid managed traces path")
+    apps = root / "apps"
+    if apps.is_symlink() or (apps.exists() and not apps.is_dir()):
+        raise LifecycleError("INVALID_LAYOUT", "Invalid managed apps path")
     if not locations["control"].is_file() or locations["control"].is_symlink():
         raise LifecycleError("INVALID_LAYOUT", "Invalid managed control database")
     validate_git_structure(locations["content"])
@@ -641,7 +645,7 @@ def adopt(args) -> None:
                 f"Refusing adoption with unexpected lifecycle state: {', '.join(unexpected)}",
                 3,
             )
-        allowed = {"content", "control", "traces", "article-media", "search"}
+        allowed = {"content", "control", "traces", "article-media", "search", "apps"}
         unexpected_root = sorted(set(root_entries(root)) - allowed)
         if unexpected_root:
             raise LifecycleError(
@@ -827,6 +831,10 @@ def backup(args) -> None:
             if ready["evidence"]["mode"] == "local":
                 copy_tree(paths(root)["traces"], staging / "traces")
             copy_tree(paths(root)["article_media"], staging / "article-media")
+            # Ownership excludes the serving process and its app-storage child.
+            # Preserve SQLite DBs plus any remaining WAL together, consistently.
+            if (root / "apps").exists():
+                copy_tree(root / "apps", staging / "apps")
             (staging / ".lifecycle").mkdir(mode=0o700)
             shutil.copy2(root / ".lifecycle" / "initialized.json", staging / ".lifecycle" / "initialized.json")
             recovery = root / ".lifecycle" / "recovery"
@@ -900,7 +908,7 @@ def safe_member_name(name: str) -> bool:
     first = pure.parts[0]
     if first == "backup-manifest.json":
         return len(pure.parts) == 1
-    if first in {"content", "control", "traces", "article-media"}:
+    if first in {"content", "control", "traces", "article-media", "apps"}:
         return True
     if first == ".lifecycle":
         return len(pure.parts) == 1 or (
@@ -1062,6 +1070,8 @@ def restore(args) -> None:
                 finally:
                     restored_control.close()
                 stores = ["content", "control", "article-media"]
+                if (staging / "apps").exists():
+                    stores.append("apps")
                 if manifest["evidence"]["mode"] == "local":
                     stores.append("traces")
                 for name in stores:

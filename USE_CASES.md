@@ -1,6 +1,6 @@
 # Agent Wiki use cases
 
-This document defines 61 high-level intended use cases in 10 groups for Agent Wiki. Each use case has a stable ID and describes the goal of a person, agent, or integration. Checkboxes track complete implementation and verification, not intended scope.
+This document defines 66 high-level intended use cases in 11 groups for Agent Wiki. Each use case has a stable ID and describes the goal of a person, agent, or integration. Existing checkboxes track complete implementation and verification, not intended scope.
 
 ## Terms
 
@@ -104,3 +104,11 @@ This document defines 61 high-level intended use cases in 10 groups for Agent Wi
 - [ ] **AW-059 — Keep derived data recoverable.** An operator rebuilds or relocates search indexes while preserving articles, original evidence, and citations.
 - [ ] **AW-060 — Recover durable knowledge and access.** An operator backs up and restores the knowledge collection, its history, and the identities and permissions needed to use it.
 - [ ] **AW-061 — Upgrade or repair an installation.** An operator upgrades the wiki or repairs interrupted maintenance while preserving its data and a recovery path.
+
+## 11. Publish agent-built applications
+
+- **AW-062 — Publish an interactive page.** An agent publishes and revises a complete HTML/CSS/JS page that readers can open from ordinary wiki articles.
+- **AW-063 — Register a backend.** An agent provisions a backend with its own durable database, isolated from the wiki's content and identity storage.
+- **AW-064 — Maintain application data.** An authorized agent defines and migrates a backend's schema and reads or changes its data through the shared API.
+- **AW-065 — Share a scoped backend.** A backend owner grants identities access to its data and binds one or more hosted pages to it.
+- **AW-066 — Recover application history and data.** An operator preserves page versions and backend data through publication, restart, backup and restore.

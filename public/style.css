@@ -1059,3 +1059,11 @@ footer select {
 #editor-conflict {
   margin-block: 1.5rem;
 }
+
+.hosted-app {
+  display: block;
+  width: 100%;
+  min-height: 75vh;
+  border: 0;
+  background: white;
+}

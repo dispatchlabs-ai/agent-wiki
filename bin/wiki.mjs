@@ -96,7 +96,7 @@ try {
         values.file === "-" ? 0 : values.file,
         "utf8",
       );
-      if (Buffer.byteLength(text) > 512000)
+      if (command !== "call" && Buffer.byteLength(text) > 512000)
         throw new WikiError("USAGE", "Input exceeds 512 KB");
       return text;
     };
