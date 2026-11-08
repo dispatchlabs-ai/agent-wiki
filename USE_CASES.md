@@ -35,12 +35,13 @@ This document defines 61 high-level intended use cases in 10 groups for Agent Wi
 
 - [ ] **AW-012 — Create an article.** An editor adds a durable explanation of a subject to the knowledge collection.
 - [ ] **AW-013 — Revise an article.** An editor updates an existing explanation as new information or decisions become available.
+- [ ] **AW-062 — Revise part of an article.** An editor changes a passage or section without resubmitting the rest of the article or its metadata.
 - [ ] **AW-014 — Connect related subjects.** An editor links articles so readers can follow relationships and discover supporting context.
 - [ ] **AW-015 — Make knowledge discoverable.** An editor maintains useful titles, descriptions, topics, and relationships for the collection.
 - [ ] **AW-016 — Inspect a draft.** An editor previews how proposed Markdown will appear before saving it.
 - [ ] **AW-017 — Support a claim with evidence.** An editor connects claims to their sources and checks quoted evidence before publishing it.
 - [ ] **AW-018 — Update related articles together.** An editor saves related article changes together, including new articles that link to one another.
-- [ ] **AW-019 — Retire an article coherently.** An operator removes an article and repairs incoming links while preserving its history.
+- [ ] **AW-019 — Retire an article coherently.** An authorized editor removes an article; incoming links are repaired together and its history is preserved.
 
 ## 4. Review and recover article changes
 

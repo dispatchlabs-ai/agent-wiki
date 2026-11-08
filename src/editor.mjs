@@ -5,6 +5,7 @@ import { ControlStore, digest } from "./control-store.mjs";
 import { validateEvidence, verifyDraftEvidence } from "./evidence-quotes.mjs";
 import { WikiError } from "./errors.mjs";
 import { editSchema } from "../public/edit-contract.js";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { withWriterLock } from "./writer-lock.mjs";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,22 @@ import {
   parsePage,
 } from "./git-wiki.mjs";
 import { references } from "./wiki.mjs";
+import { applyArticleEdits, repairArticleLinks } from "./article-edits.mjs";
+
+function storedMetadata(page) {
+  const metadata = { ...page };
+  for (const key of [
+    "id",
+    "filename",
+    "blob",
+    "body",
+    "number",
+    "created_at",
+    "change_type",
+  ])
+    delete metadata[key];
+  return metadata;
+}
 
 function operationIdentity(actor, authority, operation) {
   // Persistent machine requests have short, independent runs. Bind retries to
@@ -130,7 +147,11 @@ export function saveGitEdits(
     proposed = new Map(wiki.pages);
   const now = new Date().toISOString();
   const seen = new Set();
-  for (const u of draft.updates) {
+  /** @type {{id:string,name:string,current:any,deleted?:boolean,link_repair?:boolean}[]} */
+  const saved = [];
+  /** @type {Map<string, string|null>} */
+  const deleted = new Map();
+  for (let u of draft.updates) {
     if (!u || !validId(u.id) || seen.has(u.id))
       throw new WikiError(
         "INVALID_EDIT",
@@ -138,12 +159,54 @@ export function saveGitEdits(
       );
     seen.add(u.id);
     const current = wiki.current(u.id);
-    if (u.expected_revision_id !== (current?.revision_id || null))
-      throw new WikiError(
-        "REVISION_CONFLICT",
-        "Conflict: article changed; read it again before editing",
-        409,
+    const patching = u.edits !== undefined;
+    const deleting = u.delete === true;
+    if ((patching || deleting) && !current)
+      throw new WikiError("ARTICLE_NOT_FOUND", `No article: ${u.id}`, 404);
+    // Exact text is its own guard, so targeted changes may omit the revision.
+    if ((!patching && !deleting) || u.expected_revision_id !== undefined) {
+      if (u.expected_revision_id !== (current?.revision_id || null))
+        throw new WikiError(
+          "REVISION_CONFLICT",
+          "Conflict: article changed; read it again before editing",
+          409,
+        );
+    }
+    if (deleting) {
+      if (typeof u.summary !== "string" || !u.summary.trim())
+        throw new WikiError("INVALID_EDIT", "Invalid summary");
+      if (
+        u.replace_with !== undefined &&
+        (!validId(u.replace_with) || u.replace_with === u.id)
+      )
+        throw new WikiError("INVALID_EDIT", "Invalid replace_with");
+      deleted.set(u.id, u.replace_with ?? null);
+      files[current.filename] = null;
+      proposed.delete(u.id);
+      saved.push({ id: u.id, name: current.filename, current, deleted: true });
+      continue;
+    }
+    if (patching) {
+      const body = applyArticleEdits(
+        current.body,
+        u.edits,
+        u.expected_revision_id !== undefined,
       );
+      if (
+        body === current.body &&
+        ["title", "description", "topic", "related", "questions"].every(
+          (field) => u[field] === undefined,
+        )
+      )
+        throw new WikiError("EDIT_NO_CHANGE", "The edit changes nothing");
+      u = {
+        title: current.title,
+        description: current.description,
+        topic: current.topic,
+        ...u,
+        body,
+      };
+    }
     for (const field of ["title", "description", "topic", "body", "summary"]) {
       const max =
         editSchema.properties.updates.items.properties[field].maxLength;
@@ -176,18 +239,8 @@ export function saveGitEdits(
         );
     }
     const metadata = current
-      ? { ...wiki.pages.get(u.id) }
+      ? storedMetadata(wiki.pages.get(u.id))
       : { kind: "topic", sources: [] };
-    for (const key of [
-      "id",
-      "filename",
-      "blob",
-      "body",
-      "number",
-      "created_at",
-      "change_type",
-    ])
-      delete metadata[key];
     Object.assign(metadata, {
       title: u.title,
       description: u.description,
@@ -202,16 +255,81 @@ export function saveGitEdits(
     const name = current?.filename || `wiki/${u.id}.md`;
     files[name] = markdown(metadata, u.body);
     proposed.set(u.id, parsePage(files[name], name, null));
-    const revision_id = git(repo, ["hash-object", "--stdin"], {
-      input: files[name],
-    });
+    saved.push({ id: u.id, name, current });
+  }
+  for (const replacement of deleted.values())
+    if (replacement && !proposed.has(replacement))
+      throw new WikiError(
+        "INVALID_EDIT",
+        `Unknown replace_with article: ${replacement}`,
+      );
+  if (deleted.size) {
+    const names = [...deleted.keys()].join(", ");
+    const batched = new Set(saved.map((entry) => entry.id));
+    for (const page of [...proposed.values()]) {
+      const linked = [
+        ...(wiki.linkCache.get(page.blob) || references(page.body)),
+        ...page.related,
+      ].some((target) => deleted.has(target));
+      if (!linked) continue;
+      const metadata = storedMetadata(page);
+      metadata.related = [
+        ...new Set(
+          page.related
+            .map((target) =>
+              deleted.has(target) ? deleted.get(target) : target,
+            )
+            .filter((target) => target && target !== page.id),
+        ),
+      ];
+      if (!batched.has(page.id)) {
+        metadata.summary = `Repaired links to deleted article: ${names}`;
+        metadata.updated = now.slice(0, 10);
+      }
+      files[page.filename] = markdown(
+        metadata,
+        repairArticleLinks(page.body, deleted),
+      );
+      const repaired = parsePage(files[page.filename], page.filename, null);
+      if (references(repaired.body).some((target) => deleted.has(target)))
+        throw new WikiError(
+          "LINK_REPAIR_FAILED",
+          `Could not repair links in ${page.id}; edit them, then delete again`,
+          409,
+        );
+      proposed.set(page.id, repaired);
+      if (!batched.has(page.id))
+        saved.push({
+          id: page.id,
+          name: page.filename,
+          current: wiki.current(page.id),
+          link_repair: true,
+        });
+    }
+  }
+  for (const { id, name, current, ...flags } of saved) {
+    const last = (wiki.histories.get(id) || []).at(-1)?.number || 0;
+    if (flags.deleted) {
+      results.push({
+        id,
+        number: last,
+        revision_id: current.revision_id,
+        url: `/wiki/${id}/`,
+        deleted: true,
+      });
+      continue;
+    }
+    // Same object ID as git hash-object, without one subprocess per article.
+    const revision_id = createHash("sha1")
+      .update(`blob ${Buffer.byteLength(files[name])}\0`)
+      .update(files[name])
+      .digest("hex");
     results.push({
-      id: u.id,
-      number:
-        ((wiki.histories.get(u.id) || []).at(-1)?.number || 0) +
-        Number(!current || revision_id !== current.revision_id),
+      id,
+      number: last + Number(!current || revision_id !== current.revision_id),
       revision_id,
-      url: `/wiki/${u.id}/`,
+      url: `/wiki/${id}/`,
+      ...flags,
     });
   }
   for (const p of proposed.values())

@@ -1,4 +1,8 @@
-import { editSchema } from "./edit-contract.js";
+import {
+  articleDeleteSchema,
+  articleEditSchema,
+  editSchema,
+} from "./edit-contract.js";
 
 /** @param {(url: string, draft?: any) => Promise<any>} request
  * @param {boolean} writable
@@ -269,6 +273,23 @@ export function createWikiTools(request, writable, config = {}) {
       inputSchema: editSchema,
       execute: (args) => request("/api/articles/edits", args),
     });
+  if (writable)
+    tools.push(
+      {
+        name: "wiki.edit",
+        description:
+          "Change part of one article without sending its whole body. Each edit is one of: {old_text, new_text, replace_all?} (old_text must match exactly once unless replace_all is true); {section, new_text} (replace a section and its subsections, heading included; empty new_text removes it; requires expected_revision_id); {append, section?} (add to the end of a section, or of the article). Edits apply in order and commit together. Title, description, topic and other metadata are preserved unless supplied. Use a new operation_id per change and reuse it with identical input on retry.",
+        inputSchema: articleEditSchema,
+        execute: (args) => request("/api/articles/patches", args),
+      },
+      {
+        name: "wiki.delete",
+        description:
+          "Delete an article. Links to it in other articles are repaired in the same commit: they become plain text, or point to replace_with when supplied. The receipt lists every repaired article. Git retains the history, so numbered revisions stay readable and saving the same id restores it. Reuse operation_id with identical input on retry.",
+        inputSchema: articleDeleteSchema,
+        execute: (args) => request("/api/articles/deletions", args),
+      },
+    );
   tools.push({
     name: "wiki.preview",
     description:

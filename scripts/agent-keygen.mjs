@@ -81,7 +81,9 @@ const tools = [
     ? ["wiki.traceSearch", "wiki.traces", "wiki.trace", "wiki.file"]
     : []),
   "wiki.preview",
-  ...(actions.includes("write") ? ["wiki.save"] : []),
+  ...(actions.includes("write")
+    ? ["wiki.save", "wiki.edit", "wiki.delete"]
+    : []),
 ];
 const registration = {
   version: 1,

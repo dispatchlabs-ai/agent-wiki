@@ -7,6 +7,8 @@ const routes = {
   "wiki.read": ["get", "/api/articles/{id}/{revision}.json", "read"],
   "wiki.history": ["get", "/api/articles/{id}/history.json", "history"],
   "wiki.save": ["post", "/api/articles/edits", "create, edit, save"],
+  "wiki.edit": ["post", "/api/articles/patches", "patch"],
+  "wiki.delete": ["post", "/api/articles/deletions", "delete"],
   "wiki.preview": ["post", "/api/articles/preview", "preview"],
   "wiki.traceSearch": ["get", "/api/traces/search", "trace-search"],
   "wiki.traces": ["get", "/api/traces/catalog.json", "traces"],
@@ -110,6 +112,8 @@ const receipt = {
           number: { type: "integer" },
           revision_id: string,
           url: string,
+          deleted: { const: true },
+          link_repair: { const: true },
         },
       },
     },
@@ -139,6 +143,8 @@ const responseSchemas = {
     ],
   },
   "wiki.save": receipt,
+  "wiki.edit": receipt,
+  "wiki.delete": receipt,
   "wiki.preview": {
     type: "object",
     required: ["html"],
@@ -391,7 +397,7 @@ export function openAPI() {
           description: "Required with browser session",
         },
       ];
-      if (operation.id === "wiki.save")
+      if (operation.permission === "write")
         spec.parameters.push({
           name: "X-Wiki-Write",
           in: "header",

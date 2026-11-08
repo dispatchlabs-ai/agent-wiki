@@ -70,7 +70,9 @@ export async function registerTools(context, writable, config = {}) {
             }
           },
           annotations: {
-            readOnlyHint: tool.name !== "wiki.save",
+            readOnlyHint: !["wiki.save", "wiki.edit", "wiki.delete"].includes(
+              tool.name,
+            ),
             untrustedContentHint: true,
           },
         },
