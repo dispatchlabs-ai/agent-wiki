@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-08
+
 ### Added
 
 - `wiki.edit` makes targeted article changes by exact text, section or append without resubmitting the article or its metadata.
