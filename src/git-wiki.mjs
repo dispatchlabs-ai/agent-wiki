@@ -603,6 +603,11 @@ export function commitFiles(
         !/^\.wiki\/operations\/[a-z0-9-]+\.json$/.test(name)
       )
         throw Error("Invalid write path");
+      if (text === null) {
+        // Git's index format removes a path with mode 0 and the null object.
+        entries.push(`0 ${"0".repeat(40)}\t${name}\n`);
+        continue;
+      }
       const blob = git(repo, ["hash-object", "-w", "--stdin"], { input: text });
       entries.push(`100644 ${blob}\t${name}\n`);
     }
@@ -630,8 +635,14 @@ export function commitFiles(
       "--staged",
       "--worktree",
       "--",
-      ...Object.keys(files),
+      ...Object.keys(files).filter((name) => files[name] !== null),
     ]);
+    const removed = Object.keys(files).filter((name) => files[name] === null);
+    if (removed.length) {
+      git(repo, ["rm", "-q", "--cached", "--ignore-unmatch", "--", ...removed]);
+      for (const name of removed)
+        fs.rmSync(path.join(repo, name), { force: true });
+    }
     return commit;
   } finally {
     fs.rmSync(index, { force: true });

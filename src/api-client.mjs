@@ -154,9 +154,12 @@ export class WikiApiClient {
       signal:
         init.signal ||
         (target.pathname.startsWith("/api/traces/") ||
-        ["/api/articles/edits", "/api/articles/health.json"].includes(
-          target.pathname,
-        )
+        [
+          "/api/articles/edits",
+          "/api/articles/patches",
+          "/api/articles/deletions",
+          "/api/articles/health.json",
+        ].includes(target.pathname)
           ? undefined
           : AbortSignal.timeout(30000)),
     });

@@ -37,6 +37,10 @@ New installation: npm run setup:help (Python 3; prints setup steps, changes noth
   edit ID --file JSON --revision BLOB --operation-id ID
       JSON is one article update (title, description, topic, body, summary).
       edit requires the revision you read; create expects no existing article.
+  patch ID --file JSON --operation-id ID [--revision BLOB]
+      JSON has summary and edits: {old_text,new_text}, {section,new_text}, {append}.
+  delete ID --summary TEXT --operation-id ID [--replace-with ID] [--revision BLOB]
+      Repairs links to the article in the same commit; Git keeps its history.
   save --file JSON              Submit an exact batch, including operation_id.
   preview --file MARKDOWN       Render an unsaved draft.
   trace-search QUERY            Search evidence [--limit N --offset N].
@@ -60,6 +64,8 @@ try {
     allowPositionals: true,
     options: {
       json: { type: "boolean" },
+      summary: { type: "string" },
+      "replace-with": { type: "string" },
       forget: { type: "boolean" },
       help: { type: "boolean", short: "h" },
       config: { type: "string" },
@@ -303,6 +309,32 @@ try {
           return api.request("/api/articles/preview", { body: file() });
         if (command === "save")
           return api.request("/api/articles/edits", JSON.parse(file()));
+        if (command === "patch" || command === "delete") {
+          id();
+          if (!values["operation-id"])
+            throw new WikiError("USAGE", "Supply --operation-id");
+          if (command === "delete" && !values.summary)
+            throw new WikiError("USAGE", "Supply --summary");
+          const fields = {
+            id: argument,
+            operation_id: values["operation-id"],
+            ...(values.revision
+              ? { expected_revision_id: values.revision }
+              : {}),
+          };
+          return command === "patch"
+            ? api.request("/api/articles/patches", {
+                ...JSON.parse(file()),
+                ...fields,
+              })
+            : api.request("/api/articles/deletions", {
+                ...fields,
+                summary: values.summary,
+                ...(values["replace-with"]
+                  ? { replace_with: values["replace-with"] }
+                  : {}),
+              });
+        }
         if (["create", "edit"].includes(command)) {
           id();
           if (

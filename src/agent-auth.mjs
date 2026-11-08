@@ -173,7 +173,14 @@ export class AgentAuth {
   action(path) {
     if (["/mcp", "/mcp/", "/api/agent/run"].includes(path)) return null;
     if (path.startsWith("/article-media/")) return "read";
-    if (path === "/api/articles/edits") return "write";
+    if (
+      [
+        "/api/articles/edits",
+        "/api/articles/patches",
+        "/api/articles/deletions",
+      ].includes(path)
+    )
+      return "write";
     if (path.startsWith("/api/articles/")) return "read";
     if (evidencePath(path)) return "trace";
     throw new WikiError("NOT_FOUND", "Not found", 404);

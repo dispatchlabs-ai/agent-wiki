@@ -19,7 +19,7 @@ export function evidencePath(path) {
   ].some((prefix) => path.startsWith(prefix));
 }
 export function toolAction(name) {
-  if (name === "wiki.save") return "write";
+  if (["wiki.save", "wiki.edit", "wiki.delete"].includes(name)) return "write";
   if (name.startsWith("wiki.trace") || name === "wiki.file") return "trace";
   return "read";
 }

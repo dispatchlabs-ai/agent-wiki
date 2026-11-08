@@ -11,6 +11,9 @@
  * @property {string[]} [related]
  * @property {string[]} [questions]
  * @property {{conversation:string,event:string,quote:string}[]} [evidence]
+ * @property {object[]} [edits] Targeted changes applied to the current body.
+ * @property {boolean} [delete] Removes the article and repairs links to it.
+ * @property {string} [replace_with] Article that receives repaired links.
  * @typedef {{operation_id: string, updates: ArticleUpdate[]}} EditDraft
  * @typedef {{id: string, number: number, url: string, revision_id: string}} ArticleReceipt
  * @typedef {{operation_id:string,state:"saved",articles:ArticleReceipt[],actor?:string,authority?:object,initiator?:string}} StoredReceipt
@@ -73,5 +76,53 @@ export const editSchema = {
     },
   },
   required: ["operation_id", "updates"],
+  additionalProperties: false,
+};
+
+const summary = { type: "string", minLength: 1, maxLength: 1000 };
+export const articleEditSchema = {
+  type: "object",
+  properties: {
+    operation_id: id,
+    id,
+    summary,
+    expected_revision_id: {
+      type: "string",
+      description:
+        "Optional for old_text and append edits; required to replace a section.",
+    },
+    edits: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          old_text: { type: "string", minLength: 1 },
+          new_text: { type: "string" },
+          replace_all: { type: "boolean" },
+          section: { type: "string" },
+          append: { type: "string", minLength: 1 },
+        },
+        additionalProperties: false,
+      },
+    },
+    title: editSchema.properties.updates.items.properties.title,
+    description: editSchema.properties.updates.items.properties.description,
+    topic: editSchema.properties.updates.items.properties.topic,
+    related: editSchema.properties.updates.items.properties.related,
+    questions: editSchema.properties.updates.items.properties.questions,
+  },
+  required: ["operation_id", "id", "summary"],
+  additionalProperties: false,
+};
+export const articleDeleteSchema = {
+  type: "object",
+  properties: {
+    operation_id: id,
+    id,
+    summary,
+    expected_revision_id: { type: "string" },
+    replace_with: id,
+  },
+  required: ["operation_id", "id", "summary"],
   additionalProperties: false,
 };
