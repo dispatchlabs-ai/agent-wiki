@@ -52,7 +52,7 @@ export function agentsPage(agents, actor, origin, toolNames) {
         : [],
     connections: agents.db
       .prepare(
-        "SELECT g.id,p.name,c.name client,g.expires FROM remote_grants g JOIN principals p ON p.id=g.agent JOIN remote_clients c ON c.id=g.client WHERE g.principal=? AND g.active=1 AND g.expires>? ORDER BY g.expires DESC",
+        "SELECT g.id,p.name,c.name client,g.expires FROM remote_grants g JOIN principals p ON p.id=g.agent JOIN remote_clients c ON c.id=g.client WHERE g.principal=? AND g.active=1 AND (g.expires=0 OR g.expires>?) ORDER BY g.expires DESC",
       )
       .all(actor.id, agents.now()),
   };

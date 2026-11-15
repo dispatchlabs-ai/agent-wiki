@@ -306,12 +306,17 @@ export function AgentsApp({ initial }) {
                       <p>
                         {c.name}{" "}
                         <span>
-                          · Expires{" "}
-                          {new Date(c.expires).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
+                          {c.expires === 0
+                            ? "· Until revoked"
+                            : "· Expires " +
+                              new Date(c.expires).toLocaleDateString(
+                                undefined,
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}
                         </span>
                       </p>
                     </div>

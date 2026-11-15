@@ -5,6 +5,11 @@ import { shell } from "./render.mjs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AgentConsent } from "../ui/components/auth.mjs";
+import { openRefresh, sealRefresh } from "./oauth-replay.mjs";
+
+// Bound retry tolerance, not the connection lifetime. Outside this window a
+// reused rotating token still revokes its family (OAuth security BCP, RFC 9700).
+const refreshRetryMs = 30000;
 
 const scopeActions = {
   "wiki:read": "read",
@@ -275,7 +280,7 @@ export class RemoteAgents {
     const grant =
       this.db
         .prepare(
-          "SELECT * FROM remote_grants WHERE id=? AND active=1 AND expires>?",
+          "SELECT * FROM remote_grants WHERE id=? AND active=1 AND (expires=0 OR expires>?)",
         )
         .get(id, this.agents.now()) || invalid("invalid_grant");
     this.agents.human(grant.principal);
@@ -289,16 +294,18 @@ export class RemoteAgents {
     const access = secret(),
       refresh = secret(),
       now = this.agents.now();
-    this.db.prepare("DELETE FROM remote_tokens WHERE expires<=?").run(now);
+    this.db
+      .prepare("DELETE FROM remote_refresh_replays WHERE expires<=?")
+      .run(now);
+    this.db
+      .prepare(
+        "DELETE FROM remote_tokens WHERE (expires<>0 AND expires<=?) OR grant_id IN (SELECT id FROM remote_grants WHERE active=0)",
+      )
+      .run(now);
+    const expires = Math.min(now + 300000, grant.expires || Infinity);
     this.db
       .prepare("INSERT INTO remote_tokens VALUES (?,?,?,?,?)")
-      .run(
-        digest(access),
-        grant.id,
-        "access",
-        Math.min(now + 300000, grant.expires),
-        0,
-      );
+      .run(digest(access), grant.id, "access", expires, 0);
     this.db
       .prepare("INSERT INTO remote_tokens VALUES (?,?,?,?,?)")
       .run(digest(refresh), grant.id, "refresh", grant.expires, 0);
@@ -306,8 +313,42 @@ export class RemoteAgents {
       access_token: access,
       refresh_token: refresh,
       token_type: "Bearer",
-      expires_in: Math.min(300, Math.floor((grant.expires - now) / 1000)),
+      expires_in: Math.floor((expires - now) / 1000),
       scope: JSON.parse(grant.scope).join(" "),
+    };
+  }
+  retryRefresh(token, grant) {
+    // Follow any immediately rotated successors so delayed concurrent callers
+    // converge on the current token, rather than creating diverging families.
+    let response;
+    for (;;) {
+      const row = this.db
+        .prepare(
+          "SELECT * FROM remote_tokens WHERE hash=? AND grant_id=? AND kind='refresh'",
+        )
+        .get(digest(token), grant.id);
+      if (!row) return null;
+      if (!row.used) break;
+      const replay = this.db
+        .prepare(
+          "SELECT response FROM remote_refresh_replays WHERE hash=? AND expires>?",
+        )
+        .get(row.hash, this.agents.now());
+      if (!replay) return null;
+      response = openRefresh(token, grant.id, replay.response);
+      token = response.refresh_token;
+    }
+    const access = this.db
+      .prepare(
+        "SELECT expires FROM remote_tokens WHERE hash=? AND grant_id=? AND kind='access' AND expires>?",
+      )
+      .get(digest(response.access_token), grant.id, this.agents.now());
+    if (!access) return null;
+    return {
+      ...response,
+      expires_in: Math.floor(
+        (Number(access.expires) - this.agents.now()) / 1000,
+      ),
     };
   }
   exchange(form) {
@@ -336,24 +377,29 @@ export class RemoteAgents {
           Number(
             this.db
               .prepare(
-                "SELECT count(*) n FROM remote_grants WHERE principal=? AND active=1 AND expires>?",
+                "SELECT count(*) n FROM remote_grants WHERE principal=? AND active=1 AND (expires=0 OR expires>?)",
               )
               .get(row.principal, this.agents.now()).n,
           ) >= 100
         )
           invalid("temporarily_unavailable", 429);
-        const expires = this.agents.now() + 30 * 86400000;
-        const run = this.agents.startRecord(row.principal, row.agent, {
-          mode: "independent",
-          scope: [
-            {
-              space: "default",
-              actions: request.scopes.map((s) => scopeActions[s]),
-            },
-          ],
-          traceSpace: "default",
-          expires,
-        });
+        const expires = 0;
+        const run = this.agents.startRecord(
+          row.principal,
+          row.agent,
+          {
+            mode: "independent",
+            scope: [
+              {
+                space: "default",
+                actions: request.scopes.map((s) => scopeActions[s]),
+              },
+            ],
+            traceSpace: "default",
+            expires,
+          },
+          { untilRevoked: true },
+        );
         const id = randomUUID();
         this.db
           .prepare("INSERT INTO remote_grants VALUES (?,?,?,?,?,?,?,1,?)")
@@ -378,27 +424,42 @@ export class RemoteAgents {
       const token =
         this.db
           .prepare(
-            "SELECT * FROM remote_tokens WHERE hash=? AND kind='refresh' AND expires>?",
+            "SELECT * FROM remote_tokens WHERE hash=? AND kind='refresh' AND (expires=0 OR expires>?)",
           )
           .get(digest(form.get("refresh_token") || ""), this.agents.now()) ||
         invalid("invalid_grant");
       const grant = this.validGrant(token.grant_id);
       if (grant.client !== form.get("client_id")) invalid("invalid_grant");
-      if (token.used) {
-        this.db
-          .prepare("UPDATE remote_grants SET active=0 WHERE id=?")
-          .run(grant.id);
-        return null;
-      }
       if (
         form.has("scope") &&
         form.get("scope") !== JSON.parse(grant.scope).join(" ")
       )
         invalid("invalid_scope");
+      if (token.used) {
+        const retry = this.retryRefresh(form.get("refresh_token"), grant);
+        if (retry) return retry;
+        this.db
+          .prepare("UPDATE remote_grants SET active=0 WHERE id=?")
+          .run(grant.id);
+        this.db
+          .prepare("UPDATE agent_runs SET active=0 WHERE id=?")
+          .run(grant.run);
+        this.agents.record(grant.principal, "agent:refresh:replay", grant.id);
+        return null;
+      }
       this.db
         .prepare("UPDATE remote_tokens SET used=1 WHERE hash=?")
         .run(token.hash);
-      return this.issue(grant);
+      const response = this.issue(grant);
+      this.db
+        .prepare("INSERT INTO remote_refresh_replays VALUES (?,?,?)")
+        .run(
+          token.hash,
+          sealRefresh(form.get("refresh_token"), grant.id, response),
+          this.agents.now() + refreshRetryMs,
+        );
+      this.agents.record(grant.principal, "agent:refresh", grant.id);
+      return response;
     });
     return result || invalid("invalid_grant");
   }

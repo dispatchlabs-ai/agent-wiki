@@ -268,7 +268,7 @@ export function AgentConsent({
       h(
         "p",
         { className: "auth-help" },
-        "The connection lasts up to 30 days. You can revoke it in ",
+        "The connection stays authorized until you revoke it in ",
         h("a", { href: "/agents/" }, "Agents"),
         ". Each operation records you as the initiator and the agent as the actor.",
       ),

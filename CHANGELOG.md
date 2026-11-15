@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-15
+
+### Fixed
+
+- New native OAuth connections remain authorized until revoked. Access tokens still expire after five minutes; previously approved connections retain their original expiry.
+- Concurrent refreshes and retries within 30 seconds converge on the same rotated credentials, including after a server restart. Older token reuse still revokes the connection. Retry responses are encrypted using the presented token; bearer secrets are never stored in plaintext.
+
 ## [0.11.0] - 2026-11-08
 
 ### Added

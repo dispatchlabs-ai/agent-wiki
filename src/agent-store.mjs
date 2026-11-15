@@ -76,6 +76,7 @@ export class AgentStore {
       CREATE TABLE IF NOT EXISTS remote_codes(hash TEXT PRIMARY KEY, principal TEXT NOT NULL REFERENCES principals(id), agent TEXT NOT NULL REFERENCES agents(id), request TEXT NOT NULL, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS remote_grants(id TEXT PRIMARY KEY, client TEXT NOT NULL REFERENCES remote_clients(id), principal TEXT NOT NULL REFERENCES principals(id), agent TEXT NOT NULL REFERENCES agents(id), run TEXT NOT NULL REFERENCES agent_runs(id), scope TEXT NOT NULL, expires INTEGER NOT NULL, active INTEGER NOT NULL, audience TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS remote_tokens(hash TEXT PRIMARY KEY, grant_id TEXT NOT NULL REFERENCES remote_grants(id), kind TEXT NOT NULL, expires INTEGER NOT NULL, used INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS remote_refresh_replays(hash TEXT PRIMARY KEY REFERENCES remote_tokens(hash) ON DELETE CASCADE, response TEXT NOT NULL, expires INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS remote_token_expiry ON remote_tokens(expires);
       CREATE INDEX IF NOT EXISTS agent_token_expiry ON agent_tokens(expires);
     `);
@@ -422,9 +423,14 @@ export class AgentStore {
       this.startRecord(actor, agent, input),
     );
   }
-  startRecord(actor, agent, input) {
+  startRecord(actor, agent, input, { untilRevoked = false } = {}) {
     const entries = scope(input.scope),
-      expires = expiry(input.expires, this.now());
+      // Only the internal OAuth consent path can create an unbounded run.
+      // Zero represents "until revoked" in the existing NOT NULL schema.
+      expires =
+        untilRevoked && input.mode === "independent"
+          ? 0
+          : expiry(input.expires, this.now());
     if (!["delegated", "independent"].includes(input.mode))
       throw new WikiError(
         "INVALID_MODE",
@@ -487,7 +493,7 @@ export class AgentStore {
           JOIN agents a ON a.id=r.agent
           JOIN principals agent ON agent.id=a.id AND agent.active=1
           JOIN principals initiator ON initiator.id=r.initiator AND initiator.active=1
-          WHERE r.id=? AND r.active=1 AND r.expires>?
+          WHERE r.id=? AND r.active=1 AND (r.expires=0 OR r.expires>?)
           AND (a.owner=r.initiator OR EXISTS (
             SELECT 1 FROM agent_permissions p
             WHERE p.agent=r.agent AND p.principal=r.initiator AND p.permission='invoke'
@@ -758,7 +764,7 @@ export class AgentStore {
         `SELECT g.*,t.expires token_expires FROM remote_tokens t
         JOIN remote_grants g ON g.id=t.grant_id
         JOIN principals p ON p.id=g.principal AND p.kind='human' AND p.active=1
-        WHERE t.hash=? AND t.kind='access' AND t.expires>? AND g.expires>? AND g.active=1`,
+        WHERE t.hash=? AND t.kind='access' AND t.expires>? AND (g.expires=0 OR g.expires>?) AND g.active=1`,
       )
       .get(digest(token), this.now(), this.now());
     if (!row || audience !== row.audience) fail();
