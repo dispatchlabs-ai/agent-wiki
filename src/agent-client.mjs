@@ -178,7 +178,13 @@ export class AgentCredential {
 
 export async function connectAgent(config, options = {}) {
   const credential = new AgentCredential(config, options);
-  const client = new Client({ name: "agent-wiki-adapter", version: "1" });
+  const client = new Client(
+    { name: "agent-wiki-adapter", version: "1" },
+    // Modern HTTP cancels the individual request stream. The SDK's default
+    // legacy cancellation notification cannot reach a stateless request's
+    // handler. Negotiate modern serving while retaining legacy fallback.
+    { versionNegotiation: { mode: "auto" } },
+  );
   const transport = new StreamableHTTPClientTransport(
     new URL(config.endpoint),
     {

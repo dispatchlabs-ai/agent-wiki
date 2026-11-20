@@ -1,6 +1,7 @@
 #!/bin/sh
-# Portable clean-clone build, static checks, and production dependency audit.
+# Portable clean-clone build, static/integration checks, and dependency audit.
 set -eu
 npm ci
 npm run check
+npm test
 npm audit --omit=dev --audit-level=high
