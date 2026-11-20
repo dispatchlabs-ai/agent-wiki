@@ -11,6 +11,7 @@
     "check": "prettier --check . && npm run typecheck",
     "format": "prettier --write .",
     "typecheck": "tsc --project tsconfig.json",
+    "test": "node --test test/*.test.mjs",
     "build:ui": "node scripts/build-ui.mjs",
     "prepare": "npm run build:ui",
     "wiki": "node bin/wiki.mjs",
@@ -18,7 +19,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
-    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/server": "2.4.0",
     "@simplewebauthn/browser": "14.0.0",
